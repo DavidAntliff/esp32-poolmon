@@ -168,7 +168,7 @@ void sensor_task(void *pvParameter)
 
     // wait for wifi to initialise
     // TODO: do this properly
-    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    //vTaskDelay(10000 / portTICK_PERIOD_MS);
 
     // set up LED GPIO
     led_init();
@@ -189,7 +189,9 @@ void sensor_task(void *pvParameter)
 
     // associate devices on bus with DS18B20 device driver
     DS18B20_Info * device_infos[MAX_DEVICES] = {0};
+    taskENTER_CRITICAL(&myMutex);
     associate_ds18b20_devices(owb, device_rom_codes, device_infos, (num_devices < MAX_DEVICES) ? num_devices : MAX_DEVICES);
+    taskEXIT_CRITICAL(&myMutex);
 
     // blink the LED to indicate the number of devices detected:
     led_indicate_num_devices(num_devices);
@@ -363,8 +365,8 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             QueueHandle_t sensor_queue = xQueueCreate(2, sizeof(SensorReading));
 
             // priority of sending task should be lower than receiving task:
-            xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_queue, CONFIG_MQTT_PRIORITY, NULL);
-            //xTaskCreate(&publish_task, "publish_task", 4096, sensor_queue, CONFIG_MQTT_PRIORITY, NULL);
+            xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_queue, 4, NULL);
+            xTaskCreate(&publish_task, "publish_task", 4096, sensor_queue, 5, NULL);
 
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
