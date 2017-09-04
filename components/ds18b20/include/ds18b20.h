@@ -40,6 +40,9 @@
 extern "C" {
 #endif
 
+// Return this for readings that suffer CRC errors (msb=0x80, lsb=0x00)
+#define DS18B20_INVALID_READING (-2048.0f)
+
 /**
  * @brief Symbols for the supported temperature resolution of the device.
  */

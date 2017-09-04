@@ -269,7 +269,7 @@ static uint8_t _calc_crc_block(uint8_t crc, const uint8_t * buffer, size_t len)
     do
     {
         crc = _calc_crc(crc, *buffer++);
-        //ESP_LOGD(TAG, "crc 0x%02x, len %d", crc, len);
+        ESP_LOGD(TAG, "crc 0x%02x, len %d", crc, len);
     }
     while (--len > 0);
     return crc;

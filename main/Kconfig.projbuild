@@ -11,4 +11,16 @@ config ONE_WIRE_GPIO
 
 		GPIOs 35-39 are input-only so cannot be used to drive the One Wire Bus.
 
+config WIFI_SSID
+    string "WiFi SSID"
+    default "myssid"
+    help
+        SSID (network name) for the example to connect to.
+
+config WIFI_PASSWORD
+    string "WiFi Password"
+    default "mypassword"
+    help
+        WiFi password (WPA or WPA2) for the example to use.
+
 endmenu

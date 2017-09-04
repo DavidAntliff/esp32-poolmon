@@ -197,7 +197,7 @@ static Scratchpad _read_scratchpad(const DS18B20_Info * ds18b20_info, size_t cou
     {
         owb_write_byte(ds18b20_info->bus, DS18B20_FUNCTION_SCRATCHPAD_READ);
         owb_read_bytes(ds18b20_info->bus, (uint8_t *)&scratchpad, count);
-        esp_log_buffer_hex(TAG, &scratchpad, count);
+        //esp_log_buffer_hex(TAG, &scratchpad, count);
     }
     return scratchpad;
 }
@@ -214,7 +214,7 @@ static bool _write_scratchpad(const DS18B20_Info * ds18b20_info, const Scratchpa
             owb_write_byte(ds18b20_info->bus, DS18B20_FUNCTION_SCRATCHPAD_WRITE);
             owb_write_bytes(ds18b20_info->bus, (uint8_t *)&scratchpad->trigger_high, 3);
             ESP_LOGD(TAG, "scratchpad write 3 bytes:");
-            esp_log_buffer_hex(TAG, &scratchpad->trigger_high, 3);
+            //esp_log_buffer_hex(TAG, &scratchpad->trigger_high, 3);
             result = true;
 
             if (verify)
@@ -326,7 +326,7 @@ bool ds18b20_set_resolution(DS18B20_Info * ds18b20_info, DS18B20_RESOLUTION reso
             if (result)
             {
                 ds18b20_info->resolution = resolution;
-                ESP_LOGI(TAG, "Resolution set to %d bits", (int)resolution);
+                ESP_LOGD(TAG, "Resolution set to %d bits", (int)resolution);
             }
             else
             {
@@ -360,7 +360,7 @@ DS18B20_RESOLUTION ds18b20_read_resolution(DS18B20_Info * ds18b20_info)
         }
         else
         {
-            ESP_LOGI(TAG, "Resolution read as %d", resolution);
+            ESP_LOGD(TAG, "Resolution read as %d", resolution);
         }
     }
     return resolution;
@@ -371,7 +371,7 @@ bool ds18b20_convert(const DS18B20_Info * ds18b20_info)
     bool result = false;
     if (_is_init(ds18b20_info))
     {
-        OneWireBus * bus = ds18b20_info->bus;
+        const OneWireBus * bus = ds18b20_info->bus;
         if (_address_device(ds18b20_info))
         {
             // initiate a temperature measurement
@@ -408,7 +408,7 @@ float ds18b20_read_temp(const DS18B20_Info * ds18b20_info)
     float temp = 0.0f;
     if (_is_init(ds18b20_info))
     {
-        OneWireBus * bus = ds18b20_info->bus;
+        const OneWireBus * bus = ds18b20_info->bus;
         if (_address_device(ds18b20_info))
         {
             // read measurement
@@ -436,7 +436,8 @@ float ds18b20_read_temp(const DS18B20_Info * ds18b20_info)
                 if (owb_crc8_bytes(0, buffer, 9) != 0)
                 {
                     ESP_LOGE(TAG, "CRC failed");
-                    temp_LSB = temp_MSB = 0;
+                    temp_LSB = 0x00;
+                    temp_MSB = 0x80;
                 }
             }
 
