@@ -43,12 +43,16 @@
 #define MAX_DEVICES          (8)
 #define DS18B20_RESOLUTION   (DS18B20_RESOLUTION_10_BIT)
 #define SAMPLE_PERIOD        (4000)  // sensor sampling period in milliseconds
+#define PUBLISH_QUEUE_DEPTH  (16)
 
 #define TAG "poolmon"
 //static const char * TAG = "poolmon";
 
 static EventGroupHandle_t wifi_event_group;
 const static int CONNECTED_BIT = BIT0;
+
+// let's try a global variable for now
+static mqtt_client * client = NULL;
 
 typedef struct
 {
@@ -67,7 +71,7 @@ typedef struct
 typedef struct
 {
     int sensor_id;
-    float reading;
+    float value;
 } SensorReading;
 
 /**
@@ -202,13 +206,13 @@ void sensor_task(void *pvParameter)
                 {
                     SensorReading sensor_reading = {
                         .sensor_id = i,
-                        .reading = readings[i],
+                        .value = readings[i],
                     };
-//                    BaseType_t status = xQueueSendToBack(sensor_queue, &sensor_reading, 0);
-//                    if (status != pdPASS)
-//                    {
-//                        ESP_LOGE(TAG":sensor", "Could not send to queue");
-//                    }
+                    BaseType_t status = xQueueSendToBack(inputs->publish_queue, &sensor_reading, 0);
+                    if (status != pdPASS)
+                    {
+                        ESP_LOGE(TAG":sensor", "Could not send to queue");
+                    }
                 }
                 else
                 {
@@ -232,78 +236,153 @@ void sensor_task(void *pvParameter)
 // publish sensor readings
 void publish_task(void *pvParameter)
 {
-    QueueHandle_t sensor_queue = (QueueHandle_t)pvParameter;
+    QueueHandle_t publish_queue = (QueueHandle_t)pvParameter;
     ESP_LOGW(TAG":publish_task", "Core ID %d", xPortGetCoreID());
 
     while (1)
     {
-        if (uxQueueMessagesWaiting(sensor_queue) != 0)
-        {
-            ESP_LOGE(TAG":mqtt", "Queue should be empty!\n");
-        }
+        // Not necessarily true when using multiple cores:
+        //if (uxQueueMessagesWaiting(publish_queue) != 0)
+        //{
+        //    ESP_LOGE(TAG":mqtt", "Queue should be empty!\n");
+        //}
+
         SensorReading reading = {0};
-        BaseType_t sensor_queue_status = xQueueReceive(sensor_queue, &reading, portMAX_DELAY);
+        BaseType_t sensor_queue_status = xQueueReceive(publish_queue, &reading, portMAX_DELAY);
         if (sensor_queue_status == pdPASS)
         {
-            //ESP_LOGI(TAG":mqtt", "Received %d:%f", reading.sensor_id, reading.reading);
+            if (client != NULL)
+            {
+                ESP_LOGD(TAG":publish_task", "Received %d:%f", reading.sensor_id, reading.value);
+                char topic[64] = {0};
+                char value[8] = {0};
+                snprintf(topic, 64-1, "poolmon/sensor/%d", reading.sensor_id);
+                snprintf(value, 8-1, "%.3f", reading.value);
+                ESP_LOGI(TAG":publish_task", "Publish %s %s", topic, value);
+                mqtt_publish(client, topic, value, strlen(value), 0, 0);
+            }
+            else
+            {
+                ESP_LOGW(TAG":publish_task", "MQTT not ready - throw away");
+            }
         }
         else
         {
-            ESP_LOGE(TAG":mqtt", "Could not receive from queue");
+            ESP_LOGE(TAG":publish_task", "Could not receive from queue");
         }
     }
+
     vTaskDelete(NULL);
 }
 
 void connected_cb(void *self, void *params)
 {
     mqtt_client *client = (mqtt_client *)self;
-    mqtt_subscribe(client, "/espda", 0);
-    mqtt_publish(client, "/espda", "howdy!", 6, 0, 0);
+
+    // send a device status update
+    const char * value = "MQTT connected";
+    mqtt_publish(client, "poolmon/device/status", value, strlen(value), 0, 0);
+
+    // let's subscribe to poolmon/device/control
+    mqtt_subscribe(client, "poolmon/device/control/#", 0);
 }
+
 void disconnected_cb(void *self, void *params)
 {
-
 }
+
 void reconnect_cb(void *self, void *params)
 {
+    mqtt_client *client = (mqtt_client *)self;
 
+    // send a device status update
+    const char * value = "MQTT reconnected";
+    mqtt_publish(client, "poolmon/device/status", value, strlen(value), 0, 0);
 }
+
 void subscribe_cb(void *self, void *params)
 {
-    ESP_LOGI(TAG":mqtt", "[APP] Subscribe ok, test publish msg");
-    mqtt_client *client = (mqtt_client *)self;
-    mqtt_publish(client, "/espda", "abcde", 5, 0, 0);
+//    ESP_LOGI(TAG":mqtt", "[APP] Subscribe ok, test publish msg");
+//    mqtt_client *client = (mqtt_client *)self;
+//    mqtt_publish(client, "/espda", "abcde", 5, 0, 0);
 }
 
 void publish_cb(void *self, void *params)
 {
-
+    ESP_LOGI(TAG":mqtt", "[APP] Publish CB");
 }
+
 void data_cb(void *self, void *params)
 {
-    mqtt_client *client = (mqtt_client *)self;
+    //mqtt_client *client = (mqtt_client *)self;
     mqtt_event_data_t *event_data = (mqtt_event_data_t *)params;
 
-    if(event_data->data_offset == 0) {
-
+    if (event_data->data_offset == 0) {
         char *topic = malloc(event_data->topic_length + 1);
         memcpy(topic, event_data->topic, event_data->topic_length);
         topic[event_data->topic_length] = 0;
         ESP_LOGI(TAG":mqtt", "[APP] Publish topic: %s", topic);
+
+        char *data = malloc(event_data->data_length + 1);
+        memcpy(data, event_data->data, event_data->data_length);
+        data[event_data->data_length] = 0;
+
+        // data is null-terminated so can be treated like a string if required
+
+        ESP_LOGI(TAG":mqtt", "[APP] Publish data[%d/%d bytes]",
+                 event_data->data_length + event_data->data_offset,
+                 event_data->data_total_length);
+        esp_log_buffer_hex(TAG":mqtt", data, event_data->data_length + 1);
+
+        // Reboot command:
+        if (strcmp(topic, "poolmon/device/control/reboot") == 0)
+        {
+            int count = atoi(data);
+
+            // TODO: to do this properly, start a "reboot" task
+            // That way a reboot can be reissued or cancelled,
+            // and communication with the device is not lost.
+
+            while (count > 0)
+            {
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                ESP_LOGW(TAG, "[APP] Rebooting in %d seconds", count);
+                --count;
+            }
+
+            const char * value = "Rebooting";
+            mqtt_publish(client, "poolmon/device/status", value, strlen(value), 0, 0);
+
+            // wait another second or so for the MQTT message to go
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+            fflush(stdout);
+            esp_restart();
+        }
+
+        // TODO: control values:
+        //  - proper reboot scheduling
+        //  - sensor polling period (for all sensors)
+        //  - sensor resolution (per sensor)
+        //  - MQTT host name
+        //  - MQTT keep-alive duration
+        //  - log level
+
+        // TODO: status values:
+        //  - uptime
+        //  - number of sensors detected
+        //  - sensor errors (for each)
+        //  - sensor stats (min, max)
+        //
+
         free(topic);
+        free(data);
     }
-
-    // char *data = malloc(event_data->data_length + 1);
-    // memcpy(data, event_data->data, event_data->data_length);
-    // data[event_data->data_length] = 0;
-    ESP_LOGI(TAG":mqtt", "[APP] Publish data[%d/%d bytes]",
-             event_data->data_length + event_data->data_offset,
-             event_data->data_total_length);
-    // data);
-
-    // free(data);
-
+    else
+    {
+        // TODO: how do we deal with this? When does it occur?
+        ESP_LOGW(TAG":mqtt", "event_data->data_offset is not zero: %d", event_data->data_offset);
+    }
 }
 
 mqtt_settings settings = {
@@ -342,15 +421,7 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
 
             //init app here
-            mqtt_start(&settings);
-
-//            // create a queue for sensor readings
-//            QueueHandle_t sensor_queue = xQueueCreate(2, sizeof(SensorReading));
-//
-//            // priority of sending task should be lower than receiving task:
-//            xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_queue, 4, NULL);
-//            xTaskCreate(&publish_task, "publish_task", 4096, sensor_queue, 5, NULL);
-
+            client = mqtt_start(&settings);
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             /* This is a workaround as ESP32 WiFi libs don't currently
@@ -358,6 +429,7 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             esp_wifi_connect();
             mqtt_stop();
             xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+            client = NULL;
             break;
         default:
             break;
@@ -429,15 +501,14 @@ void app_main()
 
     // Create a queue for the sensor task to publish sensor readings
     // (Priority of sending task should be lower than receiving task)
-    QueueHandle_t publish_queue = xQueueCreate(2, sizeof(SensorReading));
+    QueueHandle_t publish_queue = xQueueCreate(PUBLISH_QUEUE_DEPTH, sizeof(SensorReading));
 
     SensorTaskInputs sensor_task_inputs = {
         .sensors = &sensors,
         .publish_queue = publish_queue,
     };
     xTaskCreate(&sensor_task, "sensor_task", 4096, &sensor_task_inputs, CONFIG_MQTT_PRIORITY - 1, NULL);
-
-//    xTaskCreate(&publish_task, "publish_task", 4096, sensor_queue, CONFIG_MQTT_PRIORITY, NULL);
+    xTaskCreate(&publish_task, "publish_task", 4096, publish_queue, CONFIG_MQTT_PRIORITY, NULL);
 
 //    nvs_flash_init();
     wifi_conn_init();
