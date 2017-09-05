@@ -1,0 +1,9 @@
+[submodule "components/espmqtt"]
+	path = components/espmqtt
+	url = https://github.com/DavidAntliff/espmqtt.git
+[submodule "components/esp32-ds18b20"]
+	path = components/esp32-ds18b20
+	url = https://github.com/DavidAntliff/esp32-ds18b20.git
+[submodule "components/esp32-owb"]
+	path = components/esp32-owb
+	url = https://github.com/DavidAntliff/esp32-owb.git

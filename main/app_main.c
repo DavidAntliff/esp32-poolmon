@@ -42,13 +42,27 @@
 #define GPIO_ONE_WIRE        (CONFIG_ONE_WIRE_GPIO)
 #define MAX_DEVICES          (8)
 #define DS18B20_RESOLUTION   (DS18B20_RESOLUTION_10_BIT)
-#define SAMPLE_PERIOD        (10000)  // sensor sampling period in milliseconds
+#define SAMPLE_PERIOD        (4000)  // sensor sampling period in milliseconds
 
 #define TAG "poolmon"
 //static const char * TAG = "poolmon";
 
 static EventGroupHandle_t wifi_event_group;
 const static int CONNECTED_BIT = BIT0;
+
+typedef struct
+{
+    OneWireBus * owb;
+    OneWireBus_ROMCode * rom_codes;
+    DS18B20_Info ** ds18b20_infos;
+    int num_ds18b20s;
+} Sensors;
+
+typedef struct
+{
+    Sensors * sensors;
+    QueueHandle_t publish_queue;
+} SensorTaskInputs;
 
 typedef struct
 {
@@ -140,12 +154,7 @@ void led_indicate_num_devices(int num_devices)
 
 void read_temperatures(DS18B20_Info ** device_infos, float * readings, int num_devices)
 {
-    portMUX_TYPE myMutex = portMUX_INITIALIZER_UNLOCKED;
-
-    // timing-critical
-    taskENTER_CRITICAL(&myMutex);
     ds18b20_convert_all(device_infos[0]->bus);
-    taskEXIT_CRITICAL(&myMutex);
 
     // in this application all devices use the same resolution,
     // so use the first device to determine the delay
@@ -155,50 +164,21 @@ void read_temperatures(DS18B20_Info ** device_infos, float * readings, int num_d
     // (using printf before reading may take too long)
     for (int i = 0; i < num_devices; ++i)
     {
-        // timing-critical
-        taskENTER_CRITICAL(&myMutex);
         readings[i] = ds18b20_read_temp(device_infos[i]);
-        taskEXIT_CRITICAL(&myMutex);
     }
 }
 
 void sensor_task(void *pvParameter)
 {
-    QueueHandle_t sensor_queue = (QueueHandle_t)pvParameter;
+    SensorTaskInputs * inputs = (SensorTaskInputs *)pvParameter;
+    int sample_count = 0;
 
-    // wait for wifi to initialise
-    // TODO: do this properly
-    //vTaskDelay(10000 / portTICK_PERIOD_MS);
+    ESP_LOGW(TAG":sensor_task", "Core ID %d", xPortGetCoreID());
 
-    // set up LED GPIO
-    led_init();
-
-    // set up the One Wire Bus
-    OneWireBus * owb = owb_malloc();
-    owb_init(owb, GPIO_ONE_WIRE);
-    owb_use_crc(owb, true);       // enable CRC check for ROM code
-
-    // locate attached devices
-    OneWireBus_ROMCode device_rom_codes[MAX_DEVICES] = {0};
-
-    // timing-critical
-    portMUX_TYPE myMutex = portMUX_INITIALIZER_UNLOCKED;
-    taskENTER_CRITICAL(&myMutex);
-    int num_devices = find_owb_rom_codes(owb, device_rom_codes, MAX_DEVICES);
-    taskEXIT_CRITICAL(&myMutex);
-
-    // associate devices on bus with DS18B20 device driver
-    DS18B20_Info * device_infos[MAX_DEVICES] = {0};
-    taskENTER_CRITICAL(&myMutex);
-    associate_ds18b20_devices(owb, device_rom_codes, device_infos, (num_devices < MAX_DEVICES) ? num_devices : MAX_DEVICES);
-    taskEXIT_CRITICAL(&myMutex);
-
-    // blink the LED to indicate the number of devices detected:
-    led_indicate_num_devices(num_devices);
-
-    if (num_devices > 0)
+    int errors[MAX_DEVICES] = {0};
+    if (inputs->sensors->num_ds18b20s > 0)
     {
-        // wait a second before starting sampling
+        // wait a second before starting commencing sampling
         vTaskDelay(1000 / portTICK_PERIOD_MS);
 
         while (1)
@@ -208,16 +188,15 @@ void sensor_task(void *pvParameter)
             led_on();
 
             float readings[MAX_DEVICES] = { 0 };
-            read_temperatures(device_infos, readings, num_devices);
+            read_temperatures(inputs->sensors->ds18b20_infos, readings, inputs->sensors->num_ds18b20s);
+            ++sample_count;
 
             led_off();
 
             // print results in a separate loop, after all have been read
-            printf("\nTemperature readings (degrees C):\n");
-            for (int i = 0; i < num_devices; ++i)
+            printf("\nTemperature readings (degrees C): sample %d\n", sample_count);
+            for (int i = 0; i < inputs->sensors->num_ds18b20s; ++i)
             {
-                printf("  %d: %.1f\n", i, readings[i]);
-
                 // filter out invalid readings
                 if (readings[i] != DS18B20_INVALID_READING)
                 {
@@ -231,19 +210,21 @@ void sensor_task(void *pvParameter)
 //                        ESP_LOGE(TAG":sensor", "Could not send to queue");
 //                    }
                 }
+                else
+                {
+                    ++errors[i];
+                }
+                printf("  %d: %.1f    %d errors\n", i, readings[i], errors[i]);
             }
 
             // make up delay to approximate sample period
             vTaskDelay(SAMPLE_PERIOD / portTICK_PERIOD_MS - (xTaskGetTickCount() - start_ticks));
         }
     }
-
-    // clean up dynamically allocated data
-    for (int i = 0; i < num_devices; ++i)
+    else
     {
-        ds18b20_free(&device_infos[i]);
+        ESP_LOGE(TAG, "No devices found");
     }
-    owb_free(&owb);
 
     vTaskDelete(NULL);
 }
@@ -252,6 +233,7 @@ void sensor_task(void *pvParameter)
 void publish_task(void *pvParameter)
 {
     QueueHandle_t sensor_queue = (QueueHandle_t)pvParameter;
+    ESP_LOGW(TAG":publish_task", "Core ID %d", xPortGetCoreID());
 
     while (1)
     {
@@ -358,15 +340,16 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             break;
         case SYSTEM_EVENT_STA_GOT_IP:
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
-            mqtt_start(&settings);
+
             //init app here
+            mqtt_start(&settings);
 
-            // create a queue for sensor readings
-            QueueHandle_t sensor_queue = xQueueCreate(2, sizeof(SensorReading));
-
-            // priority of sending task should be lower than receiving task:
-            xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_queue, 4, NULL);
-            xTaskCreate(&publish_task, "publish_task", 4096, sensor_queue, 5, NULL);
+//            // create a queue for sensor readings
+//            QueueHandle_t sensor_queue = xQueueCreate(2, sizeof(SensorReading));
+//
+//            // priority of sending task should be lower than receiving task:
+//            xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_queue, 4, NULL);
+//            xTaskCreate(&publish_task, "publish_task", 4096, sensor_queue, 5, NULL);
 
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -402,19 +385,73 @@ static void wifi_conn_init(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
+Sensors detect_sensors(void)
+{
+    // set up the One Wire Bus
+    OneWireBus * owb = owb_malloc();
+    owb_init(owb, GPIO_ONE_WIRE);
+    owb_use_crc(owb, true);       // enable CRC check for ROM code
+
+    // locate attached devices
+    OneWireBus_ROMCode * device_rom_codes = calloc(MAX_DEVICES, sizeof(*device_rom_codes));
+
+    int num_devices = find_owb_rom_codes(owb, device_rom_codes, MAX_DEVICES);
+
+    // free up unused space
+    device_rom_codes = realloc(device_rom_codes, num_devices * sizeof(*device_rom_codes));
+
+    // associate devices on bus with DS18B20 device driver
+    DS18B20_Info ** device_infos = calloc(num_devices, sizeof(*device_infos));
+    associate_ds18b20_devices(owb, device_rom_codes, device_infos, num_devices);
+
+    Sensors sensors = {
+        .owb = owb,
+        .rom_codes = device_rom_codes,
+        .ds18b20_infos = device_infos,
+        .num_ds18b20s = num_devices,
+    };
+    return sensors;
+}
+
 void app_main()
 {
     esp_log_level_set("*", ESP_LOG_INFO);
 
     ESP_LOGI(TAG, "[APP] Startup..");
+    led_init();
 
-//    // create a queue for sensor readings
-//    QueueHandle_t sensor_queue = xQueueCreate(2, sizeof(SensorReading));
-//
-//    // priority of sending task should be lower than receiving task:
-//    xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_queue, CONFIG_MQTT_PRIORITY - 1, NULL);
+    // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
+    // Assume that new devices are not connected during operation.
+    Sensors sensors = detect_sensors();
+
+    // Blink the LED to indicate the number of devices detected:
+    led_indicate_num_devices(sensors.num_ds18b20s);
+
+    // Create a queue for the sensor task to publish sensor readings
+    // (Priority of sending task should be lower than receiving task)
+    QueueHandle_t publish_queue = xQueueCreate(2, sizeof(SensorReading));
+
+    SensorTaskInputs sensor_task_inputs = {
+        .sensors = &sensors,
+        .publish_queue = publish_queue,
+    };
+    xTaskCreate(&sensor_task, "sensor_task", 4096, &sensor_task_inputs, CONFIG_MQTT_PRIORITY - 1, NULL);
+
 //    xTaskCreate(&publish_task, "publish_task", 4096, sensor_queue, CONFIG_MQTT_PRIORITY, NULL);
 
 //    nvs_flash_init();
     wifi_conn_init();
+
+    // Run forever...
+    while(1)
+        ;
+
+    // clean up dynamically allocated data
+    free(sensors.rom_codes);
+    for (int i = 0; i < sensors.num_ds18b20s; ++i)
+    {
+        ds18b20_free(&(sensors.ds18b20_infos[i]));
+    }
+    free(sensors.ds18b20_infos);
+    owb_free(&(sensors.owb));
 }

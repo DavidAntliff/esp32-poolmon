@@ -5,6 +5,6 @@
 
 VERBOSE := 1
 
-PROJECT_NAME := poolmon-esp32
+PROJECT_NAME := esp32-poolmon
 
 include $(IDF_PATH)/make/project.mk
