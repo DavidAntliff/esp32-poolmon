@@ -251,6 +251,8 @@ void publish_task(void *pvParameter)
         BaseType_t sensor_queue_status = xQueueReceive(publish_queue, &reading, portMAX_DELAY);
         if (sensor_queue_status == pdPASS)
         {
+            // TODO: we need a more reliable way to know that the client is valid,
+            // as attempting to publish when the client has died causes a crash.
             if (client != NULL)
             {
                 ESP_LOGD(TAG":publish_task", "Received %d:%f", reading.sensor_id, reading.value);
