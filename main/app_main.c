@@ -34,248 +34,34 @@
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
-#include "owb.h"
-#include "ds18b20.h"
+#include "led.h"
 #include "mqtt.h"
+#include "sensor_temp.h"
+#include "sensor_flow.h"
+#include "publish.h"
 
 #define GPIO_LED             (GPIO_NUM_2)
 #define GPIO_ONE_WIRE        (CONFIG_ONE_WIRE_GPIO)
-#define MAX_DEVICES          (8)
-#define DS18B20_RESOLUTION   (DS18B20_RESOLUTION_10_BIT)
-#define SAMPLE_PERIOD        (4000)  // sensor sampling period in milliseconds
+
 #define PUBLISH_QUEUE_DEPTH  (16)
 
 #define TAG "poolmon"
-//static const char * TAG = "poolmon";
 
 static EventGroupHandle_t wifi_event_group;
 const static int CONNECTED_BIT = BIT0;
 
 // let's try a global variable for now
-static mqtt_client * client = NULL;
+mqtt_client * g_client = NULL;
 
-typedef struct
-{
-    OneWireBus * owb;
-    OneWireBus_ROMCode * rom_codes;
-    DS18B20_Info ** ds18b20_infos;
-    int num_ds18b20s;
-} Sensors;
-
-typedef struct
-{
-    Sensors * sensors;
-    QueueHandle_t publish_queue;
-} SensorTaskInputs;
-
-typedef struct
-{
-    int sensor_id;
-    float value;
-} SensorReading;
-
-/**
- * @brief Find all (or the first N) ROM codes for devices connected to the One Wire Bus.
- * @param[in] owb Pointer to initialised bus instance.
- * @param[in] devices A pre-existing array of ROM code structures, sufficient to hold max_devices entries.
- * @param[in] max_devices Maximum number of ROM codes to find.
- * @return Number of ROM codes found, or zero if no devices found.
- */
-static int find_owb_rom_codes(const OneWireBus * owb, OneWireBus_ROMCode * rom_codes, int max_codes)
-{
-    int num_devices = 0;
-    OneWireBus_SearchState search_state = {0};
-    bool found = owb_search_first(owb, &search_state);
-
-    ESP_LOGI(TAG, "Find devices:");
-    while (found && num_devices <= max_codes)
-    {
-        char rom_code_s[17];
-        owb_string_from_rom_code(search_state.rom_code, rom_code_s, sizeof(rom_code_s));
-        ESP_LOGI(TAG, "  %d : %s", num_devices, rom_code_s);
-        rom_codes[num_devices] = search_state.rom_code;
-        ++num_devices;
-        found = owb_search_next(owb, &search_state);
-    }
-    return num_devices;
-}
-
-static void associate_ds18b20_devices(const OneWireBus * owb,
-                                      const OneWireBus_ROMCode * rom_codes,
-                                      DS18B20_Info ** device_infos,
-                                      int num_devices)
-{
-    for (int i = 0; i < num_devices; ++i)
-    {
-        DS18B20_Info * ds18b20_info = ds18b20_malloc();
-        device_infos[i] = ds18b20_info;
-
-        if (num_devices == 1)
-        {
-            ESP_LOGD(TAG, "Single device optimisations enabled");
-            ds18b20_init_solo(ds18b20_info, owb);          // only one device on bus
-        }
-        else
-        {
-            ds18b20_init(ds18b20_info, owb, rom_codes[i]); // associate with bus and device
-        }
-        ds18b20_use_crc(ds18b20_info, true);           // enable CRC check for temperature readings
-        ds18b20_set_resolution(ds18b20_info, DS18B20_RESOLUTION);
-    }
-}
 
 //TODO: LED task, to blink LED when required
 // - count number of connected devices
 // - indicate when sampling
 // - indicate MQTT connection state
 // - indicate MQTT activity (publish, receive)
-void led_init(void)
-{
-    gpio_pad_select_gpio(GPIO_LED);
-    gpio_set_direction(GPIO_LED, GPIO_MODE_OUTPUT);
-}
 
-void led_on(void)
-{
-    gpio_set_level(GPIO_LED, 1);
-}
 
-void led_off(void)
-{
-    gpio_set_level(GPIO_LED, 0);
-}
 
-void led_indicate_num_devices(int num_devices)
-{
-    for (int i = 0; i < num_devices; ++i)
-    {
-        led_on();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        led_off();
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-    }
-}
-
-void read_temperatures(DS18B20_Info ** device_infos, float * readings, int num_devices)
-{
-    ds18b20_convert_all(device_infos[0]->bus);
-
-    // in this application all devices use the same resolution,
-    // so use the first device to determine the delay
-    ds18b20_wait_for_conversion(device_infos[0]);
-
-    // read the results immediately after conversion otherwise it may fail
-    // (using printf before reading may take too long)
-    for (int i = 0; i < num_devices; ++i)
-    {
-        readings[i] = ds18b20_read_temp(device_infos[i]);
-    }
-}
-
-void sensor_task(void *pvParameter)
-{
-    SensorTaskInputs * inputs = (SensorTaskInputs *)pvParameter;
-    int sample_count = 0;
-
-    ESP_LOGW(TAG":sensor_task", "Core ID %d", xPortGetCoreID());
-
-    int errors[MAX_DEVICES] = {0};
-    if (inputs->sensors->num_ds18b20s > 0)
-    {
-        // wait a second before starting commencing sampling
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-        while (1)
-        {
-            TickType_t start_ticks = xTaskGetTickCount();
-
-            led_on();
-
-            float readings[MAX_DEVICES] = { 0 };
-            read_temperatures(inputs->sensors->ds18b20_infos, readings, inputs->sensors->num_ds18b20s);
-            ++sample_count;
-
-            led_off();
-
-            // print results in a separate loop, after all have been read
-            printf("\nTemperature readings (degrees C): sample %d\n", sample_count);
-            for (int i = 0; i < inputs->sensors->num_ds18b20s; ++i)
-            {
-                // filter out invalid readings
-                if (readings[i] != DS18B20_INVALID_READING)
-                {
-                    SensorReading sensor_reading = {
-                        .sensor_id = i,
-                        .value = readings[i],
-                    };
-                    BaseType_t status = xQueueSendToBack(inputs->publish_queue, &sensor_reading, 0);
-                    if (status != pdPASS)
-                    {
-                        ESP_LOGE(TAG":sensor", "Could not send to queue");
-                    }
-                }
-                else
-                {
-                    ++errors[i];
-                }
-                printf("  %d: %.1f    %d errors\n", i, readings[i], errors[i]);
-            }
-
-            // make up delay to approximate sample period
-            vTaskDelay(SAMPLE_PERIOD / portTICK_PERIOD_MS - (xTaskGetTickCount() - start_ticks));
-        }
-    }
-    else
-    {
-        ESP_LOGE(TAG, "No devices found");
-    }
-
-    vTaskDelete(NULL);
-}
-
-// publish sensor readings
-void publish_task(void *pvParameter)
-{
-    QueueHandle_t publish_queue = (QueueHandle_t)pvParameter;
-    ESP_LOGW(TAG":publish_task", "Core ID %d", xPortGetCoreID());
-
-    while (1)
-    {
-        // Not necessarily true when using multiple cores:
-        //if (uxQueueMessagesWaiting(publish_queue) != 0)
-        //{
-        //    ESP_LOGE(TAG":mqtt", "Queue should be empty!\n");
-        //}
-
-        SensorReading reading = {0};
-        BaseType_t sensor_queue_status = xQueueReceive(publish_queue, &reading, portMAX_DELAY);
-        if (sensor_queue_status == pdPASS)
-        {
-            // TODO: we need a more reliable way to know that the client is valid,
-            // as attempting to publish when the client has died causes a crash.
-            if (client != NULL)
-            {
-                ESP_LOGD(TAG":publish_task", "Received %d:%f", reading.sensor_id, reading.value);
-                char topic[64] = {0};
-                char value[8] = {0};
-                snprintf(topic, 64-1, "poolmon/sensor/%d", reading.sensor_id);
-                snprintf(value, 8-1, "%.3f", reading.value);
-                ESP_LOGI(TAG":publish_task", "Publish %s %s", topic, value);
-                mqtt_publish(client, topic, value, strlen(value), 0, 0);
-            }
-            else
-            {
-                ESP_LOGW(TAG":publish_task", "MQTT not ready - throw away");
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG":publish_task", "Could not receive from queue");
-        }
-    }
-
-    vTaskDelete(NULL);
-}
 
 void connected_cb(void *self, void *params)
 {
@@ -353,7 +139,7 @@ void data_cb(void *self, void *params)
             }
 
             const char * value = "Rebooting";
-            mqtt_publish(client, "poolmon/device/status", value, strlen(value), 0, 0);
+            mqtt_publish(g_client, "poolmon/device/status", value, strlen(value), 0, 0);
 
             // wait another second or so for the MQTT message to go
             vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -423,15 +209,15 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
 
             //init app here
-            client = mqtt_start(&settings);
+            g_client = mqtt_start(&settings);
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             /* This is a workaround as ESP32 WiFi libs don't currently
                auto-reassociate. */
+            g_client = NULL;
             esp_wifi_connect();
             mqtt_stop();
             xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
-            client = NULL;
             break;
         default:
             break;
@@ -459,58 +245,22 @@ static void wifi_conn_init(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-Sensors detect_sensors(void)
-{
-    // set up the One Wire Bus
-    OneWireBus * owb = owb_malloc();
-    owb_init(owb, GPIO_ONE_WIRE);
-    owb_use_crc(owb, true);       // enable CRC check for ROM code
-
-    // locate attached devices
-    OneWireBus_ROMCode * device_rom_codes = calloc(MAX_DEVICES, sizeof(*device_rom_codes));
-
-    int num_devices = find_owb_rom_codes(owb, device_rom_codes, MAX_DEVICES);
-
-    // free up unused space
-    device_rom_codes = realloc(device_rom_codes, num_devices * sizeof(*device_rom_codes));
-
-    // associate devices on bus with DS18B20 device driver
-    DS18B20_Info ** device_infos = calloc(num_devices, sizeof(*device_infos));
-    associate_ds18b20_devices(owb, device_rom_codes, device_infos, num_devices);
-
-    Sensors sensors = {
-        .owb = owb,
-        .rom_codes = device_rom_codes,
-        .ds18b20_infos = device_infos,
-        .num_ds18b20s = num_devices,
-    };
-    return sensors;
-}
-
 void app_main()
 {
     esp_log_level_set("*", ESP_LOG_INFO);
 
     ESP_LOGI(TAG, "[APP] Startup..");
-    led_init();
+    led_init(GPIO_LED);
+
+    // Priority of queue consumer should be higher than producers
+    UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;
+    UBaseType_t sensor_priority = publish_priority - 1;
+
+    QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
-    // Assume that new devices are not connected during operation.
-    Sensors sensors = detect_sensors();
-
-    // Blink the LED to indicate the number of devices detected:
-    led_indicate_num_devices(sensors.num_ds18b20s);
-
-    // Create a queue for the sensor task to publish sensor readings
-    // (Priority of sending task should be lower than receiving task)
-    QueueHandle_t publish_queue = xQueueCreate(PUBLISH_QUEUE_DEPTH, sizeof(SensorReading));
-
-    SensorTaskInputs sensor_task_inputs = {
-        .sensors = &sensors,
-        .publish_queue = publish_queue,
-    };
-    xTaskCreate(&sensor_task, "sensor_task", 4096, &sensor_task_inputs, CONFIG_MQTT_PRIORITY - 1, NULL);
-    xTaskCreate(&publish_task, "publish_task", 4096, publish_queue, CONFIG_MQTT_PRIORITY, NULL);
+    TempSensors * temp_sensors = sensor_temp_init(GPIO_ONE_WIRE, sensor_priority, publish_queue);
+    //sensor_flow_init();
 
 //    nvs_flash_init();
     wifi_conn_init();
@@ -519,12 +269,6 @@ void app_main()
     while(1)
         ;
 
-    // clean up dynamically allocated data
-    free(sensors.rom_codes);
-    for (int i = 0; i < sensors.num_ds18b20s; ++i)
-    {
-        ds18b20_free(&(sensors.ds18b20_infos[i]));
-    }
-    free(sensors.ds18b20_infos);
-    owb_free(&(sensors.owb));
+    sensor_temp_close(temp_sensors);
+    //sensor_flow_close();
 }

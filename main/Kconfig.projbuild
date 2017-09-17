@@ -1,4 +1,4 @@
-menu "PoolMon-ESP32 Configuration"
+menu "esp32-poolmon Configuration"
 
 config ONE_WIRE_GPIO
     int "OneWire GPIO number"
