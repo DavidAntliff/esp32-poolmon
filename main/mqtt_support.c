@@ -30,6 +30,7 @@
 
 #include "mqtt_support.h"
 #include "mqtt.h"
+#include "hardware.h"
 
 #define TAG "mqtt_support"
 
@@ -42,10 +43,11 @@ void connected_cb(void *self, void *params)
 
     // send a device status update
     const char * value = "MQTT connected";
-    mqtt_publish(client, "poolmon/device/status", value, strlen(value), 0, 0);
+    mqtt_publish(client, "nodered/status", value, strlen(value), 0, 0);
 
-    // let's subscribe to poolmon/device/control
-    mqtt_subscribe(client, "poolmon/device/control/#", 0);
+    // subscribe
+    mqtt_subscribe(client, "nodered/blue", 0);
+    mqtt_subscribe(client, "nodered/green", 0);
 }
 
 void disconnected_cb(void *self, void *params)
@@ -58,7 +60,7 @@ void reconnect_cb(void *self, void *params)
 
     // send a device status update
     const char * value = "MQTT reconnected";
-    mqtt_publish(client, "poolmon/device/status", value, strlen(value), 0, 0);
+    mqtt_publish(client, "nodered/status", value, strlen(value), 0, 0);
 }
 
 void subscribe_cb(void *self, void *params)
@@ -95,46 +97,16 @@ void data_cb(void *self, void *params)
                  event_data->data_total_length);
         esp_log_buffer_hex(TAG":mqtt", data, event_data->data_length + 1);
 
-        // Reboot command:
-        if (strcmp(topic, "poolmon/device/control/reboot") == 0)
+        if (strcmp(topic, "nodered/blue") == 0)
         {
-            int count = atoi(data);
-
-            // TODO: to do this properly, start a "reboot" task
-            // That way a reboot can be reissued or cancelled,
-            // and communication with the device is not lost.
-
-            while (count > 0)
-            {
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
-                ESP_LOGW(TAG, "[APP] Rebooting in %d seconds", count);
-                --count;
-            }
-
-            const char * value = "Rebooting";
-            mqtt_publish(g_client, "poolmon/device/status", value, strlen(value), 0, 0);
-
-            // wait another second or so for the MQTT message to go
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-            fflush(stdout);
-            esp_restart();
+            int enable = atoi(data);
+            gpio_set_level(GPIO_BLUE_LED, enable);
         }
-
-        // TODO: control values:
-        //  - proper reboot scheduling
-        //  - sensor polling period (for all sensors)
-        //  - sensor resolution (per sensor)
-        //  - MQTT host name
-        //  - MQTT keep-alive duration
-        //  - log level
-
-        // TODO: status values:
-        //  - uptime
-        //  - number of sensors detected
-        //  - sensor errors (for each)
-        //  - sensor stats (min, max)
-        //
+        else if (strcmp(topic, "nodered/green") == 0)
+        {
+            int enable = atoi(data);
+            gpio_set_level(GPIO_GREEN_LED, enable);
+        }
 
         free(topic);
         free(data);

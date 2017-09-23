@@ -59,7 +59,7 @@ static void publish_task(void * pvParameter)
                 ESP_LOGD(TAG":publish_task", "Received %d:%f", reading.sensor_id, reading.value);
                 char topic[64] = {0};
                 char value[8] = {0};
-                snprintf(topic, 64-1, "poolmon/sensor/%d", reading.sensor_id);
+                snprintf(topic, 64-1, "nodered/temp");
                 snprintf(value, 8-1, "%.3f", reading.value);
                 ESP_LOGI(TAG":publish_task", "Publish %s %s", topic, value);
                 mqtt_publish(g_client, topic, value, strlen(value), 0, 0);
