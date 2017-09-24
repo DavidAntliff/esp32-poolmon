@@ -102,12 +102,12 @@ void app_main()
     // green LED init
     gpio_pad_select_gpio(GPIO_GREEN_LED);
     gpio_set_direction(GPIO_GREEN_LED, GPIO_MODE_OUTPUT);
-    gpio_set_level(GPIO_GREEN_LED, 0);
+    gpio_set_level(GPIO_GREEN_LED, 1);
 
     // blue LED init
     gpio_pad_select_gpio(GPIO_BLUE_LED);
     gpio_set_direction(GPIO_BLUE_LED, GPIO_MODE_OUTPUT);
-    gpio_set_level(GPIO_BLUE_LED, 0);
+    gpio_set_level(GPIO_BLUE_LED, 1);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;
