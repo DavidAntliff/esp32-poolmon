@@ -35,6 +35,7 @@
 #include "sensor_flow.h"
 #include "publish.h"
 #include "wifi_support.h"
+#include "avr_support.h"
 
 #define GPIO_LED             (GPIO_NUM_2)
 #define GPIO_ONE_WIRE        (CONFIG_ONE_WIRE_GPIO)
@@ -63,12 +64,14 @@ void app_main()
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;
     UBaseType_t sensor_priority = publish_priority - 1;
+    UBaseType_t avr_priority = sensor_priority;
 
     QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
     TempSensors * temp_sensors = sensor_temp_init(GPIO_ONE_WIRE, sensor_priority, publish_queue);
     //sensor_flow_init();
+    avr_support_init(avr_priority);
 
     //    nvs_flash_init();
     wifi_support_init();

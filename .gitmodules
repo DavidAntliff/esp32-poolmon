@@ -7,3 +7,6 @@
 [submodule "components/esp32-owb"]
 	path = components/esp32-owb
 	url = https://github.com/DavidAntliff/esp32-owb.git
+[submodule "components/esp32-smbus"]
+	path = components/esp32-smbus
+	url = https://github.com/DavidAntliff/esp32-smbus.git
