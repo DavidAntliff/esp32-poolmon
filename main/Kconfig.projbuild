@@ -15,7 +15,7 @@ config WIFI_PASSWORD
 config ONE_WIRE_GPIO
     int "OneWire GPIO number"
     range 0 34
-    default 5
+    default 4
     help
         GPIO number (IOxx) to access One Wire Bus.
 

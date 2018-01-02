@@ -1,0 +1,71 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2018 David Antliff
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#include "i2c_master.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "esp_system.h"
+#include "driver/i2c.h"
+#include "esp_log.h"
+
+
+#define TAG "i2c"
+
+void i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed)
+{
+    i2c_config_t conf;
+    conf.mode = I2C_MODE_MASTER;
+    conf.sda_io_num = sda_io_num;
+    conf.sda_pullup_en = GPIO_PULLUP_DISABLE;  // use external pullups
+    conf.scl_io_num = scl_io_num;
+    conf.scl_pullup_en = GPIO_PULLUP_DISABLE;  // use external pullups
+    conf.master.clk_speed = clk_speed;         // Hz
+    i2c_param_config(i2c_port, &conf);
+    i2c_driver_install(i2c_port, conf.mode,
+                       I2C_MASTER_RX_BUF_LEN,
+                       I2C_MASTER_TX_BUF_LEN, 0);
+}
+
+int i2c_scan(i2c_port_t i2c_num)
+{
+    int num_detected = 0;
+    for (int address = 1; address < 0x7f; ++address)
+    {
+        i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+        i2c_master_start(cmd);
+        i2c_master_write_byte(cmd, address << 1, true /*ACK_CHECK*/);
+        i2c_master_stop(cmd);
+        esp_err_t err = i2c_master_cmd_begin(i2c_num, cmd, (1000 / portTICK_RATE_MS));
+        //ESP_LOGI(TAG, "address 0x%02x %d", address, err);
+        if (err == 0)
+        {
+            ++num_detected;
+            ESP_LOGI(TAG, "detected I2C address on master %d at address 0x%02x", i2c_num, address);
+        }
+        i2c_cmd_link_delete(cmd);
+    }
+    return num_detected;
+}
