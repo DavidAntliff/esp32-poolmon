@@ -34,6 +34,7 @@
 #include "sensor_temp.h"
 #include "publish.h"
 #include "owb.h"
+#include "owb_rmt.h"
 #include "ds18b20.h"
 
 #define MAX_DEVICES          (8)
@@ -83,7 +84,8 @@ static int find_owb_rom_codes(const OneWireBus * owb, OneWireBus_ROMCode * rom_c
 {
     int num_devices = 0;
     OneWireBus_SearchState search_state = {0};
-    bool found = owb_search_first(owb, &search_state);
+    bool found = false;
+    owb_search_first(owb, &search_state, &found);
 
     ESP_LOGI(TAG, "Find devices:");
     while (found && num_devices <= max_codes)
@@ -93,7 +95,7 @@ static int find_owb_rom_codes(const OneWireBus * owb, OneWireBus_ROMCode * rom_c
         ESP_LOGI(TAG, "  %d : %s", num_devices, rom_code_s);
         rom_codes[num_devices] = search_state.rom_code;
         ++num_devices;
-        found = owb_search_next(owb, &search_state);
+        owb_search_next(owb, &search_state, &found);
     }
     return num_devices;
 }
@@ -125,9 +127,10 @@ static void associate_ds18b20_devices(const OneWireBus * owb,
 static temp_sensors_t * detect_sensors(uint8_t gpio)
 {
     // set up the One Wire Bus
-    OneWireBus * owb = owb_malloc();
-    owb_init(owb, gpio);
-    owb_use_crc(owb, true);       // enable CRC check for ROM code
+    OneWireBus * owb = NULL;
+    owb_rmt_driver_info * rmt_driver_info = malloc(sizeof(*rmt_driver_info));
+    owb = owb_rmt_initialize(rmt_driver_info, gpio, RMT_CHANNEL_1, RMT_CHANNEL_0);
+    owb_use_crc(owb, true);       // enable CRC check for ROM code and measurement readings
 
     // locate attached devices
     OneWireBus_ROMCode * device_rom_codes = calloc(MAX_DEVICES, sizeof(*device_rom_codes));
@@ -152,10 +155,11 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
 
 static void sensor_task(void * pvParameter)
 {
+    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
+
+    assert(pvParameter);
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     int sample_count = 0;
-
-    ESP_LOGW(TAG":sensor_task", "Core ID %d", xPortGetCoreID());
 
     int errors[MAX_DEVICES] = {0};
     if (task_inputs->sensors->num_ds18b20s > 0)
@@ -177,7 +181,7 @@ static void sensor_task(void * pvParameter)
             led_off();
 
             // print results in a separate loop, after all have been read
-            printf("\nTemperature readings (degrees C): sample %d\n", sample_count);
+            ESP_LOGI(TAG, "Temperature readings (degrees C): sample %d", sample_count);
             for (int i = 0; i < task_inputs->sensors->num_ds18b20s; ++i)
             {
                 // filter out invalid readings
@@ -189,7 +193,7 @@ static void sensor_task(void * pvParameter)
                 {
                     ++errors[i];
                 }
-                printf("  %d: %.1f    %d errors\n", i, readings[i], errors[i]);
+                ESP_LOGI(TAG, "  %d: %.1f    %d errors", i, readings[i], errors[i]);
             }
 
             // make up delay to approximate sample period
@@ -214,13 +218,13 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandl
     led_flash(100, 200, sensors->num_ds18b20s);
 
     // task will take ownership of this struct
-    task_inputs_t * sensor_task_inputs = malloc(sizeof(*sensor_task_inputs));
-    if (sensor_task_inputs)
+    task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
+    if (task_inputs)
     {
-        memset(sensor_task_inputs, 0, sizeof(*sensor_task_inputs));
-        sensor_task_inputs->sensors = sensors;
-        sensor_task_inputs->publish_queue = publish_queue;
-        xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_task_inputs, priority, NULL);
+        memset(task_inputs, 0, sizeof(*task_inputs));
+        task_inputs->sensors = sensors;
+        task_inputs->publish_queue = publish_queue;
+        xTaskCreate(&sensor_task, "sensor_task", 4096, task_inputs, priority, NULL);
     }
     return sensors;
 }
@@ -236,7 +240,8 @@ void sensor_temp_close(temp_sensors_t * sensors)
             ds18b20_free(&(sensors->ds18b20_infos[i]));
         }
         free(sensors->ds18b20_infos);
-        owb_free(&(sensors->owb));
+        owb_uninitialize(sensors->owb);
+        free((void *)sensors->owb->driver);
         free(sensors);
     }
 }

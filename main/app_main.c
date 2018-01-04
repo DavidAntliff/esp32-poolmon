@@ -86,7 +86,7 @@ void app_main()
     wifi_support_init();
 
     // Run forever...
-    while(1)
+    while (1)
         ;
 
     sensor_temp_close(temp_sensors);
