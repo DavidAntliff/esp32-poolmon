@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-#include "i2c_master.h"
+#include <string.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -31,25 +31,32 @@
 #include "driver/i2c.h"
 #include "esp_log.h"
 
+#include "i2c_master.h"
 
 #define TAG "i2c"
 
-void i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed)
+i2c_master_info_t * i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed)
 {
-    i2c_config_t conf;
-    conf.mode = I2C_MODE_MASTER;
-    conf.sda_io_num = sda_io_num;
-    conf.sda_pullup_en = GPIO_PULLUP_DISABLE;  // use external pullups
-    conf.scl_io_num = scl_io_num;
-    conf.scl_pullup_en = GPIO_PULLUP_DISABLE;  // use external pullups
-    conf.master.clk_speed = clk_speed;         // Hz
-    i2c_param_config(i2c_port, &conf);
-    i2c_driver_install(i2c_port, conf.mode,
-                       I2C_MASTER_RX_BUF_LEN,
-                       I2C_MASTER_TX_BUF_LEN, 0);
+    i2c_master_info_t * info = malloc(sizeof(*info));
+    if (info)
+    {
+        memset(info, 0, sizeof(*info));
+        info->port = i2c_port;
+        info->config.mode = I2C_MODE_MASTER;
+        info->config.sda_io_num = sda_io_num;
+        info->config.sda_pullup_en = GPIO_PULLUP_DISABLE;  // use external pullups
+        info->config.scl_io_num = scl_io_num;
+        info->config.scl_pullup_en = GPIO_PULLUP_DISABLE;  // use external pullups
+        info->config.master.clk_speed = clk_speed;         // Hz
+        ESP_ERROR_CHECK(i2c_param_config(i2c_port, &info->config));
+        ESP_ERROR_CHECK(i2c_driver_install(i2c_port, info->config.mode,
+                                           I2C_MASTER_RX_BUF_LEN,
+                                           I2C_MASTER_TX_BUF_LEN, 0));
+    }
+    return info;
 }
 
-int i2c_scan(i2c_port_t i2c_num)
+int i2c_scan(const i2c_master_info_t * info)
 {
     int num_detected = 0;
     for (int address = 1; address < 0x7f; ++address)
@@ -58,12 +65,12 @@ int i2c_scan(i2c_port_t i2c_num)
         i2c_master_start(cmd);
         i2c_master_write_byte(cmd, address << 1, true /*ACK_CHECK*/);
         i2c_master_stop(cmd);
-        esp_err_t err = i2c_master_cmd_begin(i2c_num, cmd, (1000 / portTICK_RATE_MS));
+        esp_err_t err = i2c_master_cmd_begin(info->port, cmd, (1000 / portTICK_RATE_MS));
         //ESP_LOGI(TAG, "address 0x%02x %d", address, err);
         if (err == 0)
         {
             ++num_detected;
-            ESP_LOGI(TAG, "detected I2C address on master %d at address 0x%02x", i2c_num, address);
+            ESP_LOGI(TAG, "detected I2C address on master %d at address 0x%02x", info->port, address);
         }
         i2c_cmd_link_delete(cmd);
     }

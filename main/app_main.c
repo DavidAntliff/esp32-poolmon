@@ -27,12 +27,14 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 //#include "nvs_flash.h"
-#include "sdkconfig.h"
 
+#include "constants.h"
 #include "led.h"
 #include "mqtt.h"
+#include "i2c_master.h"
 #include "sensor_temp.h"
 #include "sensor_flow.h"
+#include "sensor_light.h"
 #include "publish.h"
 #include "wifi_support.h"
 #include "avr_support.h"
@@ -69,9 +71,16 @@ void app_main()
     QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
-    TempSensors * temp_sensors = sensor_temp_init(GPIO_ONE_WIRE, sensor_priority, publish_queue);
+    temp_sensors_t * temp_sensors = sensor_temp_init(GPIO_ONE_WIRE, sensor_priority, publish_queue);
     //sensor_flow_init();
-    avr_support_init(avr_priority);
+
+    // I2C devices
+    i2c_master_info_t * i2c_master_info = i2c_master_init(I2C_MASTER_NUM, CONFIG_I2C_MASTER_SDA_GPIO, CONFIG_I2C_MASTER_SCL_GPIO, I2C_MASTER_FREQ_HZ);
+    int num_i2c_devices = i2c_scan(i2c_master_info);
+    ESP_LOGI(TAG, "%d I2C devices detected", num_i2c_devices);
+
+    avr_support_init(i2c_master_info, avr_priority, publish_queue);
+    sensor_light_init(i2c_master_info, sensor_priority, publish_queue);
 
     //    nvs_flash_init();
     wifi_support_init();
@@ -82,4 +91,7 @@ void app_main()
 
     sensor_temp_close(temp_sensors);
     //sensor_flow_close();
+    //sensor_light_close();
+
+    i2c_master_close(i2c_master_info);
 }

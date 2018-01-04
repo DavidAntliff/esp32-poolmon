@@ -34,11 +34,47 @@
 
 extern mqtt_client * g_client;
 
+#define ROOT_TOPIC "poolmon"
+
+typedef struct
+{
+    const char * topic;
+} value_info_t;
+
+// value publish info indexed by value ID
+static const value_info_t values_info[PUBLISH_VALUE_LAST] =
+{
+    { "sensors/temp/1", },
+    { "sensors/temp/2", },
+    { "sensors/temp/3", },
+    { "sensors/temp/4", },
+    { "sensors/temp/5", },
+
+    { "sensors/light/1/full_spectrum", },
+    { "sensors/light/1/visible", },
+    { "sensors/light/1/infrared", },
+    { "sensors/light/1/lux", },
+
+    { "sensors/flow/1/freq", },
+    { "sensors/flow/1/rate", },
+
+    { "switches/1", },
+    { "switches/2", },
+    { "switches/3", },
+    { "switches/4", },
+
+    { "ssr/1", },
+    { "ssr/2", },
+
+    { "alarm/1", },
+};
+
+
 // publish sensor readings
 static void publish_task(void * pvParameter)
 {
     QueueHandle_t publish_queue = (QueueHandle_t)pvParameter;
-    ESP_LOGW(TAG":publish_task", "Core ID %d", xPortGetCoreID());
+    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
 
     while (1)
     {
@@ -48,21 +84,28 @@ static void publish_task(void * pvParameter)
         //    ESP_LOGE(TAG":mqtt", "Queue should be empty!\n");
         //}
 
-        SensorReading reading = {0};
-        BaseType_t sensor_queue_status = xQueueReceive(publish_queue, &reading, portMAX_DELAY);
+        published_value_t published_value = {0};
+        BaseType_t sensor_queue_status = xQueueReceive(publish_queue, &published_value, portMAX_DELAY);
         if (sensor_queue_status == pdPASS)
         {
             // TODO: we need a more reliable way to know that the client is valid,
             // as attempting to publish when the client has died causes a crash.
             if (g_client != NULL)
             {
-                ESP_LOGD(TAG":publish_task", "Received %d:%f", reading.sensor_id, reading.value);
-                char topic[64] = {0};
-                char value[8] = {0};
-                snprintf(topic, 64-1, "poolmon/sensor/%d", reading.sensor_id);
-                snprintf(value, 8-1, "%.3f", reading.value);
-                ESP_LOGI(TAG":publish_task", "Publish %s %s", topic, value);
-                mqtt_publish(g_client, topic, value, strlen(value), 0, 0);
+                ESP_LOGD(TAG, "Received %d:%f", published_value.id, published_value.value);
+                if (published_value.id >= 0 && published_value.id < PUBLISH_VALUE_LAST)
+                {
+                    char topic[64] = {0};
+                    char value[8] = {0};
+                    snprintf(topic, 64-1, "%s/%s", ROOT_TOPIC, values_info[published_value.id].topic);
+                    snprintf(value, 8-1, "%.3f", published_value.value);
+                    ESP_LOGI(TAG, "Publish %s %s", topic, value);
+                    mqtt_publish(g_client, topic, value, strlen(value), 0, 0);
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "Invalid value ID %d", published_value.id);
+                }
             }
             else
             {
@@ -78,11 +121,33 @@ static void publish_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
+void publish_value(publish_value_id_t value_id, float value, QueueHandle_t publish_queue)
+{
+    if (value_id >= 0 && value_id < PUBLISH_VALUE_LAST)
+    {
+        published_value_t published_value = {
+            .id = value_id,
+            .value = value,
+        };
+        BaseType_t status = xQueueSendToBack(publish_queue, &published_value, 0);
+        if (status != pdPASS)
+        {
+            ESP_LOGE(TAG, "Could not send to queue");
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Invalid value ID %d", value_id);
+    }
+}
+
 QueueHandle_t publish_init(unsigned int queue_depth, UBaseType_t priority)
 {
+    assert(sizeof(values_info) / sizeof(values_info[0]) == PUBLISH_VALUE_LAST);
+
     // Create a queue for the sensor task to publish sensor readings
     // (Priority of sending task should be lower than receiving task)
-    QueueHandle_t publish_queue = xQueueCreate(queue_depth, sizeof(SensorReading));
+    QueueHandle_t publish_queue = xQueueCreate(queue_depth, sizeof(published_value_t));
     xTaskCreate(&publish_task, "publish_task", 4096, publish_queue, priority, NULL);
     return publish_queue;
 }

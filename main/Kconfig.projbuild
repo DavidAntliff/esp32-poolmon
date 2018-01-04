@@ -23,7 +23,7 @@ config ONE_WIRE_GPIO
 
         GPIOs 35-39 are input-only so cannot be used to drive the One Wire Bus.
 
-config I2C_MASTER_SCL
+config I2C_MASTER_SCL_GPIO
     int "I2C Master SCL GPIO number"
     range 0 34
     default 19
@@ -34,7 +34,7 @@ config I2C_MASTER_SCL
 
         GPIOs 35-39 are input-only so cannot be used to drive the One Wire Bus.
 
-config I2C_MASTER_SDA
+config I2C_MASTER_SDA_GPIO
     int "I2C Master SDA GPIO number"
     range 0 34
     default 18
@@ -50,5 +50,21 @@ config AVR_I2C_ADDRESS
     default 0x44
     help
         I2C address for AVR ATtiny84A device.
+
+config LCD_I2C_ADDRESS
+    hex "I2C Address for LCD device"
+    default 0x27
+    help
+        I2C address for HD44780-compatible LCD device.
+
+config LIGHT_SENSOR_I2C_ADDRESS
+    hex "I2C Address for Light Sensor device"
+    default 0x39
+    help
+        I2C address for TSL2561 ambient light sensor device.
+
+        If ADDR Sel pin is tied to GND, the address is 0x29.
+        If ADDR Sel pin is floating, the address is 0x39.
+        If ADDR Sel pin is tied to VCC, the address is 0x49.
 
 endmenu

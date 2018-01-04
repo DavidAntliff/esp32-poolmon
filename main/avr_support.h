@@ -27,7 +27,10 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 
-void avr_support_init(UBaseType_t priority);
+#include "i2c_master.h"
+
+void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue);
 
 #endif // AVR_SUPPORT_H

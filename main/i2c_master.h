@@ -32,8 +32,16 @@
 #define I2C_MASTER_RX_BUF_LEN    0                     // disabled
 #define I2C_MASTER_FREQ_HZ       400000
 
-void i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed);
+typedef struct
+{
+    i2c_port_t port;
+    i2c_config_t config;
+} i2c_master_info_t;
 
-int i2c_scan(i2c_port_t i2c_num);
+i2c_master_info_t * i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed);
+
+int i2c_scan(const i2c_master_info_t * info);
+
+void i2c_master_close(i2c_master_info_t * info);
 
 #endif // I2C_MASTER_H

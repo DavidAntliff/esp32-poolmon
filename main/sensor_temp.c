@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -40,7 +42,7 @@
 
 #define TAG "sensor_temp"
 
-struct _TempSensors
+struct _temp_sensors_t
 {
     OneWireBus * owb;
     OneWireBus_ROMCode * rom_codes;
@@ -50,9 +52,9 @@ struct _TempSensors
 
 typedef struct
 {
-    TempSensors * sensors;
+    temp_sensors_t * sensors;
     QueueHandle_t publish_queue;
-} SensorTaskInputs;
+} task_inputs_t;
 
 static void read_temperatures(DS18B20_Info ** device_infos, float * readings, int num_devices)
 {
@@ -120,7 +122,7 @@ static void associate_ds18b20_devices(const OneWireBus * owb,
     }
 }
 
-static TempSensors * detect_sensors(uint8_t gpio)
+static temp_sensors_t * detect_sensors(uint8_t gpio)
 {
     // set up the One Wire Bus
     OneWireBus * owb = owb_malloc();
@@ -139,7 +141,7 @@ static TempSensors * detect_sensors(uint8_t gpio)
     DS18B20_Info ** device_infos = calloc(num_devices, sizeof(*device_infos));
     associate_ds18b20_devices(owb, device_rom_codes, device_infos, num_devices);
 
-    TempSensors * sensors = malloc(sizeof(*sensors));
+    temp_sensors_t * sensors = malloc(sizeof(*sensors));
     sensors->owb = owb;
     sensors->rom_codes = device_rom_codes;
     sensors->ds18b20_infos = device_infos;
@@ -150,13 +152,13 @@ static TempSensors * detect_sensors(uint8_t gpio)
 
 static void sensor_task(void * pvParameter)
 {
-    SensorTaskInputs * inputs = (SensorTaskInputs *)pvParameter;
+    task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     int sample_count = 0;
 
     ESP_LOGW(TAG":sensor_task", "Core ID %d", xPortGetCoreID());
 
     int errors[MAX_DEVICES] = {0};
-    if (inputs->sensors->num_ds18b20s > 0)
+    if (task_inputs->sensors->num_ds18b20s > 0)
     {
         // wait a second before starting commencing sampling
         vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -169,27 +171,19 @@ static void sensor_task(void * pvParameter)
 
             float readings[MAX_DEVICES] = { 0 };
 
-            read_temperatures(inputs->sensors->ds18b20_infos, readings, inputs->sensors->num_ds18b20s);
+            read_temperatures(task_inputs->sensors->ds18b20_infos, readings, task_inputs->sensors->num_ds18b20s);
             ++sample_count;
 
             led_off();
 
             // print results in a separate loop, after all have been read
             printf("\nTemperature readings (degrees C): sample %d\n", sample_count);
-            for (int i = 0; i < inputs->sensors->num_ds18b20s; ++i)
+            for (int i = 0; i < task_inputs->sensors->num_ds18b20s; ++i)
             {
                 // filter out invalid readings
                 if (readings[i] != DS18B20_INVALID_READING)
                 {
-                    SensorReading sensor_reading = {
-                        .sensor_id = i,
-                        .value = readings[i],
-                    };
-                    BaseType_t status = xQueueSendToBack(inputs->publish_queue, &sensor_reading, 0);
-                    if (status != pdPASS)
-                    {
-                        ESP_LOGE(TAG":sensor", "Could not send to queue");
-                    }
+                    publish_value(PUBLISH_VALUE_TEMP_1 + i, readings[i], task_inputs->publish_queue);
                 }
                 else
                 {
@@ -207,28 +201,31 @@ static void sensor_task(void * pvParameter)
         ESP_LOGE(TAG, "No devices found");
     }
 
-    free(inputs);
+    free(task_inputs);
     vTaskDelete(NULL);
 }
 
-TempSensors * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandle_t publish_queue)
+temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandle_t publish_queue)
 {
     // Assume that new devices are not connected during operation.
-    TempSensors * sensors = detect_sensors(gpio);
+    temp_sensors_t * sensors = detect_sensors(gpio);
 
     // Blink the LED to indicate the number of temperature devices detected:
     led_flash(100, 200, sensors->num_ds18b20s);
 
     // task will take ownership of this struct
-    SensorTaskInputs * sensor_task_inputs = malloc(sizeof(*sensor_task_inputs));
-    sensor_task_inputs->sensors = sensors;
-    sensor_task_inputs->publish_queue = publish_queue;
-    xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_task_inputs, priority, NULL);
-
+    task_inputs_t * sensor_task_inputs = malloc(sizeof(*sensor_task_inputs));
+    if (sensor_task_inputs)
+    {
+        memset(sensor_task_inputs, 0, sizeof(*sensor_task_inputs));
+        sensor_task_inputs->sensors = sensors;
+        sensor_task_inputs->publish_queue = publish_queue;
+        xTaskCreate(&sensor_task, "sensor_task", 4096, sensor_task_inputs, priority, NULL);
+    }
     return sensors;
 }
 
-void sensor_temp_close(TempSensors * sensors)
+void sensor_temp_close(temp_sensors_t * sensors)
 {
     if (sensors != NULL)
     {

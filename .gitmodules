@@ -10,3 +10,9 @@
 [submodule "components/esp32-smbus"]
 	path = components/esp32-smbus
 	url = https://github.com/DavidAntliff/esp32-smbus.git
+[submodule "components/esp32-tsl2561"]
+	path = components/esp32-tsl2561
+	url = https://github.com/DavidAntliff/esp32-tsl2561
+[submodule "avr/avr-poolmon"]
+	path = avr/avr-poolmon
+	url = https://github.com/DavidAntliff/avr-poolmon

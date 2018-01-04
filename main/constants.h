@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2017 David Antliff
+ * Copyright (c) 2018 David Antliff
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,16 +22,9 @@
  * SOFTWARE.
  */
 
-#ifndef SENSOR_TEMP_H
-#define SENSOR_TEMP_H
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
+#include "sdkconfig.h"
 
-typedef struct _temp_sensors_t temp_sensors_t;
-
-temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandle_t publish_queue);
-void sensor_temp_close(temp_sensors_t * sensors);
-
-#endif // SENSOR_TEMP_H
+#endif // CONSTANTS
