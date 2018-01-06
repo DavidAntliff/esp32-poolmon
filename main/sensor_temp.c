@@ -30,8 +30,9 @@
 #include "esp_system.h"
 #include "esp_log.h"
 
-#include "led.h"
 #include "sensor_temp.h"
+#include "constants.h"
+#include "led.h"
 #include "publish.h"
 #include "owb.h"
 #include "owb_rmt.h"
@@ -129,7 +130,7 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
     // set up the One Wire Bus
     OneWireBus * owb = NULL;
     owb_rmt_driver_info * rmt_driver_info = malloc(sizeof(*rmt_driver_info));
-    owb = owb_rmt_initialize(rmt_driver_info, gpio, RMT_CHANNEL_1, RMT_CHANNEL_0);
+    owb = owb_rmt_initialize(rmt_driver_info, gpio, OWB_RMT_CHANNEL_TX, OWB_RMT_CHANNEL_RX);
     owb_use_crc(owb, true);       // enable CRC check for ROM code and measurement readings
 
     // locate attached devices
@@ -153,11 +154,11 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
     return sensors;
 }
 
-static void sensor_task(void * pvParameter)
+static void sensor_temp_task(void * pvParameter)
 {
+    assert(pvParameter);
     ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
 
-    assert(pvParameter);
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     int sample_count = 0;
 
@@ -167,9 +168,11 @@ static void sensor_task(void * pvParameter)
         // wait a second before starting commencing sampling
         vTaskDelay(1000 / portTICK_PERIOD_MS);
 
+        TickType_t last_wake_time = xTaskGetTickCount();
+
         while (1)
         {
-            TickType_t start_ticks = xTaskGetTickCount();
+            last_wake_time = xTaskGetTickCount();
 
             led_on();
 
@@ -196,8 +199,8 @@ static void sensor_task(void * pvParameter)
                 ESP_LOGI(TAG, "  %d: %.1f    %d errors", i, readings[i], errors[i]);
             }
 
-            // make up delay to approximate sample period
-            vTaskDelay(SAMPLE_PERIOD / portTICK_PERIOD_MS - (xTaskGetTickCount() - start_ticks));
+            //vTaskDelayUntil(&last_wake_time, 1000 / portTICK_PERIOD_MS); -- not yet supported by ESP-IDF
+            vTaskDelay(SAMPLE_PERIOD / portTICK_PERIOD_MS - (xTaskGetTickCount() - last_wake_time));
         }
     }
     else
@@ -224,7 +227,7 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandl
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->sensors = sensors;
         task_inputs->publish_queue = publish_queue;
-        xTaskCreate(&sensor_task, "sensor_task", 4096, task_inputs, priority, NULL);
+        xTaskCreate(&sensor_temp_task, "sensor_temp_task", 4096, task_inputs, priority, NULL);
     }
     return sensors;
 }

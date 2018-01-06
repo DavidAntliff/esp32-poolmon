@@ -27,4 +27,24 @@
 
 #include "sdkconfig.h"
 
+#define PUBLISH_QUEUE_DEPTH      16
+
+// RMT channel allocations
+#define OWB_RMT_CHANNEL_RX       RMT_CHANNEL_0
+#define OWB_RMT_CHANNEL_TX       RMT_CHANNEL_1
+#define FLOW_METER_RMT_CHANNEL   RMT_CHANNEL_2
+
+// Counter allocations
+#define FLOW_METER_PCNT_UNIT     PCNT_UNIT_0
+#define FLOW_METER_PCNT_CHANNEL  PCNT_CHANNEL_0
+
+// Flow Meter default config - accurate to 0.1 Hz
+#define FLOW_METER_RMT_CLK_DIV      160      // APB @ 80MHz / 160 = 0.5 MHz = 2us ticks
+#define FLOW_METER_SAMPLING_PERIOD  (10.0)   // seconds
+#define FLOW_METER_SAMPLING_WINDOW  (5.0)    // seconds
+#define FLOW_METER_FILTER_LENGTH    1023     // APB @ 80MHz => limits maximum frequency to 39,100 Hz
+#define FLOW_METER_MODEL_A          (0.319)  // rate (LPM) = A * x (Hz) + B
+#define FLOW_METER_MODEL_B          (0.619)  // based on flow meter measurements, October 2017
+#define FLOW_METER_MODEL_CUTOFF_HZ  (1.0)    // For values of x < cutoff, linear-interpolate to zero so that 0 Hz = 0 LPM
+
 #endif // CONSTANTS

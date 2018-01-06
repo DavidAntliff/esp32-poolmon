@@ -48,6 +48,9 @@ typedef struct
 
 static void sensor_light_task(void * pvParameter)
 {
+    assert(pvParameter);
+    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
+
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
 
     uint8_t address = CONFIG_LIGHT_SENSOR_I2C_ADDRESS;

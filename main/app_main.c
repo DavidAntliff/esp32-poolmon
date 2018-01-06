@@ -27,6 +27,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 //#include "nvs_flash.h"
+#include "soc/rtc.h"
 
 #include "constants.h"
 #include "led.h"
@@ -39,14 +40,7 @@
 #include "wifi_support.h"
 #include "avr_support.h"
 
-#define GPIO_LED             (GPIO_NUM_2)
-#define GPIO_ONE_WIRE        (CONFIG_ONE_WIRE_GPIO)
-
-#define PUBLISH_QUEUE_DEPTH  (16)
-
 #define TAG "poolmon"
-
-
 
 //TODO: LED task, to blink LED when required
 // - count number of connected devices
@@ -54,14 +48,16 @@
 // - indicate MQTT connection state
 // - indicate MQTT activity (publish, receive)
 
-
-
 void app_main()
 {
     esp_log_level_set("*", ESP_LOG_INFO);
 
     ESP_LOGI(TAG, "[APP] Startup..");
-    led_init(GPIO_LED);
+    led_init(CONFIG_ONBOARD_LED_GPIO);
+
+    // round to nearest MHz (stored value is only precise to MHz)
+    uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
+    ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;
@@ -71,7 +67,7 @@ void app_main()
     QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
-    temp_sensors_t * temp_sensors = sensor_temp_init(GPIO_ONE_WIRE, sensor_priority, publish_queue);
+    temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, publish_queue);
     //sensor_flow_init();
 
     // I2C devices
@@ -81,6 +77,9 @@ void app_main()
 
     avr_support_init(i2c_master_info, avr_priority, publish_queue);
     sensor_light_init(i2c_master_info, sensor_priority, publish_queue);
+    sensor_flow_init(CONFIG_FLOW_METER_PULSE_GPIO, FLOW_METER_PCNT_UNIT, FLOW_METER_PCNT_CHANNEL,
+                     CONFIG_FLOW_METER_RMT_GPIO, FLOW_METER_RMT_CHANNEL, FLOW_METER_RMT_CLK_DIV,
+                     FLOW_METER_SAMPLING_PERIOD, FLOW_METER_SAMPLING_WINDOW, FLOW_METER_FILTER_LENGTH, sensor_priority, publish_queue);
 
     //    nvs_flash_init();
     wifi_support_init();
