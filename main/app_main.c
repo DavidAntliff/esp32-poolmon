@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2017 David Antliff
+ * Copyright (c) 2017-2018 David Antliff
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -39,6 +39,7 @@
 #include "publish.h"
 #include "wifi_support.h"
 #include "avr_support.h"
+#include "display.h"
 
 #define TAG "poolmon"
 
@@ -52,36 +53,46 @@ void app_main()
 {
     esp_log_level_set("*", ESP_LOG_INFO);
 
+    // Priority of queue consumer should be higher than producers
+    UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;
+    UBaseType_t display_priority = publish_priority - 1;
+    UBaseType_t sensor_priority = publish_priority - 1;
+    UBaseType_t avr_priority = sensor_priority;
+
     ESP_LOGI(TAG, "[APP] Startup..");
+
+    // Onboard LED
     led_init(CONFIG_ONBOARD_LED_GPIO);
+
+    // I2C bus
+    i2c_master_info_t * i2c_master_info = i2c_master_init(I2C_MASTER_NUM, CONFIG_I2C_MASTER_SDA_GPIO, CONFIG_I2C_MASTER_SCL_GPIO, I2C_MASTER_FREQ_HZ);
+    int num_i2c_devices = i2c_scan(i2c_master_info);
+    ESP_LOGI(TAG, "%d I2C devices detected", num_i2c_devices);
+
+    // bring up the display ASAP in case of error
+    display_init(i2c_master_info, display_priority);
 
     // round to nearest MHz (stored value is only precise to MHz)
     uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
     ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
 
-    // Priority of queue consumer should be higher than producers
-    UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;
-    UBaseType_t sensor_priority = publish_priority - 1;
-    UBaseType_t avr_priority = sensor_priority;
-
     QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
+
+    // Temp sensors
     temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, publish_queue);
-    //sensor_flow_init();
 
-    // I2C devices
-    i2c_master_info_t * i2c_master_info = i2c_master_init(I2C_MASTER_NUM, CONFIG_I2C_MASTER_SDA_GPIO, CONFIG_I2C_MASTER_SCL_GPIO, I2C_MASTER_FREQ_HZ);
-    int num_i2c_devices = i2c_scan(i2c_master_info);
-    ESP_LOGI(TAG, "%d I2C devices detected", num_i2c_devices);
-
+    // I2C devices - AVR, Light Sensor, LCD
     avr_support_init(i2c_master_info, avr_priority, publish_queue);
     sensor_light_init(i2c_master_info, sensor_priority, publish_queue);
+
+    // Flow Meter
     sensor_flow_init(CONFIG_FLOW_METER_PULSE_GPIO, FLOW_METER_PCNT_UNIT, FLOW_METER_PCNT_CHANNEL,
                      CONFIG_FLOW_METER_RMT_GPIO, FLOW_METER_RMT_CHANNEL, FLOW_METER_RMT_CLK_DIV,
                      FLOW_METER_SAMPLING_PERIOD, FLOW_METER_SAMPLING_WINDOW, FLOW_METER_FILTER_LENGTH, sensor_priority, publish_queue);
 
-    //    nvs_flash_init();
+    //nvs_flash_init();
     wifi_support_init();
 
     // Run forever...
@@ -89,8 +100,5 @@ void app_main()
         ;
 
     sensor_temp_close(temp_sensors);
-    //sensor_flow_close();
-    //sensor_light_close();
-
     i2c_master_close(i2c_master_info);
 }

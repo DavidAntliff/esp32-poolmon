@@ -16,3 +16,6 @@
 [submodule "avr/avr-poolmon"]
 	path = avr/avr-poolmon
 	url = https://github.com/DavidAntliff/avr-poolmon
+[submodule "components/esp32-i2c-lcd1602"]
+	path = components/esp32-i2c-lcd1602
+	url = https://github.com/DavidAntliff/esp32-i2c-lcd1602.git

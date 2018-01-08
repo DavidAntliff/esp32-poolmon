@@ -114,9 +114,8 @@ static void avr_support_task(void * pvParameter)
     i2c_port_t i2c_port = task_inputs->i2c_master_info->port;
 
     // Set up the SMBus
-    int address = CONFIG_AVR_I2C_ADDRESS;
     smbus_info_t * smbus_info = smbus_malloc();
-    smbus_init(smbus_info, i2c_port, address);
+    smbus_init(smbus_info, i2c_port, CONFIG_AVR_I2C_ADDRESS);
     smbus_set_timeout(smbus_info, SMBUS_TIMEOUT / portTICK_RATE_MS);
 
     uint8_t status = _read_register(smbus_info, REGISTER_STATUS);

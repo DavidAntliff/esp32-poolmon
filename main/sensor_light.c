@@ -53,11 +53,9 @@ static void sensor_light_task(void * pvParameter)
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
 
-    uint8_t address = CONFIG_LIGHT_SENSOR_I2C_ADDRESS;
-
     // Set up the SMBus
     smbus_info_t * smbus_info = smbus_malloc();
-    smbus_init(smbus_info, task_inputs->i2c_master_info->port, address);
+    smbus_init(smbus_info, task_inputs->i2c_master_info->port, CONFIG_LIGHT_SENSOR_I2C_ADDRESS);
     smbus_set_timeout(smbus_info, 1000 / portTICK_RATE_MS);
 
     // Set up the TSL2561 device

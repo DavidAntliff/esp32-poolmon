@@ -58,11 +58,11 @@ config AVR_I2C_ADDRESS
     help
         I2C address for AVR ATtiny84A device.
 
-config LCD_I2C_ADDRESS
-    hex "I2C Address for LCD device"
+config LCD1602_I2C_ADDRESS
+    hex "I2C Address for LCD1602 device"
     default 0x27
     help
-        I2C address for HD44780-compatible LCD device.
+        I2C address for HD44780-compatible LCD1602 device.
 
 config LIGHT_SENSOR_I2C_ADDRESS
     hex "I2C Address for Light Sensor device"
