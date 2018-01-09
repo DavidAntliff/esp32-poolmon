@@ -29,6 +29,11 @@
 //#include "nvs_flash.h"
 #include "soc/rtc.h"
 
+// memory monitoring
+#include "esp_system.h"
+#include "esp_heap_alloc_caps.h"
+#include "freertos/heap_regions.h"
+
 #include "constants.h"
 #include "led.h"
 #include "mqtt.h"
@@ -97,7 +102,12 @@ void app_main()
 
     // Run forever...
     while (1)
-        ;
+    {
+        ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());  // byte-addressable heap memory
+        ESP_LOGI(TAG, "32bit aligned RAM left %d", xPortGetFreeHeapSizeTagged(MALLOC_CAP_32BIT));  // IRAM 32-bit aligned heap
+
+        vTaskDelay(1000 / portTICK_RATE_MS);
+    }
 
     sensor_temp_close(temp_sensors);
     i2c_master_close(i2c_master_info);
