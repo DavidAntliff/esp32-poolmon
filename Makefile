@@ -9,5 +9,5 @@ PROJECT_NAME := esp32-poolmon
 
 include $(IDF_PATH)/make/project.mk
 
-#BUILD := $(shell date +"%Y%m%d-%H%M%S")
-#CFLAGS += -DBUILD=$(BUILD)
+BUILD_TIMESTAMP := $(shell date +"%Y%m%d-%H%M%S")
+CFLAGS += -DBUILD_TIMESTAMP=\"$(BUILD_TIMESTAMP)\"
