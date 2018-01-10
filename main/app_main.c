@@ -35,6 +35,7 @@
 #include "freertos/heap_regions.h"
 
 #include "constants.h"
+#include "datastore.h"
 #include "led.h"
 #include "mqtt.h"
 #include "i2c_master.h"
@@ -54,10 +55,16 @@
 // - indicate MQTT connection state
 // - indicate MQTT activity (publish, receive)
 
+// TODO: make this non-global!
+datastore_t * datastore = NULL;
+
 void app_main()
 {
+//    esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("*", ESP_LOG_WARN);
     esp_log_level_set("display", ESP_LOG_INFO);
+    esp_log_level_set("datastore", ESP_LOG_INFO);
+    esp_log_level_set("sensor_light", ESP_LOG_INFO);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;
@@ -66,6 +73,10 @@ void app_main()
     UBaseType_t avr_priority = sensor_priority;
 
     ESP_LOGI(TAG, "[APP] Startup..");
+
+    datastore = datastore_malloc();
+    datastore_init(datastore);
+    datastore_dump(datastore);
 
     // Onboard LED
     led_init(CONFIG_ONBOARD_LED_GPIO);
@@ -112,4 +123,5 @@ void app_main()
 
     sensor_temp_close(temp_sensors);
     i2c_master_close(i2c_master_info);
+    datastore_free(&datastore);
 }

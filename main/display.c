@@ -31,6 +31,7 @@
 
 #include "display.h"
 #include "constants.h"
+#include "datastore.h"
 #include "i2c_master.h"
 #include "smbus.h"
 #include "i2c-lcd1602.h"
@@ -45,6 +46,8 @@
 #  warning "Please ensure BUILD_TIMESTAMP is defined"
 #  define BUILD_TIMESTAMP "undefined"
 #endif
+
+extern datastore_t * datastore;
 
 typedef enum
 {
@@ -184,11 +187,17 @@ static void _handle_page_blank(const i2c_lcd1602_info_t * lcd_info, void * state
 
 static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
+    char version[DATASTORE_LEN_VERSION] = "";
+    char build_date_time[DATASTORE_LEN_BUILD_DATE_TIME] = "";
+    datastore_get_string(datastore, DATASTORE_ID_SYSTEM_VERSION, 0, version);
+    datastore_get_string(datastore, DATASTORE_ID_SYSTEM_BUILD_DATE_TIME, 0, build_date_time);
+
     char line[ROW_STRING_WIDTH] = "";
-    snprintf(line, ROW_STRING_WIDTH, "PoolControl v%d.%d", VERSION_MAJOR, VERSION_MINOR);
+    snprintf(line, ROW_STRING_WIDTH, "PoolControl v%s", version);
+    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
     ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 
-    snprintf(line, ROW_STRING_WIDTH, " %s", BUILD_TIMESTAMP);
+    snprintf(line, ROW_STRING_WIDTH, " %s", build_date_time);
     ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
     ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 }
@@ -197,6 +206,7 @@ static void _handle_page_sensors_temp_1_2(const i2c_lcd1602_info_t * lcd_info, v
 {
     char line[ROW_STRING_WIDTH] = "";
     snprintf(line, ROW_STRING_WIDTH, "Temp%c  %2.1f %2.1f", I2C_LCD1602_CHARACTER_CUSTOM_0, 18.1, 20.2);
+    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
     ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 
     snprintf(line, ROW_STRING_WIDTH, "  %2.1f %2.1f %2.1f", 22.9, 21.8, 21.7);
@@ -218,8 +228,21 @@ static void _handle_page_sensors_temp_5_P(const i2c_lcd1602_info_t * lcd_info, v
 
 static void _handle_page_sensors_light(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_LIGHT"));
+    uint32_t full = 0, visible = 0, infrared = 0, illuminance = 0;
+    datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, &full);
+    datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, &visible);
+    datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, &infrared);
+    datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, &illuminance);
+
+//    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_LIGHT"));
+    char line[ROW_STRING_WIDTH] = "";
+    snprintf(line, ROW_STRING_WIDTH, "Li F%5d L%5d", full, illuminance);
+    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
+    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+
+    snprintf(line, ROW_STRING_WIDTH, "   I%5d V%5d", infrared, visible);
+    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
+    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 }
 
 static void _handle_page_sensors_flow(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -385,7 +408,7 @@ static void display_task(void * pvParameter)
     // update pages once per second
     while (1)
     {
-        ESP_LOGI(TAG, "display loop");
+        ESP_LOGD(TAG, "display loop");
         dispatch_to_handler(lcd_info, current_page);
         input_t input = INPUT_NONE;
         BaseType_t rc = xQueueReceive(button_queue, &input, 1000 / portTICK_RATE_MS);
@@ -398,6 +421,12 @@ static void display_task(void * pvParameter)
                 ESP_LOGI(TAG, "change to page %d", new_page);
                 current_page = new_page;
                 ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+
+                // special case - when changing to the Last Error page, dump the entire datastore
+                if (current_page == PAGE_LAST_ERROR)
+                {
+                    datastore_dump(datastore);
+                }
             }
         }
     }
@@ -423,7 +452,7 @@ static void button_task(void * pvParameter)
     bool debounced_state = false;
 
     TickType_t last_pressed = xTaskGetTickCount();
-    TickType_t last_released = last_pressed;
+    //TickType_t last_released = last_pressed;
 
     while (1)
     {
@@ -452,7 +481,7 @@ static void button_task(void * pvParameter)
                         input = INPUT_LONG;
                         ESP_LOGI(TAG, "long");
                     }
-                    last_released = now;
+                    //last_released = now;
                 }
                 else
                 {

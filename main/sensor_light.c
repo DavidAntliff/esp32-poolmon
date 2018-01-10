@@ -31,6 +31,7 @@
 #include "esp_log.h"
 
 #include "constants.h"
+#include "datastore.h"
 #include "sensor_light.h"
 #include "smbus.h"
 #include "tsl2561.h"
@@ -45,6 +46,8 @@ typedef struct
     i2c_master_info_t * i2c_master_info;
     QueueHandle_t publish_queue;
 } task_inputs_t;
+
+extern datastore_t * datastore;
 
 static void sensor_light_task(void * pvParameter)
 {
@@ -87,7 +90,12 @@ static void sensor_light_task(void * pvParameter)
         ESP_LOGI(TAG, "  Full spectrum: %d", visible + infrared);
         ESP_LOGI(TAG, "  Infrared:      %d", infrared);
         ESP_LOGI(TAG, "  Visible:       %d", visible);
-        ESP_LOGI(TAG, "  Lux:           %d", lux);
+        ESP_LOGI(TAG, "  Illuminance:   %d lux", lux);
+
+        datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, visible + infrared);
+        datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, infrared);
+        datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, visible);
+        datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, lux);
 
         //vTaskDelayUntil(&last_wake_time, 1000 / portTICK_PERIOD_MS); -- not yet supported by ESP-IDF
         vTaskDelay(SAMPLE_PERIOD / portTICK_PERIOD_MS - (xTaskGetTickCount() - last_wake_time));
