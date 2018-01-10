@@ -56,7 +56,8 @@
 
 void app_main()
 {
-    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("*", ESP_LOG_WARN);
+    esp_log_level_set("display", ESP_LOG_INFO);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;
@@ -98,7 +99,7 @@ void app_main()
                      FLOW_METER_SAMPLING_PERIOD, FLOW_METER_SAMPLING_WINDOW, FLOW_METER_FILTER_LENGTH, sensor_priority, publish_queue);
 
     //nvs_flash_init();
-    wifi_support_init();
+    //wifi_support_init();
 
     // Run forever...
     while (1)

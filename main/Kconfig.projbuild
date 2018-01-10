@@ -30,6 +30,15 @@ config ONE_WIRE_GPIO
 
         GPIOs 35-39 are input-only so cannot be used to drive the One Wire Bus.
 
+config DISPLAY_BUTTON_GPIO
+    int "Display Button GPIO number"
+    range 0 34
+    default 22
+    help
+        GPIO number (IOxx) to read the Display Button state.
+
+        Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used.
+
 config I2C_MASTER_SCL_GPIO
     int "I2C Master SCL GPIO number"
     range 0 34
@@ -39,7 +48,7 @@ config I2C_MASTER_SCL_GPIO
 
         Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used.
 
-        GPIOs 35-39 are input-only so cannot be used to drive the One Wire Bus.
+        GPIOs 35-39 are input-only so cannot be used to drive the I2C bus.
 
 config I2C_MASTER_SDA_GPIO
     int "I2C Master SDA GPIO number"
@@ -50,7 +59,7 @@ config I2C_MASTER_SDA_GPIO
 
         Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used.
 
-        GPIOs 35-39 are input-only so cannot be used to drive the One Wire Bus.
+        GPIOs 35-39 are input-only so cannot be used to drive the I2C bus.
 
 config AVR_I2C_ADDRESS
     hex "I2C Address for AVR device"
