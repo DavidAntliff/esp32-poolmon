@@ -32,6 +32,7 @@
 
 #include "sensor_temp.h"
 #include "constants.h"
+#include "datastore.h"
 #include "led.h"
 #include "publish.h"
 #include "owb.h"
@@ -43,6 +44,8 @@
 #define SAMPLE_PERIOD        (4000)  // sensor sampling period in milliseconds
 
 #define TAG "sensor_temp"
+
+extern datastore_t * datastore;
 
 struct _temp_sensors_t
 {
@@ -191,6 +194,7 @@ static void sensor_temp_task(void * pvParameter)
                 if (readings[i] != DS18B20_INVALID_READING)
                 {
                     publish_value(PUBLISH_VALUE_TEMP_1 + i, readings[i], task_inputs->publish_queue);
+                    //datastore_set_uint32(datastore, DATASTORE_ID_TEMP_VALUE, i, readings[i]);
                 }
                 else
                 {

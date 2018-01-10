@@ -54,6 +54,13 @@ struct _private_t
             uint32_t error_timestamp;
         } i2c_master;
 
+//        struct temp
+//        {
+//            float value[DATASTORE_INSTANCES_TEMP];
+//            char label[DATASTORE_INSTANCES_TEMP][DATASTORE_LEN_TEMP_LABEL];
+//            datastore_temp_assignment_t assignment[DATASTORE_INSTANCES_TEMP];
+//        } temp;
+
         struct light
         {
             uint32_t full;
@@ -72,6 +79,10 @@ typedef enum
     DATASTORE_TYPE_INVALID = 0,
     DATASTORE_TYPE_UINT8,
     DATASTORE_TYPE_UINT32,
+    DATASTORE_TYPE_INT8,
+    DATASTORE_TYPE_INT32,
+    DATASTORE_TYPE_FLOAT,
+    DATASTORE_TYPE_DOUBLE,
     DATASTORE_TYPE_STRING,
     DATASTORE_TYPE_LAST,
 } datastore_type_t;
@@ -103,14 +114,18 @@ typedef struct
 #define NAME(X) #X
 
 static index_t INDEX[] = {
-    { DATASTORE_ID_SYSTEM_VERSION,         NAME(DATASTORE_ID_SYSTEM_VERSION), DATASTORE_TYPE_STRING, 1, offsetof(private_t, data.system.version), sizeof(((private_t *)0)->data.system.version) },
+    { DATASTORE_ID_SYSTEM_VERSION,         NAME(DATASTORE_ID_SYSTEM_VERSION),         DATASTORE_TYPE_STRING, 1, offsetof(private_t, data.system.version),         sizeof(((private_t *)0)->data.system.version) },
     { DATASTORE_ID_SYSTEM_BUILD_DATE_TIME, NAME(DATASTORE_ID_SYSTEM_BUILD_DATE_TIME), DATASTORE_TYPE_STRING, 1, offsetof(private_t, data.system.build_date_time), sizeof(((private_t *)0)->data.system.build_date_time) },
-    { DATASTORE_ID_SYSTEM_UPTIME,          NAME(DATASTORE_ID_SYSTEM_UPTIME), DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.system.uptime), sizeof(((private_t *)0)->data.system.uptime) },
+    { DATASTORE_ID_SYSTEM_UPTIME,          NAME(DATASTORE_ID_SYSTEM_UPTIME),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.system.uptime),          sizeof(((private_t *)0)->data.system.uptime) },
 
-    { DATASTORE_ID_LIGHT_FULL,             NAME(DATASTORE_ID_LIGHT_FULL), DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.full), sizeof(((private_t *)0)->data.light.full) },
-    { DATASTORE_ID_LIGHT_VISIBLE,          NAME(DATASTORE_ID_LIGHT_VISIBLE), DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.visible), sizeof(((private_t *)0)->data.light.visible) },
-    { DATASTORE_ID_LIGHT_INFRARED,         NAME(DATASTORE_ID_LIGHT_INFRARED), DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.infrared), sizeof(((private_t *)0)->data.light.infrared) },
-    { DATASTORE_ID_LIGHT_ILLUMINANCE,      NAME(DATASTORE_ID_LIGHT_ILLUMINANCE), DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.illuminance), sizeof(((private_t *)0)->data.light.illuminance) },
+//    { DATASTORE_ID_TEMP_VALUE,             NAME(DATASTORE_ID_TEMP_VALUE),             DATASTORE_TYPE_FLOAT,  DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.value),      sizeof(((private_t *)0)->data.temp.value) },
+//    { DATASTORE_ID_TEMP_LABEL,             NAME(DATASTORE_ID_TEMP_LABEL),             DATASTORE_TYPE_STRING, DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.label),      sizeof(((private_t *)0)->data.temp.label) },
+//    { DATASTORE_ID_TEMP_ASSIGNMENT,        NAME(DATASTORE_ID_TEMP_ASSIGNMENT),        DATASTORE_TYPE_UINT8,  DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.assignment), sizeof(((private_t *)0)->data.temp.assignment) },
+
+    { DATASTORE_ID_LIGHT_FULL,             NAME(DATASTORE_ID_LIGHT_FULL),             DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.full),             sizeof(((private_t *)0)->data.light.full) },
+    { DATASTORE_ID_LIGHT_VISIBLE,          NAME(DATASTORE_ID_LIGHT_VISIBLE),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.visible),          sizeof(((private_t *)0)->data.light.visible) },
+    { DATASTORE_ID_LIGHT_INFRARED,         NAME(DATASTORE_ID_LIGHT_INFRARED),         DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.infrared),         sizeof(((private_t *)0)->data.light.infrared) },
+    { DATASTORE_ID_LIGHT_ILLUMINANCE,      NAME(DATASTORE_ID_LIGHT_ILLUMINANCE),      DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.illuminance),      sizeof(((private_t *)0)->data.light.illuminance) },
 
 };
 
@@ -185,7 +200,7 @@ datastore_error_t datastore_init(datastore_t * store)
     for (datastore_id_t id = 0; id < DATASTORE_ID_LAST; ++id)
     {
         assert(INDEX[id].id == id);
-//        assert(INDEX[id].type < DATASTORE_TYPE_LAST);
+        assert(INDEX[id].type < DATASTORE_TYPE_LAST);
     }
 
     datastore_error_t err = DATASTORE_ERROR_UNKNOWN;
@@ -216,9 +231,7 @@ datastore_error_t datastore_init(datastore_t * store)
     return err;
 }
 
-datastore_error_t datastore_set_uint8(datastore_t * store, datastore_id_t id, instance_id_t instance, uint8_t value);
-
-datastore_error_t datastore_set_uint32(datastore_t * store, datastore_id_t id, instance_id_t instance, uint32_t value)
+static datastore_error_t _set_value(const datastore_t * store, datastore_id_t id, instance_id_t instance, void * value, datastore_type_t expected_type)
 {
     datastore_error_t err = DATASTORE_ERROR_UNKNOWN;
     if ((err = _is_init(store)) == DATASTORE_OK)
@@ -229,38 +242,103 @@ datastore_error_t datastore_set_uint32(datastore_t * store, datastore_id_t id, i
             if (id >= 0 && id < DATASTORE_ID_LAST)
             {
                 // check type
-                if (INDEX[id].type == DATASTORE_TYPE_UINT32)
+                if (INDEX[id].type == expected_type)
                 {
                     // check instance
                     if (instance >= 0 && instance < INDEX[id].num_instances)
                     {
-                        ESP_LOGI(TAG, "datastore_set_uint32 %d %d %d", id, instance, value);
+                        if (value)
+                        {
+                            // get the mutex
+                            xSemaphoreTake(private->semaphore, portMAX_DELAY);
 
-                        // get the mutex
-                        xSemaphoreTake(private->semaphore, portMAX_DELAY);
+                            // set the value
+                            uint8_t * pdest = (uint8_t *)private + INDEX[id].offset;
+//                            ESP_LOGE(TAG":_setvalue", "id %d, instance %d, value %p, type %d, private %p, offset %d, size %d, pdest %p",
+//                                     id, instance, value, INDEX[id].type, private, INDEX[id].offset, INDEX[id].size, pdest);
+//                            INDEX[id].set_handler((uint8_t *)value, pdest, INDEX[id].size);
+                            _set_handler((uint8_t *)value, pdest, INDEX[id].size);
+//                            ESP_LOGE(TAG":_setvalue", "light full %d, *(uint32_t *)value %u", private->data.light.full, *(uint32_t *)(value));
 
-                        // set the value
-                        uint8_t * pdest = (uint8_t *)private + INDEX[id].offset;
-//                        INDEX[id].set_handler((uint8_t *)&value, pdest, sizeof(uint32_t));
-                        _set_handler((uint8_t *)&value, pdest, INDEX[id].size);
+                            // release the mutex
+                            xSemaphoreGive(private->semaphore);
 
-                        // release the mutex
-                        xSemaphoreGive(private->semaphore);
-
-                        // TODO: call any registered callbacks with new value
+                            // TODO: call any registered callbacks with new value
+                        }
+                        else
+                        {
+                            ESP_LOGE(TAG":_set_value", "value is NULL");
+                            err = DATASTORE_ERROR_NULL_POINTER;
+                        }
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG":_set_value", "instance %d is invalid", instance);
+                        err = DATASTORE_ERROR_INVALID_INSTANCE;
                     }
                 }
+                else
+                {
+                    ESP_LOGE(TAG":_set_value", "bad type %d (expected %d)", INDEX[id].type, expected_type);
+                    err = DATASTORE_ERROR_INVALID_TYPE;
+                }
+            }
+            else
+            {
+                ESP_LOGE(TAG":_set_value", "bad id %d", id);
+                err = DATASTORE_ERROR_INVALID_ID;
             }
         }
+        else
+        {
+            ESP_LOGE(TAG":_set_value", "private is NULL");
+            err = DATASTORE_ERROR_NULL_POINTER;
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG":_set_value", "datastore is not initialised");
+        err = DATASTORE_ERROR_NOT_INITIALISED;
     }
     return err;
 }
 
-datastore_error_t datastore_set_int8(datastore_t * store, datastore_id_t id, instance_id_t instance, int8_t value);
-datastore_error_t datastore_set_int32(datastore_t * store, datastore_id_t id, instance_id_t instance, int32_t value);
-datastore_error_t datastore_set_float(datastore_t * store, datastore_id_t id, instance_id_t instance, float value);
-datastore_error_t datastore_set_double(datastore_t * store, datastore_id_t id, instance_id_t instance, double value);
+datastore_error_t datastore_set_uint8(datastore_t * store, datastore_id_t id, instance_id_t instance, uint8_t value)
+{
+    return _set_value(store, id, instance, &value, DATASTORE_TYPE_UINT8);
+}
+
+datastore_error_t datastore_set_uint32(datastore_t * store, datastore_id_t id, instance_id_t instance, uint32_t value)
+{
+    return _set_value(store, id, instance, &value, DATASTORE_TYPE_UINT32);
+}
+
+datastore_error_t datastore_set_int8(datastore_t * store, datastore_id_t id, instance_id_t instance, int8_t value)
+{
+    return _set_value(store, id, instance, &value, DATASTORE_TYPE_INT8);
+}
+
+datastore_error_t datastore_set_int32(datastore_t * store, datastore_id_t id, instance_id_t instance, int32_t value)
+{
+    return _set_value(store, id, instance, &value, DATASTORE_TYPE_UINT32);
+}
+
+datastore_error_t datastore_set_float(datastore_t * store, datastore_id_t id, instance_id_t instance, float value)
+{
+    return _set_value(store, id, instance, &value, DATASTORE_TYPE_FLOAT);
+}
+
+datastore_error_t datastore_set_double(datastore_t * store, datastore_id_t id, instance_id_t instance, double value)
+{
+    return _set_value(store, id, instance, &value, DATASTORE_TYPE_DOUBLE);
+}
+
 datastore_error_t datastore_set_string(datastore_t * store, datastore_id_t id, instance_id_t instance, const char * value)
+{
+    return _set_value(store, id, instance, &value, DATASTORE_TYPE_STRING);
+}
+
+static datastore_error_t _get_value(const datastore_t * store, datastore_id_t id, instance_id_t instance, void * value, datastore_type_t expected_type)
 {
     datastore_error_t err = DATASTORE_ERROR_UNKNOWN;
     if ((err = _is_init(store)) == DATASTORE_OK)
@@ -271,145 +349,100 @@ datastore_error_t datastore_set_string(datastore_t * store, datastore_id_t id, i
             if (id >= 0 && id < DATASTORE_ID_LAST)
             {
                 // check type
-                if (INDEX[id].type == DATASTORE_TYPE_STRING)
+                if (INDEX[id].type == expected_type)
                 {
                     // check instance
                     if (instance >= 0 && instance < INDEX[id].num_instances)
                     {
-                        ESP_LOGI(TAG, "datastore_set_string %d %d %s", id, instance, value);
+                        if (value)
+                        {
+                            // get the mutex
+                            xSemaphoreTake(private->semaphore, portMAX_DELAY);
 
-                        // get the mutex
-                        xSemaphoreTake(private->semaphore, portMAX_DELAY);
+                            // get the value
+                            uint8_t * psrc = (uint8_t *)private + INDEX[id].offset;
+//                            ESP_LOGE(TAG":_getvalue", "id %d, instance %d, value %p, type %d, private %p, offset %d, size %d, psrc %p",
+//                                     id, instance, value, INDEX[id].type, private, INDEX[id].offset, INDEX[id].size, psrc);
+//                            ESP_LOGE(TAG":_getvalue", "light full %d", private->data.light.full);
+//                            INDEX[id].get_handler(psrc, (uint8_t *)value, INDEX[id].size);
+                            _get_handler(psrc, (uint8_t *)value, INDEX[id].size);
 
-                        // set the value
-                        uint8_t * pdest = (uint8_t *)private + INDEX[id].offset;
-//                        INDEX[id].set_handler((uint8_t *)&value, pdest, sizeof(uint32_t));
-                        _set_handler((uint8_t *)&value, pdest, INDEX[id].size);
+                            // release the mutex
+                            xSemaphoreGive(private->semaphore);
 
-                        // release the mutex
-                        xSemaphoreGive(private->semaphore);
-
-                        // TODO: call any registered callbacks with new value
+                            // TODO: call any registered callbacks with new value
+                        }
+                        else
+                        {
+                            ESP_LOGE(TAG":_get_value", "value is NULL");
+                            err = DATASTORE_ERROR_NULL_POINTER;
+                        }
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG":_get_value", "instance %d is invalid", instance);
+                        err = DATASTORE_ERROR_INVALID_INSTANCE;
                     }
                 }
+                else
+                {
+                    ESP_LOGE(TAG":_get_value", "bad type %d (expected %d)", INDEX[id].type, expected_type);
+                    err = DATASTORE_ERROR_INVALID_TYPE;
+                }
+            }
+            else
+            {
+                ESP_LOGE(TAG":_get_value", "bad id %d", id);
+                err = DATASTORE_ERROR_INVALID_ID;
             }
         }
+        else
+        {
+            ESP_LOGE(TAG":_get_value", "private is NULL");
+            err = DATASTORE_ERROR_NULL_POINTER;
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG":_get_value", "datastore is not initialised");
+        err = DATASTORE_ERROR_NOT_INITIALISED;
     }
     return err;
 }
 
 datastore_error_t datastore_get_uint8(const datastore_t * store, datastore_id_t id, instance_id_t instance, uint8_t * value)
 {
-    return DATASTORE_ERROR_UNKNOWN;
+    return _get_value(store, id, instance, value, DATASTORE_TYPE_UINT8);
 }
+
 datastore_error_t datastore_get_uint32(const datastore_t * store, datastore_id_t id, instance_id_t instance, uint32_t * value)
 {
-    datastore_error_t err = DATASTORE_ERROR_UNKNOWN;
-    if ((err = _is_init(store)) == DATASTORE_OK)
-    {
-        private_t * private = (private_t *)store->private;
-        if (private != NULL)
-        {
-            if (id >= 0 && id < DATASTORE_ID_LAST)
-            {
-                // check type
-                if (INDEX[id].type == DATASTORE_TYPE_UINT32)
-                {
-                    // check instance
-                    if (instance >= 0 && instance < INDEX[id].num_instances)
-                    {
-                        if (value)
-                        {
-                            // get the mutex
-                            xSemaphoreTake(private->semaphore, portMAX_DELAY);
-
-                            // get the value
-                            uint8_t * psrc = (uint8_t *)private + INDEX[id].offset;
-//                            INDEX[id].get_handler(psrc, (uint8_t *)value, sizeof(uint32_t));
-                            _get_handler(psrc, (uint8_t *)value, INDEX[id].size);
-
-                            // release the mutex
-                            xSemaphoreGive(private->semaphore);
-
-                            ESP_LOGI(TAG, "datastore_get_uint32 %d %d %d", id, instance, *value);
-
-                            // TODO: call any registered callbacks with new value
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return err;
+    return _get_value(store, id, instance, value, DATASTORE_TYPE_UINT32);
 }
-datastore_error_t datastore_get_int8(const datastore_t * store, datastore_id_t id, instance_id_t instance, int8_t * value);
-datastore_error_t datastore_get_int32(const datastore_t * store, datastore_id_t id, instance_id_t instance, int32_t * value);
-datastore_error_t datastore_get_float(const datastore_t * store, datastore_id_t id, instance_id_t instance, float * value);
-datastore_error_t datastore_get_double(const datastore_t * store, datastore_id_t id, instance_id_t instance, double * value);
+
+datastore_error_t datastore_get_int8(const datastore_t * store, datastore_id_t id, instance_id_t instance, int8_t * value)
+{
+    return _get_value(store, id, instance, value, DATASTORE_TYPE_INT8);
+}
+
+datastore_error_t datastore_get_int32(const datastore_t * store, datastore_id_t id, instance_id_t instance, int32_t * value)
+{
+    return _get_value(store, id, instance, value, DATASTORE_TYPE_INT32);
+}
+
+datastore_error_t datastore_get_float(const datastore_t * store, datastore_id_t id, instance_id_t instance, float * value)
+{
+    return _get_value(store, id, instance, value, DATASTORE_TYPE_FLOAT);
+}
+
+datastore_error_t datastore_get_double(const datastore_t * store, datastore_id_t id, instance_id_t instance, double * value)
+{
+    return _get_value(store, id, instance, value, DATASTORE_TYPE_DOUBLE);
+}
+
 datastore_error_t datastore_get_string(const datastore_t * store, datastore_id_t id, instance_id_t instance, char * value)
 {
-    datastore_error_t err = DATASTORE_ERROR_UNKNOWN;
-    if ((err = _is_init(store)) == DATASTORE_OK)
-    {
-        private_t * private = (private_t *)store->private;
-        if (private != NULL)
-        {
-            if (id >= 0 && id < DATASTORE_ID_LAST)
-            {
-                // check type
-                if (INDEX[id].type == DATASTORE_TYPE_STRING)
-                {
-                    // check instance
-                    if (instance >= 0 && instance < INDEX[id].num_instances)
-                    {
-                        if (value)
-                        {
-                            // get the mutex
-                            xSemaphoreTake(private->semaphore, portMAX_DELAY);
-
-                            // get the value
-                            uint8_t * psrc = (uint8_t *)private + INDEX[id].offset;
-//                            INDEX[id].get_handler(psrc, (uint8_t *)value, sizeof(uint32_t));
-                            _get_handler(psrc, (uint8_t *)value, INDEX[id].size);
-
-                            // release the mutex
-                            xSemaphoreGive(private->semaphore);
-
-                            ESP_LOGI(TAG, "datastore_get_string %d %d %s", id, instance, value);
-
-                            // TODO: call any registered callbacks with new value
-                        }
-                        else
-                        {
-                            err = DATASTORE_ERROR_NULL_POINTER;
-                        }
-
-                    }
-                    else
-                    {
-                        err = DATASTORE_ERROR_INVALID_INSTANCE;
-                    }
-                }
-                else
-                {
-                    err = DATASTORE_ERROR_INVALID_TYPE;
-                }
-            }
-            else
-            {
-                err = DATASTORE_ERROR_INVALID_ID;
-            }
-        }
-        else
-        {
-            err = DATASTORE_ERROR_NULL_POINTER;
-        }
-    }
-    else
-    {
-        err = DATASTORE_ERROR_NOT_INITIALISED;
-    }
-    return err;
+    return _get_value(store, id, instance, value, DATASTORE_TYPE_STRING);
 }
 
 datastore_error_t _to_string(const datastore_t * store, datastore_id_t id, instance_id_t instance, char * buffer, size_t len)
@@ -432,6 +465,38 @@ datastore_error_t _to_string(const datastore_t * store, datastore_id_t id, insta
                 uint32_t value = 0;
                 datastore_get_uint32(store, id, instance, &value);
                 snprintf(buffer, len, "%u", value);
+                err = DATASTORE_OK;
+                break;
+            }
+            case DATASTORE_TYPE_INT8:
+            {
+                int8_t value = 0;
+                datastore_get_int8(store, id, instance, &value);
+                snprintf(buffer, len, "%d", value);
+                err = DATASTORE_OK;
+                break;
+            }
+            case DATASTORE_TYPE_INT32:
+            {
+                int32_t value = 0;
+                datastore_get_int32(store, id, instance, &value);
+                snprintf(buffer, len, "%d", value);
+                err = DATASTORE_OK;
+                break;
+            }
+            case DATASTORE_TYPE_FLOAT:
+            {
+                float value = 0.0f;
+                datastore_get_float(store, id, instance, &value);
+                snprintf(buffer, len, "%f", value);
+                err = DATASTORE_OK;
+                break;
+            }
+            case DATASTORE_TYPE_DOUBLE:
+            {
+                double value = 0.0;
+                datastore_get_double(store, id, instance, &value);
+                snprintf(buffer, len, "%lf", value);
                 err = DATASTORE_OK;
                 break;
             }

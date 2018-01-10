@@ -112,11 +112,12 @@ static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void 
 static void _handle_page_avr_status(const i2c_lcd1602_info_t * lcd_info, void * state);
 
 static int alarm_display_count = 0;
+static bool splash_activity = false;
 
 static const page_spec_t page_specs[] = {
     // ID                       handler                        state
     { PAGE_BLANK,               _handle_page_blank,            NULL },
-    { PAGE_SPLASH,              _handle_page_splash,           NULL },
+    { PAGE_SPLASH,              _handle_page_splash,           &splash_activity },
     { PAGE_SENSORS_TEMP_1_2,    _handle_page_sensors_temp_1_2, NULL },
     { PAGE_SENSORS_TEMP_3_4,    _handle_page_sensors_temp_3_4, NULL },
     { PAGE_SENSORS_TEMP_5_P,    _handle_page_sensors_temp_5_P, NULL },
@@ -187,6 +188,8 @@ static void _handle_page_blank(const i2c_lcd1602_info_t * lcd_info, void * state
 
 static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
+    bool * activity = (bool *)state;
+
     char version[DATASTORE_LEN_VERSION] = "";
     char build_date_time[DATASTORE_LEN_BUILD_DATE_TIME] = "";
     datastore_get_string(datastore, DATASTORE_ID_SYSTEM_VERSION, 0, version);
@@ -197,9 +200,11 @@ static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * stat
     ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
     ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 
-    snprintf(line, ROW_STRING_WIDTH, " %s", build_date_time);
+    snprintf(line, ROW_STRING_WIDTH, "%c%s", *activity ? I2C_LCD1602_CHARACTER_DOT : ' ', build_date_time);
     ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
     ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+
+    *activity = !(*activity);
 }
 
 static void _handle_page_sensors_temp_1_2(const i2c_lcd1602_info_t * lcd_info, void * state)

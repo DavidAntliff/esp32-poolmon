@@ -30,9 +30,9 @@
 #include "esp_system.h"
 #include "esp_log.h"
 
+#include "sensor_light.h"
 #include "constants.h"
 #include "datastore.h"
-#include "sensor_light.h"
 #include "smbus.h"
 #include "tsl2561.h"
 #include "publish.h"
@@ -41,13 +41,13 @@
 
 #define SAMPLE_PERIOD (10000)  // sensor sampling period in milliseconds
 
+extern datastore_t * datastore;
+
 typedef struct
 {
     i2c_master_info_t * i2c_master_info;
     QueueHandle_t publish_queue;
 } task_inputs_t;
-
-extern datastore_t * datastore;
 
 static void sensor_light_task(void * pvParameter)
 {

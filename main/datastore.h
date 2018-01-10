@@ -28,6 +28,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define DATASTORE_INSTANCES_TEMP 5
+
 typedef enum
 {
     DATASTORE_ID_SYSTEM_VERSION = 0,
@@ -38,6 +40,10 @@ typedef enum
 //    DATASTORE_ID_I2C_ERROR_COUNT,
 //    DATASTORE_ID_I2C_ERROR_TIMESTAMP,
 //
+//    DATASTORE_ID_TEMP_VALUE,
+//    DATASTORE_ID_TEMP_LABEL,
+//    DATASTORE_ID_TEMP_ASSIGNMENT,
+
     DATASTORE_ID_LIGHT_FULL,
     DATASTORE_ID_LIGHT_VISIBLE,
     DATASTORE_ID_LIGHT_INFRARED,
@@ -49,6 +55,7 @@ typedef enum
 // string lengths
 #define DATASTORE_LEN_VERSION          4
 #define DATASTORE_LEN_BUILD_DATE_TIME 16
+#define DATASTORE_LEN_TEMP_LABEL       8
 
 typedef enum
 {
@@ -60,6 +67,15 @@ typedef enum
     DATASTORE_ERROR_INVALID_TYPE,     // a type is incorrect or not handled
     DATASTORE_ERROR_INVALID_INSTANCE,
 } datastore_error_t;
+
+typedef enum
+{
+    DATASTORE_TEMP_ASSIGNMENT_T1 = 0,
+    DATASTORE_TEMP_ASSIGNMENT_T2,
+    DATASTORE_TEMP_ASSIGNMENT_T3,
+    DATASTORE_TEMP_ASSIGNMENT_T4,
+    DATASTORE_TEMP_ASSIGNMENT_T5,
+} datastore_temp_assignment_t;
 
 typedef struct
 {
