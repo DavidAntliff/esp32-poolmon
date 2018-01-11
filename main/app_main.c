@@ -63,8 +63,8 @@ void app_main()
 //    esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("*", ESP_LOG_WARN);
     esp_log_level_set("display", ESP_LOG_INFO);
-    esp_log_level_set("datastore", ESP_LOG_INFO);
-    esp_log_level_set("sensor_light", ESP_LOG_INFO);
+    esp_log_level_set("datastore", ESP_LOG_DEBUG);
+    //esp_log_level_set("sensor_temp", ESP_LOG_INFO);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_MQTT_PRIORITY;

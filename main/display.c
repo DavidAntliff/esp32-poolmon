@@ -209,12 +209,24 @@ static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * stat
 
 static void _handle_page_sensors_temp_1_2(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
+    float value1 = 0.0f, value2 = 0.0f;
+    char label1[DATASTORE_LEN_TEMP_LABEL] = "", label2[DATASTORE_LEN_TEMP_LABEL] = "";
+    datastore_temp_assignment_t assign1 = -1, assign2 = -1;
+    datastore_get_float(datastore, DATASTORE_ID_TEMP_VALUE, 0, &value1);
+    datastore_get_float(datastore, DATASTORE_ID_TEMP_VALUE, 1, &value2);
+    datastore_get_string(datastore, DATASTORE_ID_TEMP_LABEL, 0, label1);
+    datastore_get_string(datastore, DATASTORE_ID_TEMP_LABEL, 1, &label2);
+    datastore_get_uint8(datastore, DATASTORE_ID_TEMP_ASSIGNMENT, 0, &assign1);
+    datastore_get_uint8(datastore, DATASTORE_ID_TEMP_ASSIGNMENT, 1, &assign2);
+
+    //esp_log_buffer_hex(TAG, label1, DATASTORE_LEN_TEMP_LABEL);
+
     char line[ROW_STRING_WIDTH] = "";
-    snprintf(line, ROW_STRING_WIDTH, "Temp%c  %2.1f %2.1f", I2C_LCD1602_CHARACTER_CUSTOM_0, 18.1, 20.2);
+    snprintf(line, ROW_STRING_WIDTH, "T1 %-7s %2.1f", label1, value1);
     ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
     ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 
-    snprintf(line, ROW_STRING_WIDTH, "  %2.1f %2.1f %2.1f", 22.9, 21.8, 21.7);
+    snprintf(line, ROW_STRING_WIDTH, "T2 %-7s %2.1f", label2, value2);
     ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
     ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
  }

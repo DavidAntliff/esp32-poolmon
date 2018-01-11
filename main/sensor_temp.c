@@ -165,6 +165,13 @@ static void sensor_temp_task(void * pvParameter)
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     int sample_count = 0;
 
+    // TODO
+    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 0, "LABEL1");
+    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 1, "LABEL2");
+    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 2, "LABEL3");
+    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 3, "LABEL4");
+    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 4, "LABEL5");
+
     int errors[MAX_DEVICES] = {0};
     if (task_inputs->sensors->num_ds18b20s > 0)
     {
@@ -194,7 +201,7 @@ static void sensor_temp_task(void * pvParameter)
                 if (readings[i] != DS18B20_INVALID_READING)
                 {
                     publish_value(PUBLISH_VALUE_TEMP_1 + i, readings[i], task_inputs->publish_queue);
-                    //datastore_set_uint32(datastore, DATASTORE_ID_TEMP_VALUE, i, readings[i]);
+                    datastore_set_float(datastore, DATASTORE_ID_TEMP_VALUE, i, readings[i]);
                 }
                 else
                 {
