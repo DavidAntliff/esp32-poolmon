@@ -32,11 +32,14 @@
 #include "driver/rmt.h"
 #include "driver/pcnt.h"
 
-#include "constants.h"
 #include "sensor_flow.h"
+#include "constants.h"
+#include "datastore.h"
 #include "publish.h"
 
 #define TAG "sensor_flow"
+
+extern datastore_t * datastore;
 
 typedef struct
 {
@@ -204,6 +207,9 @@ static void sensor_flow_task(void * pvParameter)
 
         publish_value(PUBLISH_VALUE_FLOW_FREQ, frequency_hz, task_inputs->publish_queue);
         publish_value(PUBLISH_VALUE_FLOW_RATE, rate_lpm, task_inputs->publish_queue);
+
+        datastore_set_float(datastore, DATASTORE_ID_FLOW_FREQUENCY, 0, frequency_hz);
+        datastore_set_float(datastore, DATASTORE_ID_FLOW_RATE, 0, rate_lpm);
 
         ESP_LOGI(TAG, "counter %d, frequency %f Hz, rate %f LPM", count, frequency_hz, rate_lpm);
 

@@ -69,6 +69,12 @@ struct _private_t
             uint32_t illuminance;
         } light;
 
+        struct flow
+        {
+            float frequency;  // Hz
+            float rate;       // LPM
+        } flow;
+
     } data;
 
 };
@@ -126,6 +132,9 @@ static index_t INDEX[] = {
     { DATASTORE_ID_LIGHT_VISIBLE,          NAME(DATASTORE_ID_LIGHT_VISIBLE),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.visible),          sizeof(((private_t *)0)->data.light.visible) },
     { DATASTORE_ID_LIGHT_INFRARED,         NAME(DATASTORE_ID_LIGHT_INFRARED),         DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.infrared),         sizeof(((private_t *)0)->data.light.infrared) },
     { DATASTORE_ID_LIGHT_ILLUMINANCE,      NAME(DATASTORE_ID_LIGHT_ILLUMINANCE),      DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.illuminance),      sizeof(((private_t *)0)->data.light.illuminance) },
+
+    { DATASTORE_ID_FLOW_FREQUENCY,         NAME(DATASTORE_ID_FLOW_FREQUENCY),         DATASTORE_TYPE_FLOAT,  1, offsetof(private_t, data.flow.frequency),         sizeof(((private_t *)0)->data.flow.frequency) },
+    { DATASTORE_ID_FLOW_RATE,              NAME(DATASTORE_ID_FLOW_RATE),              DATASTORE_TYPE_FLOAT,  1, offsetof(private_t, data.flow.rate),              sizeof(((private_t *)0)->data.flow.rate) },
 
 };
 
