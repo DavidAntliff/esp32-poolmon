@@ -554,7 +554,7 @@ datastore_error_t datastore_dump(const datastore_t * store)
             {
                 char value[256] = "";
                 err = _to_string(store, id, instance, value, 256);
-                ESP_LOGW(TAG, "%2d %-40s %d %s", id, INDEX[id].name, instance, value);
+                ESP_LOGW(TAG, LOG_COLOR(LOG_COLOR_PURPLE)"%2d %-40s %d %s", id, INDEX[id].name, instance, value);
             }
             if (err != DATASTORE_OK)
             {

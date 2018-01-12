@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
@@ -60,8 +62,12 @@ datastore_t * datastore = NULL;
 
 static void do_reset(const char * topic, bool value, void * context)
 {
-    ESP_LOGW(TAG, "Resetting now");
-    esp_restart();
+    if (value)
+    {
+        ESP_LOGW(TAG, "Restart requested");
+        bool * running = (bool *)context;
+        *running = false;
+    }
 }
 
 static void echo_bool(const char * topic, bool value, void * context)
@@ -74,6 +80,43 @@ static void echo_uint8(const char * topic, uint8_t value, void * context)
 {
     int ctxt_val = *(int *)context;
     ESP_LOGW(TAG, "echo_uint8: context %d, topic %s, value %d", ctxt_val, topic, value);
+}
+
+static void echo_uint32(const char * topic, uint32_t value, void * context)
+{
+    int ctxt_val = *(int *)context;
+    ESP_LOGW(TAG, "echo_uint32: context %d, topic %s, value %u", ctxt_val, topic, value);
+}
+
+static void echo_int8(const char * topic, int8_t value, void * context)
+{
+    int ctxt_val = *(int *)context;
+    ESP_LOGW(TAG, "echo_int8: context %d, topic %s, value %d", ctxt_val, topic, value);
+}
+
+static void echo_int32(const char * topic, int32_t value, void * context)
+{
+    int ctxt_val = *(int *)context;
+    ESP_LOGW(TAG, "echo_int32: context %d, topic %s, value %d", ctxt_val, topic, value);
+}
+
+static void echo_float(const char * topic, float value, void * context)
+{
+    int ctxt_val = *(int *)context;
+    ESP_LOGW(TAG, "echo_float: context %d, topic %s, value %.7f", ctxt_val, topic, value);
+}
+
+static void echo_double(const char * topic, double value, void * context)
+{
+    int ctxt_val = *(int *)context;
+    ESP_LOGW(TAG, "echo_double: context %d, topic %s, value %.17f", ctxt_val, topic, value);
+}
+
+static void echo_string(const char * topic, const char * value, void * context)
+{
+    int ctxt_val = *(int *)context;
+    ESP_LOGW(TAG, "echo_string: context %d, topic %s, value \'%s\'", ctxt_val, topic, value);
+    esp_log_buffer_hex(TAG, value, strlen(value) + 1);
 }
 
 void app_main()
@@ -128,6 +171,8 @@ void app_main()
                      CONFIG_FLOW_METER_RMT_GPIO, FLOW_METER_RMT_CHANNEL, FLOW_METER_RMT_CLK_DIV,
                      FLOW_METER_SAMPLING_PERIOD, FLOW_METER_SAMPLING_WINDOW, FLOW_METER_FILTER_LENGTH, sensor_priority, publish_queue);
 
+    bool running = true;
+
     //nvs_flash_init();
     mqtt_info_t * mqtt_info = mqtt_malloc();
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
@@ -135,19 +180,59 @@ void app_main()
     {
         //    mqtt_register_topic_as_bool(mqtt_info, "poolmon/esp32/reset", &do_reset, NULL /*context*/);
         // careful, stack variables!
-        int context_bool = 1;
-        int context_uint8 = 2;
+        int context_echo_bool = 1;
+        int context_echo_uint8 = 2;
+        int context_echo_uint32 = 3;
+        int context_echo_int8 = 4;
+        int context_echo_int32 = 5;
+        int context_echo_float = 6;
+        int context_echo_double = 7;
+        int context_echo_string = 8;
 
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/echo/bool", &echo_bool, &context_bool)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/echo/bool", &echo_bool, &context_echo_bool)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
 
-        if ((mqtt_error = mqtt_register_topic_as_uint8(mqtt_info, "poolmon/echo/uint8", &echo_uint8, &context_uint8)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_uint8(mqtt_info, "poolmon/echo/uint8", &echo_uint8, &context_echo_uint8)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_uint8 failed: %d", mqtt_error);
         }
 
+        if ((mqtt_error = mqtt_register_topic_as_uint32(mqtt_info, "poolmon/echo/uint32", &echo_uint32, &context_echo_uint32)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_uint32 failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_int8(mqtt_info, "poolmon/echo/int8", &echo_int8, &context_echo_int8)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_int8 failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_int32(mqtt_info, "poolmon/echo/int32", &echo_int32, &context_echo_int32)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_int32 failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_float(mqtt_info, "poolmon/echo/float", &echo_float, &context_echo_float)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_double(mqtt_info, "poolmon/echo/double", &echo_double, &context_echo_double)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_double failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_string(mqtt_info, "poolmon/echo/string", &echo_string, &context_echo_string)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/esp32/reset", &do_reset, &running)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+        }
     }
     else
     {
@@ -157,7 +242,7 @@ void app_main()
     wifi_support_init();
 
     // Run forever...
-    while (1)
+    while (running)
     {
         ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());  // byte-addressable heap memory
         ESP_LOGI(TAG, "32bit aligned RAM left %d", xPortGetFreeHeapSizeTagged(MALLOC_CAP_32BIT));  // IRAM 32-bit aligned heap
@@ -165,7 +250,14 @@ void app_main()
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
 
-    sensor_temp_close(temp_sensors);
-    i2c_master_close(i2c_master_info);
-    datastore_free(&datastore);
+    // TODO: signal to all tasks to close and wait for them to do so
+    // TODO: before deallocating structures that they might be using.
+
+//    sensor_temp_close(temp_sensors);
+//    i2c_master_close(i2c_master_info);
+//    datastore_free(&datastore);
+
+    ESP_LOGE(TAG, "Restarting...");
+    vTaskDelay(1000 / portTICK_RATE_MS);
+    esp_restart();
 }

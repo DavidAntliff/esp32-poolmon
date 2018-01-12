@@ -22,6 +22,16 @@
  * SOFTWARE.
  */
 
+/* Notes
+ * The 256dpi/esp-mqtt component is better suited than tuanpmt/espmqtt because:
+ *   1. it's better supported and utilised
+ *   2. it's more reliable
+ * The tuanpmt/espmqtt component suffers from a design flaw where MQTT messages grouped
+ * together in the TCP stream are dropped (in both directions).
+ *
+ * One identified issue with the 256dpi/esp-mqtt component is that large messages
+ * near the declared MQTT buffer size will cause a disconnect.
+ */
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -34,6 +44,7 @@
 
 #include "mqtt.h"
 #include "trie.h"
+#include "convert_string.h"
 
 #define TAG "mqtt"
 
@@ -91,31 +102,13 @@ static void _status_callback(esp_mqtt_status_t status)
     }
 }
 
-static bool _to_int(const char * in_str, long * lnum)
-{
-    bool ok = true;
-    char * end = NULL;
-    long val = strtol(in_str, &end, 10);
-    if (end == in_str)
-    {
-        ESP_LOGE(TAG, "numerical conversion failed: %s", in_str);
-        ok = false;
-    }
-    if (lnum)
-    {
-        *lnum = val;
-    }
-    return ok;
-}
-
 static void _message_callback(const char * topic, uint8_t * payload, size_t len)
 {
     ESP_LOGI(TAG, "_message_callback: topic '%s', len %d", topic, len);
     esp_log_buffer_hex(TAG, payload, len);
     const char * data = (const char *)payload;
 
-    // TODO: handle values other than uint8_ts
-    // TODO: use g_trie for the moment
+    // TODO: use g_trie until we add a context pointer to the message callback
     topic_info_t * topic_info = trie_search(g_trie, topic);
     if (topic_info)
     {
@@ -131,7 +124,7 @@ static void _message_callback(const char * topic, uint8_t * payload, size_t len)
                 // For true, accept any case of "T", "TRUE", non-zero
                 // For false, accept any case of "F", "FALSE", zero
                 bool value = false;
-                long numeric = 0;
+                uint32_t numeric = 0;
                 if (strncasecmp("true", data, len) == 0)
                 {
                     value = true;
@@ -140,7 +133,7 @@ static void _message_callback(const char * topic, uint8_t * payload, size_t len)
                 {
                     value = false;
                 }
-                else if (_to_int(data, &numeric))
+                else if (string_to_uint32(data, &numeric))
                 {
                     value = numeric;
                 }
@@ -155,22 +148,85 @@ static void _message_callback(const char * topic, uint8_t * payload, size_t len)
             }
             case MQTT_TYPE_UINT8:
             {
-                long value = 0;
-                if (_to_int(data, &value))
+                uint8_t value = 0;
+                if (string_to_uint8(data, &value))
                 {
-                    if (value >= 0 && value <= UINT8_MAX)
-                    {
-                        ((mqtt_receive_callback_uint8)(topic_info->rcb))(topic, value, topic_info->context);
-                    }
-                    else
-                    {
-                        ESP_LOGE(TAG, "invalid value \'%s\' for uint8", data);
-                    }
+                    ((mqtt_receive_callback_uint8)(topic_info->rcb))(topic, value, topic_info->context);
                 }
                 else
                 {
                     ESP_LOGE(TAG, "invalid value \'%s\' for uint8", data);
                 }
+                break;
+            }
+            case MQTT_TYPE_UINT32:
+            {
+                uint32_t value = 0;
+                if (string_to_uint32(data, &value))
+                {
+                    ((mqtt_receive_callback_uint32)(topic_info->rcb))(topic, value, topic_info->context);
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "invalid value \'%s\' for uint32", data);
+                }
+                break;
+            }
+            case MQTT_TYPE_INT8:
+            {
+                int8_t value = 0;
+                if (string_to_int8(data, &value))
+                {
+                    ((mqtt_receive_callback_int8)(topic_info->rcb))(topic, value, topic_info->context);
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "invalid value \'%s\' for int8", data);
+                }
+                break;
+            }
+            case MQTT_TYPE_INT32:
+            {
+                int32_t value = 0;
+                if (string_to_int32(data, &value))
+                {
+                    ((mqtt_receive_callback_int32)(topic_info->rcb))(topic, value, topic_info->context);
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "invalid value \'%s\' for int32", data);
+                }
+                break;
+            }
+            case MQTT_TYPE_FLOAT:
+            {
+                float value = 0;
+                if (string_to_float(data, &value))
+                {
+                    ((mqtt_receive_callback_float)(topic_info->rcb))(topic, value, topic_info->context);
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "invalid value \'%s\' for float", data);
+                }
+                break;
+            }
+            case MQTT_TYPE_DOUBLE:
+            {
+                double value = 0;
+                if (string_to_double(data, &value))
+                {
+                    ((mqtt_receive_callback_double)(topic_info->rcb))(topic, value, topic_info->context);
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "invalid value \'%s\' for double", data);
+                }
+                break;
+            }
+            case MQTT_TYPE_STRING:
+            {
+                ((mqtt_receive_callback_string)(topic_info->rcb))(topic, data, topic_info->context);
                 break;
             }
             default:
@@ -339,6 +395,36 @@ mqtt_error_t mqtt_register_topic_as_bool(mqtt_info_t * mqtt_info, const char * t
 mqtt_error_t mqtt_register_topic_as_uint8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint8 rcb, void * context)
 {
     return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_UINT8);
+}
+
+mqtt_error_t mqtt_register_topic_as_uint32(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint32 rcb, void * context)
+{
+    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_UINT32);
+}
+
+mqtt_error_t mqtt_register_topic_as_int8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_int8 rcb, void * context)
+{
+    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_INT8);
+}
+
+mqtt_error_t mqtt_register_topic_as_int32(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_int32 rcb, void * context)
+{
+    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_INT32);
+}
+
+mqtt_error_t mqtt_register_topic_as_float(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_float rcb, void * context)
+{
+    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_FLOAT);
+}
+
+mqtt_error_t mqtt_register_topic_as_double(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_double rcb, void * context)
+{
+    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_DOUBLE);
+}
+
+mqtt_error_t mqtt_register_topic_as_string(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_string rcb, void * context)
+{
+    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_STRING);
 }
 
 void mqtt_dump(const mqtt_info_t * mqtt_info)

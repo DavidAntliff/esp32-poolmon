@@ -76,3 +76,8 @@ int i2c_scan(const i2c_master_info_t * info)
     }
     return num_detected;
 }
+
+void i2c_master_close(i2c_master_info_t * info)
+{
+    free(info);
+}

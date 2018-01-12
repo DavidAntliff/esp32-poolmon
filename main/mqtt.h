@@ -48,8 +48,20 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info);
 
 typedef void (*mqtt_receive_callback_bool)(const char * topic, bool value, void * context);
 typedef void (*mqtt_receive_callback_uint8)(const char * topic, uint8_t value, void * context);
+typedef void (*mqtt_receive_callback_uint32)(const char * topic, uint32_t value, void * context);
+typedef void (*mqtt_receive_callback_int8)(const char * topic, int8_t value, void * context);
+typedef void (*mqtt_receive_callback_int32)(const char * topic, int32_t value, void * context);
+typedef void (*mqtt_receive_callback_float)(const char * topic, float value, void * context);
+typedef void (*mqtt_receive_callback_double)(const char * topic, double value, void * context);
+typedef void (*mqtt_receive_callback_string)(const char * topic, const char * value, void * context);
 
 mqtt_error_t mqtt_register_topic_as_bool(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_bool rcb, void * context);
 mqtt_error_t mqtt_register_topic_as_uint8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint8 rcb, void * context);
+mqtt_error_t mqtt_register_topic_as_uint32(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint32 rcb, void * context);
+mqtt_error_t mqtt_register_topic_as_int8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_int8 rcb, void * context);
+mqtt_error_t mqtt_register_topic_as_int32(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_int32 rcb, void * context);
+mqtt_error_t mqtt_register_topic_as_float(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_float rcb, void * context);
+mqtt_error_t mqtt_register_topic_as_double(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_double rcb, void * context);
+mqtt_error_t mqtt_register_topic_as_string(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_string rcb, void * context);
 
 #endif // MQTT_H

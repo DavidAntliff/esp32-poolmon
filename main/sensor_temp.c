@@ -132,28 +132,46 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
 {
     // set up the One Wire Bus
     OneWireBus * owb = NULL;
+    temp_sensors_t * sensors = NULL;
     owb_rmt_driver_info * rmt_driver_info = malloc(sizeof(*rmt_driver_info));
-    owb = owb_rmt_initialize(rmt_driver_info, gpio, OWB_RMT_CHANNEL_TX, OWB_RMT_CHANNEL_RX);
-    owb_use_crc(owb, true);       // enable CRC check for ROM code and measurement readings
 
-    // locate attached devices
-    OneWireBus_ROMCode * device_rom_codes = calloc(MAX_DEVICES, sizeof(*device_rom_codes));
+    // TODO: Need to keep hold of rmt_driver_info so we can free it later
 
-    int num_devices = find_owb_rom_codes(owb, device_rom_codes, MAX_DEVICES);
+    if (rmt_driver_info)
+    {
+        owb = owb_rmt_initialize(rmt_driver_info, gpio, OWB_RMT_CHANNEL_TX, OWB_RMT_CHANNEL_RX);
+        owb_use_crc(owb, true);       // enable CRC check for ROM code and measurement readings
 
-    // free up unused space
-    device_rom_codes = realloc(device_rom_codes, num_devices * sizeof(*device_rom_codes));
+        // locate attached devices
+        OneWireBus_ROMCode * device_rom_codes = calloc(MAX_DEVICES, sizeof(*device_rom_codes));
 
-    // associate devices on bus with DS18B20 device driver
-    DS18B20_Info ** device_infos = calloc(num_devices, sizeof(*device_infos));
-    associate_ds18b20_devices(owb, device_rom_codes, device_infos, num_devices);
+        int num_devices = find_owb_rom_codes(owb, device_rom_codes, MAX_DEVICES);
 
-    temp_sensors_t * sensors = malloc(sizeof(*sensors));
-    sensors->owb = owb;
-    sensors->rom_codes = device_rom_codes;
-    sensors->ds18b20_infos = device_infos;
-    sensors->num_ds18b20s = num_devices;
+        // free up unused space
+        device_rom_codes = realloc(device_rom_codes, num_devices * sizeof(*device_rom_codes));
 
+        // associate devices on bus with DS18B20 device driver
+        DS18B20_Info ** device_infos = calloc(num_devices, sizeof(*device_infos));
+        associate_ds18b20_devices(owb, device_rom_codes, device_infos, num_devices);
+
+        sensors = malloc(sizeof(*sensors));
+        if (sensors)
+        {
+            memset(sensors, 0, sizeof(*sensors));
+            sensors->owb = owb;
+            sensors->rom_codes = device_rom_codes;
+            sensors->ds18b20_infos = device_infos;
+            sensors->num_ds18b20s = num_devices;
+        }
+        else
+        {
+            ESP_LOGE(TAG, "malloc failed");
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "malloc failed");
+    }
     return sensors;
 }
 
@@ -255,7 +273,7 @@ void sensor_temp_close(temp_sensors_t * sensors)
         }
         free(sensors->ds18b20_infos);
         owb_uninitialize(sensors->owb);
-        free((void *)sensors->owb->driver);
+        // TODO: free the owb_rmt_driver_info struct
         free(sensors);
     }
 }
