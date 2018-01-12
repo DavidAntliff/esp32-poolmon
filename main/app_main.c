@@ -64,18 +64,25 @@ static void do_reset(const char * topic, bool value, void * context)
     esp_restart();
 }
 
+static void echo_bool(const char * topic, bool value, void * context)
+{
+    int ctxt_val = *(int *)context;
+    ESP_LOGW(TAG, "echo_bool: context %d, topic %s, value %d", ctxt_val, topic, value);
+}
+
 static void echo_uint8(const char * topic, uint8_t value, void * context)
 {
     int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_uint8 %d: %s %d", ctxt_val, topic, value);
+    ESP_LOGW(TAG, "echo_uint8: context %d, topic %s, value %d", ctxt_val, topic, value);
 }
 
 void app_main()
 {
-    esp_log_level_set("*", ESP_LOG_INFO);
-//    esp_log_level_set("*", ESP_LOG_WARN);
+//    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("*", ESP_LOG_WARN);
 //    esp_log_level_set("display", ESP_LOG_INFO);
 //    esp_log_level_set("datastore", ESP_LOG_DEBUG);
+    esp_log_level_set("mqtt", ESP_LOG_DEBUG);
     //esp_log_level_set("sensor_temp", ESP_LOG_INFO);
 
     // Priority of queue consumer should be higher than producers
@@ -123,9 +130,29 @@ void app_main()
 
     //nvs_flash_init();
     mqtt_info_t * mqtt_info = mqtt_malloc();
-    mqtt_init(mqtt_info);
-    //mqtt_support_register_topic("poolmon/esp32/reset", MQTT_SUPPORT_TYPE_BOOL, &do_reset, NULL /*context*/);
-    //mqtt_support_register_topic("poolmon/echo/uint8", MQTT_SUPPORT_TYPE_UINT8, &echo_uint8, &42/*context*/);
+    mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
+    if ((mqtt_error = mqtt_init(mqtt_info)) == MQTT_OK)
+    {
+        //    mqtt_register_topic_as_bool(mqtt_info, "poolmon/esp32/reset", &do_reset, NULL /*context*/);
+        // careful, stack variables!
+        int context_bool = 1;
+        int context_uint8 = 2;
+
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/echo/bool", &echo_bool, &context_bool)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_uint8(mqtt_info, "poolmon/echo/uint8", &echo_uint8, &context_uint8)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_uint8 failed: %d", mqtt_error);
+        }
+
+    }
+    else
+    {
+        ESP_LOGE(TAG, "mqtt_init failed: %d", mqtt_error);
+    }
 
     wifi_support_init();
 

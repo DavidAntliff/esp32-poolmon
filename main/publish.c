@@ -125,6 +125,8 @@ static void publish_task(void * pvParameter)
 
 void publish_value(publish_value_id_t value_id, float value, QueueHandle_t publish_queue)
 {
+    return; // TODO: bypass for now
+
     if (value_id >= 0 && value_id < PUBLISH_VALUE_LAST)
     {
         published_value_t published_value = {

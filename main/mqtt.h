@@ -33,7 +33,7 @@ typedef enum
     MQTT_OK = 0,
     MQTT_ERROR_NULL_POINTER,
     MQTT_ERROR_NOT_INITIALISED,
-    MQTT_ERROR_CANNOT_CREATE,
+    MQTT_ERROR_INVALID_TYPE,
     MQTT_ERROR_LAST,
 } mqtt_error_t;
 
@@ -45,5 +45,11 @@ typedef struct
 mqtt_info_t * mqtt_malloc(void);
 void mqtt_free(mqtt_info_t ** mqtt_info);
 mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info);
+
+typedef void (*mqtt_receive_callback_bool)(const char * topic, bool value, void * context);
+typedef void (*mqtt_receive_callback_uint8)(const char * topic, uint8_t value, void * context);
+
+mqtt_error_t mqtt_register_topic_as_bool(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_bool rcb, void * context);
+mqtt_error_t mqtt_register_topic_as_uint8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint8 rcb, void * context);
 
 #endif // MQTT_H

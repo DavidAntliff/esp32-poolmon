@@ -45,6 +45,30 @@ typedef struct
 // TODO: Singleton for now
 static trie * g_trie = NULL;
 
+typedef enum
+{
+    MQTT_TYPE_INVALID = 0,
+    MQTT_TYPE_BOOL,
+    MQTT_TYPE_UINT8,
+    MQTT_TYPE_UINT32,
+    MQTT_TYPE_INT8,
+    MQTT_TYPE_INT32,
+    MQTT_TYPE_FLOAT,
+    MQTT_TYPE_DOUBLE,
+    MQTT_TYPE_STRING,
+    MQTT_TYPE_LAST,
+} mqtt_type_t;
+
+typedef void (*generic_callback)(void);
+
+typedef struct
+{
+    //const char * topic;
+    mqtt_type_t type;
+    generic_callback rcb;
+    void * context;
+} topic_info_t;
+
 static void _status_callback(esp_mqtt_status_t status)
 {
     ESP_LOGI(TAG, "_status_callback: %d", status);
@@ -67,6 +91,23 @@ static void _status_callback(esp_mqtt_status_t status)
     }
 }
 
+static bool _to_int(const char * in_str, long * lnum)
+{
+    bool ok = true;
+    char * end = NULL;
+    long val = strtol(in_str, &end, 10);
+    if (end == in_str)
+    {
+        ESP_LOGE(TAG, "numerical conversion failed: %s", in_str);
+        ok = false;
+    }
+    if (lnum)
+    {
+        *lnum = val;
+    }
+    return ok;
+}
+
 static void _message_callback(const char * topic, uint8_t * payload, size_t len)
 {
     ESP_LOGI(TAG, "_message_callback: topic '%s', len %d", topic, len);
@@ -75,15 +116,72 @@ static void _message_callback(const char * topic, uint8_t * payload, size_t len)
 
     // TODO: handle values other than uint8_ts
     // TODO: use g_trie for the moment
-    uint8_t * result = trie_search(g_trie, topic);
-    if (result)
+    topic_info_t * topic_info = trie_search(g_trie, topic);
+    if (topic_info)
     {
-        *result = atoi(data);
-        ESP_LOGI(TAG, "%s %d", topic, *result);
+        uint8_t value = atoi(data);
+        ESP_LOGI(TAG, "%s %d", topic, value);
+        if (topic_info->rcb)
+        {
+            // dispatch based on type
+            switch (topic_info->type)
+            {
+            case MQTT_TYPE_BOOL:
+            {
+                // For true, accept any case of "T", "TRUE", non-zero
+                // For false, accept any case of "F", "FALSE", zero
+                bool value = false;
+                long numeric = 0;
+                if (strncasecmp("true", data, len) == 0)
+                {
+                    value = true;
+                }
+                else if (strncasecmp("false", data, len) == 0)
+                {
+                    value = false;
+                }
+                else if (_to_int(data, &numeric))
+                {
+                    value = numeric;
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "invalid value \'%s\' for bool", data);
+                    goto skip;
+                }
+                ((mqtt_receive_callback_bool)(topic_info->rcb))(topic, value, topic_info->context);
+            skip: ;
+                break;
+            }
+            case MQTT_TYPE_UINT8:
+            {
+                long value = 0;
+                if (_to_int(data, &value))
+                {
+                    if (value >= 0 && value <= UINT8_MAX)
+                    {
+                        ((mqtt_receive_callback_uint8)(topic_info->rcb))(topic, value, topic_info->context);
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "invalid value \'%s\' for uint8", data);
+                    }
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "invalid value \'%s\' for uint8", data);
+                }
+                break;
+            }
+            default:
+                ESP_LOGE(TAG, "unhandled type %d", topic_info->type);
+                break;
+            }
+        }
     }
     else
     {
-        ESP_LOGI(TAG, "%s not handled", topic);
+        ESP_LOGI(TAG, "topic %s not handled", topic);
     }
 }
 
@@ -121,7 +219,18 @@ void mqtt_free(mqtt_info_t ** mqtt_info)
     if (mqtt_info != NULL && (*mqtt_info != NULL))
     {
         ESP_LOGD(TAG, "free private %p", (*mqtt_info)->private);
+
+        private_t * private = (private_t *)(*mqtt_info)->private;
+        if (private && private->trie)
+        {
+            // TODO: free all topic_info structs in trie
+
+            ESP_LOGD(TAG, "free trie %p", private->trie);
+            trie_free(private->trie);
+            private->trie = 0;
+        }
         free((*mqtt_info)->private);
+        ESP_LOGD(TAG, "free mqtt_info %p", *mqtt_info);
         free(*mqtt_info);
         *mqtt_info = NULL;
     }
@@ -164,6 +273,7 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
 
             if (private->trie)
             {
+                ESP_LOGD(TAG, "malloc trie %p", private->trie);
                 // TODO:
                 g_trie = private->trie;
                 err = MQTT_OK;
@@ -171,7 +281,7 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
             else
             {
                 ESP_LOGE(TAG, "unable to create trie");
-                err = MQTT_ERROR_CANNOT_CREATE;
+                err = MQTT_ERROR_NULL_POINTER;
             }
         }
         else
@@ -186,6 +296,49 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
         err = MQTT_ERROR_NULL_POINTER;
     }
     return err;
+}
+
+static mqtt_error_t _register_topic(mqtt_info_t * mqtt_info, const char * topic, generic_callback rcb, void * context, mqtt_type_t type)
+{
+    mqtt_error_t err = MQTT_ERROR_UNKNOWN;
+    if ((err = _is_init(mqtt_info)) == MQTT_OK)
+    {
+        if (topic)
+        {
+            const private_t * private = (const private_t *)mqtt_info->private;
+            topic_info_t * topic_info = malloc(sizeof(*topic_info));
+            if (topic_info)
+            {
+                memset(topic_info, 0, sizeof(*topic_info));
+                //topic_info->topic = strdup(topic);
+                topic_info->type = type;
+                topic_info->rcb = rcb;
+                topic_info->context = context;
+                trie_insert(private->trie, topic, topic_info);
+            }
+            else
+            {
+                ESP_LOGE(TAG, "malloc failed");
+                err = MQTT_ERROR_NULL_POINTER;
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "topic is NULL");
+            err = MQTT_ERROR_NULL_POINTER;
+        }
+    }
+    return err;
+}
+
+mqtt_error_t mqtt_register_topic_as_bool(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_bool rcb, void * context)
+{
+    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_BOOL);
+}
+
+mqtt_error_t mqtt_register_topic_as_uint8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint8 rcb, void * context)
+{
+    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_UINT8);
 }
 
 void mqtt_dump(const mqtt_info_t * mqtt_info)

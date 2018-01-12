@@ -66,8 +66,8 @@ typedef enum
     DATASTORE_OK = 0,
     DATASTORE_ERROR_NULL_POINTER,     // a parameter or variable is NULL
     DATASTORE_ERROR_NOT_INITIALISED,  // the datastore is not initialised
-    DATASTORE_ERROR_INVALID_ID,
     DATASTORE_ERROR_INVALID_TYPE,     // a type is incorrect or not handled
+    DATASTORE_ERROR_INVALID_ID,
     DATASTORE_ERROR_INVALID_INSTANCE,
 } datastore_error_t;
 
