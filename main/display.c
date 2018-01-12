@@ -183,8 +183,8 @@ static const uint8_t degrees_C[8]  = { 0x10, 0x06, 0x09, 0x08, 0x08, 0x09, 0x06,
 
 static void _handle_page_blank(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "BLANK"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "BLANK"));
 }
 
 static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -198,12 +198,12 @@ static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * stat
 
     char line[ROW_STRING_WIDTH] = "";
     snprintf(line, ROW_STRING_WIDTH, "PoolControl v%s", version);
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 
     snprintf(line, ROW_STRING_WIDTH, "%c%s", *activity ? I2C_LCD1602_CHARACTER_DOT : ' ', build_date_time);
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 
     *activity = !(*activity);
 }
@@ -228,10 +228,10 @@ static void _handle_page_sensors_temp_1_2(const i2c_lcd1602_info_t * lcd_info, v
     _get_temp_sensor(datastore, 1, &value, label);
     snprintf(line1, ROW_STRING_WIDTH, "T2 %-7s %4.1f"DEGREES_C, label, value);
 
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line0));
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line1));
  }
 
 static void _handle_page_sensors_temp_3_4(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -248,10 +248,10 @@ static void _handle_page_sensors_temp_3_4(const i2c_lcd1602_info_t * lcd_info, v
     _get_temp_sensor(datastore, 3, &value, label);
     snprintf(line1, ROW_STRING_WIDTH, "T4 %-7s %4.1f"DEGREES_C, label, value);
 
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line0));
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line1));
 }
 
 static void _handle_page_sensors_temp_5_P(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -269,10 +269,10 @@ static void _handle_page_sensors_temp_5_P(const i2c_lcd1602_info_t * lcd_info, v
     //datastore_get_float(datastore, DATASTORE_ID_POWER_VALUE, 0, value);
     snprintf(line1, ROW_STRING_WIDTH, "Power   %7.1fW", power);
 
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line0));
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line1));
 }
 
 static void _handle_page_sensors_light(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -285,12 +285,12 @@ static void _handle_page_sensors_light(const i2c_lcd1602_info_t * lcd_info, void
 
     char line[ROW_STRING_WIDTH] = "";
     snprintf(line, ROW_STRING_WIDTH, "Li F%5d L%5d", full, illuminance);
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 
     snprintf(line, ROW_STRING_WIDTH, "   I%5d V%5d", infrared, visible);
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 }
 
 static void _handle_page_sensors_flow(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -301,88 +301,88 @@ static void _handle_page_sensors_flow(const i2c_lcd1602_info_t * lcd_info, void 
 
     char line[ROW_STRING_WIDTH] = "";
     snprintf(line, ROW_STRING_WIDTH, "Flow   %5.1f Hz ", frequency);
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 
     snprintf(line, ROW_STRING_WIDTH, "       %5.1f LPM", rate);
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 }
 
 static void _handle_page_pump_ssrs(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "PUMPS_SSRS"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "PUMPS_SSRS"));
 }
 
 static void _handle_page_alarm(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
     int * display_count = (int *)state;
     ++*display_count;
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
     char line[ROW_STRING_WIDTH] = "";
     snprintf(line, ROW_STRING_WIDTH, "ALARM %d", *display_count);
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
 }
 
 static void _handle_page_advanced(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "ADVANCED"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "ADVANCED"));
 }
 
 static void _handle_page_last_error(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "LAST_ERROR"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "LAST_ERROR"));
 }
 
 static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "WIFI_STATUS"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "WIFI_STATUS"));
 }
 
 static void _handle_page_mqtt_status(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "MQTT_STATUS"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "MQTT_STATUS"));
 }
 
 static void _handle_page_sensors_status_1(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_STATUS_1"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_STATUS_1"));
 }
 
 static void _handle_page_sensors_status_2(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_STATUS_2"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_STATUS_2"));
 }
 
 static void _handle_page_sensors_status_3(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_STATUS_3"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_STATUS_3"));
 }
 
 static void _handle_page_sensors_status_4(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_STATUS_4"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "SENSORS_STATUS_4"));
 }
 
 static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "ESP32_STATUS"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "ESP32_STATUS"));
 }
 
 static void _handle_page_avr_status(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
-    ESP_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "AVR_STATUS"));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "AVR_STATUS"));
 }
 
 static void dispatch_to_handler(i2c_lcd1602_info_t * lcd_info, page_id_t current_page)
@@ -456,10 +456,10 @@ static void display_task(void * pvParameter)
     i2c_lcd1602_write_char(lcd_info, 'B');
 
     // Define custom characters
-    i2c_lcd1602_define_char(lcd_info, I2C_LCD1602_INDEX_CUSTOM_0, degrees_C);
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_define_char(lcd_info, I2C_LCD1602_INDEX_CUSTOM_0, degrees_C));
 
     // Move to home position
-    ESP_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
 
     page_id_t current_page = PAGE_SPLASH;
 
@@ -478,7 +478,7 @@ static void display_task(void * pvParameter)
             {
                 ESP_LOGI(TAG, "change to page %d", new_page);
                 current_page = new_page;
-                ESP_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+                I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
 
                 // special case - when changing to the Last Error page, dump the entire datastore
                 if (current_page == PAGE_LAST_ERROR)
@@ -567,16 +567,25 @@ static void button_task(void * pvParameter)
 
 void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority)
 {
-    button_queue = xQueueCreate(10, sizeof(input_t));
-
-    // task will take ownership of this struct
-    task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
-    if (task_inputs)
+    static bool init = false;
+    if (!init)
     {
-        memset(task_inputs, 0, sizeof(*task_inputs));
-        task_inputs->i2c_master_info = i2c_master_info;
-        xTaskCreate(&display_task, "display_task", 4096, task_inputs, priority, NULL);
-    }
+        button_queue = xQueueCreate(10, sizeof(input_t));
 
-    xTaskCreate(&button_task, "button_task", 2048, NULL, priority, NULL);
+        // task will take ownership of this struct
+        task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
+        if (task_inputs)
+        {
+            memset(task_inputs, 0, sizeof(*task_inputs));
+            task_inputs->i2c_master_info = i2c_master_info;
+            xTaskCreate(&display_task, "display_task", 4096, task_inputs, priority, NULL);
+        }
+
+        xTaskCreate(&button_task, "button_task", 2048, NULL, priority, NULL);
+        init = true;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "display already initialised");
+    }
 }
