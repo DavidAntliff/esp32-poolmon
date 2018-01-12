@@ -33,4 +33,7 @@
 
 void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue);
 
+// reset the AVR
+void avr_support_reset(void);
+
 #endif // AVR_SUPPORT_H
