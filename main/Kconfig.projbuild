@@ -12,6 +12,18 @@ config WIFI_PASSWORD
     help
         WiFi password (WPA or WPA2) for the example to use.
 
+config MQTT_BROKER_IP_ADDRESS
+    string "MQTT Broker IP Address"
+    help
+        IP address or name of MQTT broker.
+
+config MQTT_BROKER_TCP_PORT
+    int "MQTT Broker TCP Port"
+    range 0 65535
+    default 1883
+    help
+        TCP Port to use to connect to MQTT broker.
+
 config ONBOARD_LED_GPIO
     int "Onboard LED GPIO number"
     range 0 34

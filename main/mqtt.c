@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2017 David Antliff
+ * Copyright (c) 2018 David Antliff
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,17 +22,183 @@
  * SOFTWARE.
  */
 
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_system.h"
 #include "esp_log.h"
 
-#include "mqtt_support.h"
+#include "esp_mqtt.h"
+
 #include "mqtt.h"
+#include "trie.h"
 
-#define TAG "mqtt_support"
+#define TAG "mqtt"
 
+typedef struct
+{
+    trie * trie;
+} private_t;
+
+// TODO: Singleton for now
+static trie * g_trie = NULL;
+
+static void _status_callback(esp_mqtt_status_t status)
+{
+    ESP_LOGI(TAG, "_status_callback: %d", status);
+
+    switch (status)
+    {
+        case ESP_MQTT_STATUS_CONNECTED:
+            ESP_LOGI(TAG, "MQTT Connected");
+
+            // send a device status update
+            const char * value = "MQTT connected";
+            esp_mqtt_publish("poolmon/device/status", (uint8_t*)value, strlen(value), 0, false);
+            esp_mqtt_subscribe("poolmon/#", 0);
+            break;
+        case ESP_MQTT_STATUS_DISCONNECTED:
+            ESP_LOGI(TAG, "MQTT Disconnected");
+            break;
+        default:
+            break;
+    }
+}
+
+static void _message_callback(const char * topic, uint8_t * payload, size_t len)
+{
+    ESP_LOGI(TAG, "_message_callback: topic '%s', len %d", topic, len);
+    esp_log_buffer_hex(TAG, payload, len);
+    const char * data = (const char *)payload;
+
+    // TODO: handle values other than uint8_ts
+    // TODO: use g_trie for the moment
+    uint8_t * result = trie_search(g_trie, topic);
+    if (result)
+    {
+        *result = atoi(data);
+        ESP_LOGI(TAG, "%s %d", topic, *result);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "%s not handled", topic);
+    }
+}
+
+mqtt_info_t * mqtt_malloc(void)
+{
+    mqtt_info_t * mqtt_info = NULL;
+    private_t * private = malloc(sizeof(*private));
+    if (private != NULL)
+    {
+        memset(private, 0, sizeof(*private));
+        ESP_LOGD(TAG, "malloc private %p", private);
+
+        mqtt_info = malloc(sizeof(*mqtt_info));
+        if (mqtt_info)
+        {
+            ESP_LOGD(TAG, "malloc mqtt_info %p", mqtt_info);
+            memset(mqtt_info, 0, sizeof(*mqtt_info));
+            mqtt_info->private = private;
+        }
+        else
+        {
+            ESP_LOGE(TAG, "malloc failed");
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "malloc failed");
+    }
+
+    return mqtt_info;
+}
+
+void mqtt_free(mqtt_info_t ** mqtt_info)
+{
+    if (mqtt_info != NULL && (*mqtt_info != NULL))
+    {
+        ESP_LOGD(TAG, "free private %p", (*mqtt_info)->private);
+        free((*mqtt_info)->private);
+        free(*mqtt_info);
+        *mqtt_info = NULL;
+    }
+}
+
+static mqtt_error_t _is_init(const mqtt_info_t * mqtt_info)
+{
+    mqtt_error_t err = MQTT_ERROR_NOT_INITIALISED;
+    if (mqtt_info != NULL)
+    {
+        if (mqtt_info->private)
+        {
+            // OK
+            err = MQTT_OK;
+        }
+        else
+        {
+            ESP_LOGE(TAG, "mqtt is not initialised");
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "mqtt_info is NULL");
+        err = MQTT_ERROR_NULL_POINTER;
+    }
+    return err;
+}
+
+mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
+{
+    mqtt_error_t err = MQTT_ERROR_UNKNOWN;
+    if (mqtt_info != NULL)
+    {
+        private_t * private = (private_t *)mqtt_info->private;
+        if (private != NULL)
+        {
+            // sadly the esp_mqtt component only supports a single instance
+            esp_mqtt_init(_status_callback, _message_callback, 256 /*buffer size*/, 2000 /*timeout*/);
+            private->trie = trie_create();
+
+            if (private->trie)
+            {
+                // TODO:
+                g_trie = private->trie;
+                err = MQTT_OK;
+            }
+            else
+            {
+                ESP_LOGE(TAG, "unable to create trie");
+                err = MQTT_ERROR_CANNOT_CREATE;
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "mqtt_info->private is NULL");
+            err = MQTT_ERROR_NULL_POINTER;
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "mqtt_info is NULL");
+        err = MQTT_ERROR_NULL_POINTER;
+    }
+    return err;
+}
+
+void mqtt_dump(const mqtt_info_t * mqtt_info)
+{
+    mqtt_error_t err = MQTT_ERROR_UNKNOWN;
+    if ((err = _is_init(mqtt_info)) == MQTT_OK)
+    {
+        const private_t * private = (const private_t *)mqtt_info->private;
+        ESP_LOGW(TAG, "trie: count %d, size %d bytes", trie_count(private->trie, ""), trie_size(private->trie));
+    }
+}
+
+#if 0
 // let's try a global variable for now
 mqtt_client * g_client = NULL;
 
@@ -169,3 +335,4 @@ mqtt_settings g_settings = {
     .publish_cb = publish_cb,
     .data_cb = data_cb
 };
+#endif

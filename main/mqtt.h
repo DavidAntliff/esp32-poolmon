@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2017 David Antliff
+ * Copyright (c) 2018 David Antliff
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,14 +22,28 @@
  * SOFTWARE.
  */
 
-#ifndef MQTT_SUPPORT_H
-#define MQTT_SUPPORT_H
+#ifndef MQTT_H
+#define MQTT_H
 
-#include "mqtt.h"
+#include "esp_mqtt.h"
 
-extern mqtt_client * g_client;
-extern mqtt_settings g_settings;
+typedef enum
+{
+    MQTT_ERROR_UNKNOWN = -1,
+    MQTT_OK = 0,
+    MQTT_ERROR_NULL_POINTER,
+    MQTT_ERROR_NOT_INITIALISED,
+    MQTT_ERROR_CANNOT_CREATE,
+    MQTT_ERROR_LAST,
+} mqtt_error_t;
 
-void mqtt_support_init(void);
+typedef struct
+{
+    void * private;
+} mqtt_info_t;
 
-#endif // MQTT_SUPPORT_H
+mqtt_info_t * mqtt_malloc(void);
+void mqtt_free(mqtt_info_t ** mqtt_info);
+mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info);
+
+#endif // MQTT_H

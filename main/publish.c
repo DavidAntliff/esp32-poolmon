@@ -22,17 +22,19 @@
  * SOFTWARE.
  */
 
+#include <stdio.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
 
 #include "publish.h"
-#include "mqtt.h"
 
 #define TAG "publish"
 
-extern mqtt_client * g_client;
+//extern mqtt_client * g_client;
+void * g_client;   // temporary hack
 
 #define ROOT_TOPIC "poolmon"
 
@@ -100,7 +102,7 @@ static void publish_task(void * pvParameter)
                     snprintf(topic, 64-1, "%s/%s", ROOT_TOPIC, values_info[published_value.id].topic);
                     snprintf(value, 8-1, "%.3f", published_value.value);
                     ESP_LOGI(TAG, "Publish %s %s", topic, value);
-                    mqtt_publish(g_client, topic, value, strlen(value), 0, 0);
+                    //mqtt_publish(g_client, topic, value, strlen(value), 0, 0);
                 }
                 else
                 {
