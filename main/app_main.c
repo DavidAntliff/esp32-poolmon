@@ -28,7 +28,7 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-//#include "nvs_flash.h"
+#include "nvs_flash.h"
 #include "soc/rtc.h"
 
 // memory monitoring
@@ -172,7 +172,6 @@ void app_main()
 
     bool running = true;
 
-    //nvs_flash_init();
     mqtt_info_t * mqtt_info = mqtt_malloc();
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
     if ((mqtt_error = mqtt_init(mqtt_info)) == MQTT_OK)
@@ -238,6 +237,7 @@ void app_main()
         ESP_LOGE(TAG, "mqtt_init failed: %d", mqtt_error);
     }
 
+    nvs_flash_init();
     wifi_support_init();
 
     // Run forever...
