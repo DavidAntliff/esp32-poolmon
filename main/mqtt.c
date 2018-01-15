@@ -82,7 +82,7 @@ typedef struct
 
 static void _status_callback(esp_mqtt_status_t status)
 {
-    ESP_LOGI(TAG, "_status_callback: %d", status);
+    ESP_LOGD(TAG, "_status_callback: %d", status);
 
     switch (status)
     {

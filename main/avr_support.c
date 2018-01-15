@@ -48,17 +48,24 @@ typedef struct
     QueueHandle_t publish_queue;
 } task_inputs_t;
 
+#define I2C_ERROR_CHECK(x) do {                                             \
+        esp_err_t rc = (x);                                                 \
+        if (rc != ESP_OK) {                                                 \
+            ESP_LOGW(TAG, "I2C error %d at %s:%d", rc, __FILE__, __LINE__); \
+        }                                                                   \
+    } while(0);
+
 static uint8_t _read_register(const smbus_info_t * smbus_info, uint8_t address)
 {
     uint8_t value = 0;
-    smbus_send_byte(smbus_info, address);
-    smbus_receive_byte(smbus_info, &value);
+    I2C_ERROR_CHECK(smbus_send_byte(smbus_info, address));
+    I2C_ERROR_CHECK(smbus_receive_byte(smbus_info, &value));
     return value;
 }
 
 static void _write_register(const smbus_info_t * smbus_info, uint8_t address, uint8_t value)
 {
-    smbus_write_byte(smbus_info, address, value);
+    I2C_ERROR_CHECK(smbus_write_byte(smbus_info, address, value));
 }
 
 static uint8_t _decode_switch_states(uint8_t status)
@@ -116,7 +123,7 @@ static void avr_support_task(void * pvParameter)
     // Set up the SMBus
     smbus_info_t * smbus_info = smbus_malloc();
     smbus_init(smbus_info, i2c_port, CONFIG_AVR_I2C_ADDRESS);
-    smbus_set_timeout(smbus_info, SMBUS_TIMEOUT / portTICK_RATE_MS);
+    I2C_ERROR_CHECK(smbus_set_timeout(smbus_info, SMBUS_TIMEOUT / portTICK_RATE_MS));
 
     uint8_t status = _read_register(smbus_info, REGISTER_STATUS);
     ESP_LOGI(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);

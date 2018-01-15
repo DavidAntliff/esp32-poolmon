@@ -41,6 +41,7 @@
 #define SMBUS_TIMEOUT     1000   // milliseconds
 #define DISPLAY_WIDTH     I2C_LCD1602_NUM_VISIBLE_COLUMNS
 #define ROW_STRING_WIDTH  (DISPLAY_WIDTH + 1)    // room for null terminator
+#define TICKS_PER_UPDATE  (10 / portTICK_RATE_MS)
 
 #ifndef BUILD_TIMESTAMP
 #  warning "Please ensure BUILD_TIMESTAMP is defined"
@@ -319,10 +320,13 @@ static void _handle_page_alarm(const i2c_lcd1602_info_t * lcd_info, void * state
 {
     int * display_count = (int *)state;
     ++*display_count;
-    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
+    //I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
     char line[ROW_STRING_WIDTH] = "";
-    snprintf(line, ROW_STRING_WIDTH, "ALARM %d", *display_count);
+    snprintf(line, ROW_STRING_WIDTH, "ALARM %-6d    ", *display_count);
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 0));
     I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, line));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_write_string(lcd_info, "ABCDEFGHIJKLMNOP"));
 }
 
 static void _handle_page_advanced(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -469,7 +473,7 @@ static void display_task(void * pvParameter)
         ESP_LOGD(TAG, "display loop");
         dispatch_to_handler(lcd_info, current_page);
         input_t input = INPUT_NONE;
-        BaseType_t rc = xQueueReceive(button_queue, &input, 1000 / portTICK_RATE_MS);
+        BaseType_t rc = xQueueReceive(button_queue, &input, TICKS_PER_UPDATE);
         if (rc == pdTRUE)
         {
             ESP_LOGI(TAG, "from queue: %d", input);

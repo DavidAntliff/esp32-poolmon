@@ -77,25 +77,30 @@ static void sensor_light_task(void * pvParameter)
 
         tsl2561_visible_t visible = 0;
         tsl2561_infrared_t infrared = 0;
-        tsl2561_read(tsl2561_info, &visible, &infrared);
+        if (tsl2561_read(tsl2561_info, &visible, &infrared) == ESP_OK)
+        {
+            uint32_t lux = tsl2561_compute_lux(tsl2561_info, visible, infrared);
 
-        uint32_t lux = tsl2561_compute_lux(tsl2561_info, visible, infrared);
+            publish_value(PUBLISH_VALUE_LIGHT_FULL_SPECTRUM, visible + infrared, task_inputs->publish_queue);
+            publish_value(PUBLISH_VALUE_LIGHT_VISIBLE, visible, task_inputs->publish_queue);
+            publish_value(PUBLISH_VALUE_LIGHT_INFRARED, infrared, task_inputs->publish_queue);
+            publish_value(PUBLISH_VALUE_LIGHT_LUX, lux, task_inputs->publish_queue);
 
-        publish_value(PUBLISH_VALUE_LIGHT_FULL_SPECTRUM, visible + infrared, task_inputs->publish_queue);
-        publish_value(PUBLISH_VALUE_LIGHT_VISIBLE, visible, task_inputs->publish_queue);
-        publish_value(PUBLISH_VALUE_LIGHT_INFRARED, infrared, task_inputs->publish_queue);
-        publish_value(PUBLISH_VALUE_LIGHT_LUX, lux, task_inputs->publish_queue);
+            ESP_LOGI(TAG, "Light Sensor Readings:")
+            ESP_LOGI(TAG, "  Full spectrum: %d", visible + infrared);
+            ESP_LOGI(TAG, "  Infrared:      %d", infrared);
+            ESP_LOGI(TAG, "  Visible:       %d", visible);
+            ESP_LOGI(TAG, "  Illuminance:   %d lux", lux);
 
-        ESP_LOGI(TAG, "Light Sensor Readings:")
-        ESP_LOGI(TAG, "  Full spectrum: %d", visible + infrared);
-        ESP_LOGI(TAG, "  Infrared:      %d", infrared);
-        ESP_LOGI(TAG, "  Visible:       %d", visible);
-        ESP_LOGI(TAG, "  Illuminance:   %d lux", lux);
-
-        datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, visible + infrared);
-        datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, infrared);
-        datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, visible);
-        datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, lux);
+            datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, visible + infrared);
+            datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, infrared);
+            datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, visible);
+            datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, lux);
+        }
+        else
+        {
+            ESP_LOGW(TAG, "sensor error");
+        }
 
         //vTaskDelayUntil(&last_wake_time, 1000 / portTICK_PERIOD_MS); -- not yet supported by ESP-IDF
         vTaskDelay(SAMPLE_PERIOD / portTICK_PERIOD_MS - (xTaskGetTickCount() - last_wake_time));
