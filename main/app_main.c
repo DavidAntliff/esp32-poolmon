@@ -59,13 +59,23 @@
 // TODO: make this non-global!
 datastore_t * datastore = NULL;
 
-static void do_reset(const char * topic, bool value, void * context)
+static void do_esp32_reset(const char * topic, bool value, void * context)
 {
     if (value)
     {
-        ESP_LOGW(TAG, "Restart requested");
+        ESP_LOGW(TAG, "ESP32 restart requested");
         bool * running = (bool *)context;
         *running = false;
+    }
+}
+
+static void do_avr_reset(const char * topic, bool value, void * context)
+{
+    if (value)
+    {
+        ESP_LOGW(TAG, "AVR restart requested");
+        avr_support_reset();
+
     }
 }
 
@@ -120,6 +130,16 @@ static void echo_string(const char * topic, const char * value, void * context)
 
 void app_main()
 {
+//    // Experiment: hold the AVR in reset briefly
+//    gpio_pad_select_gpio(CONFIG_AVR_RESET_GPIO);
+//    gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
+//    gpio_set_direction(CONFIG_AVR_RESET_GPIO, GPIO_MODE_OUTPUT);
+//
+//    gpio_set_level(CONFIG_AVR_RESET_GPIO, 0);
+////    //vTaskDelay(1000 / portTICK_RATE_MS);
+//    gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
+//    vTaskDelay(5000 / portTICK_RATE_MS);
+
 //    esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("*", ESP_LOG_WARN);
 //    esp_log_level_set("display", ESP_LOG_INFO);
@@ -227,7 +247,12 @@ void app_main()
             ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
         }
 
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/esp32/reset", &do_reset, &running)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/esp32/reset", &do_esp32_reset, &running)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/avr/reset", &do_avr_reset, NULL)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
