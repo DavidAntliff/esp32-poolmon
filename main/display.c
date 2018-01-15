@@ -444,6 +444,11 @@ static page_id_t handle_transition(input_t input, page_id_t current_page)
     return new_page;
 }
 
+static esp_err_t _display_init(i2c_lcd1602_info_t * lcd_info, smbus_info_t * smbus_info, bool backlight)
+{
+  return i2c_lcd1602_init(lcd_info, smbus_info, backlight);
+}
+
 static void display_task(void * pvParameter)
 {
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
@@ -456,7 +461,8 @@ static void display_task(void * pvParameter)
 
     // Set up the LCD1602 device with backlight on
     i2c_lcd1602_info_t * lcd_info = i2c_lcd1602_malloc();
-    ESP_ERROR_CHECK(i2c_lcd1602_init(lcd_info, smbus_info, true));
+    //ESP_ERROR_CHECK(i2c_lcd1602_init(lcd_info, smbus_info, true));
+    _display_init(lcd_info, smbus_info, true);
     i2c_lcd1602_write_char(lcd_info, 'B');
 
     // Define custom characters
@@ -482,6 +488,10 @@ static void display_task(void * pvParameter)
             {
                 ESP_LOGI(TAG, "change to page %d", new_page);
                 current_page = new_page;
+
+                // EXPERIMENTAL - reset display
+                _display_init(lcd_info, smbus_info, true);
+
                 I2C_LCD1602_ERROR_CHECK(i2c_lcd1602_clear(lcd_info));
 
                 // special case - when changing to the Last Error page, dump the entire datastore
