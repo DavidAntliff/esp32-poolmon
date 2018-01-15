@@ -33,8 +33,7 @@
 
 // memory monitoring
 #include "esp_system.h"
-#include "esp_heap_alloc_caps.h"
-#include "freertos/heap_regions.h"
+#include "esp_heap_caps.h"
 
 #include "constants.h"
 #include "datastore.h"
@@ -245,7 +244,7 @@ void app_main()
     while (running)
     {
         ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());  // byte-addressable heap memory
-        ESP_LOGI(TAG, "32bit aligned RAM left %d", xPortGetFreeHeapSizeTagged(MALLOC_CAP_32BIT));  // IRAM 32-bit aligned heap
+        ESP_LOGI(TAG, "32bit aligned RAM left %d", heap_caps_get_free_size(MALLOC_CAP_32BIT));  // IRAM 32-bit aligned heap
 
         vTaskDelay(1000 / portTICK_RATE_MS);
     }

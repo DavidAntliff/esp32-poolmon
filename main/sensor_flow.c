@@ -194,7 +194,7 @@ static void sensor_flow_task(void * pvParameter)
         rmt_write_items(task_inputs->rmt_channel, rmt_items, num_rmt_items, false);
 
         // wait for window to finish
-        rmt_wait_tx_done(task_inputs->rmt_channel);
+        rmt_wait_tx_done(task_inputs->rmt_channel, portMAX_DELAY);
 
         // read counter
         int16_t count = 0;
