@@ -196,7 +196,6 @@ void app_main()
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
     if ((mqtt_error = mqtt_init(mqtt_info)) == MQTT_OK)
     {
-        //    mqtt_register_topic_as_bool(mqtt_info, "poolmon/esp32/reset", &do_reset, NULL /*context*/);
         // careful, stack variables!
         int context_echo_bool = 1;
         int context_echo_uint8 = 2;
