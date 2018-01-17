@@ -255,26 +255,21 @@ static datastore_error_t _set_value(const datastore_t * store, datastore_id_t id
                 if (INDEX[id].type == expected_type)
                 {
                     // check instance
-                    if (instance >= 0 && instance < INDEX[id].num_instances)
+                    if (/*instance >= 0 &&*/ instance < INDEX[id].num_instances)
                     {
                         if (value)
                         {
-                            // get the mutex
-                            xSemaphoreTake(private->semaphore, portMAX_DELAY);
-
-                            // set the value
+                            // finally, set the value
                             size_t instance_size = INDEX[id].size / INDEX[id].num_instances;
                             assert(instance_size * INDEX[id].num_instances == INDEX[id].size);
 
                             uint8_t * pdest = (uint8_t *)private + INDEX[id].offset + instance * instance_size;
                             ESP_LOGD(TAG, "_set_value: id %d, instance %d, value %p, type %d, private %p, offset 0x%x, size 0x%x, instance_size 0x%x, pdest %p",
                                      id, instance, value, INDEX[id].type, private, INDEX[id].offset, INDEX[id].size, instance_size, pdest);
-//                            INDEX[id].set_handler((uint8_t *)value, pdest, INDEX[id].size);
-                            _set_handler((uint8_t *)value, pdest, instance_size);
-//                            ESP_LOGE(TAG, "_setvalue: light full %d, *(uint32_t *)value %u", private->data.light.full, *(uint32_t *)(value));
-                            esp_log_buffer_hex(TAG, pdest, instance_size);
 
-                            // release the mutex
+                            xSemaphoreTake(private->semaphore, portMAX_DELAY);
+                            _set_handler((uint8_t *)value, pdest, instance_size);
+                            esp_log_buffer_hex(TAG, pdest, instance_size);
                             xSemaphoreGive(private->semaphore);
 
                             // TODO: call any registered callbacks with new value
@@ -367,14 +362,11 @@ static datastore_error_t _get_value(const datastore_t * store, datastore_id_t id
                 if (INDEX[id].type == expected_type)
                 {
                     // check instance
-                    if (instance >= 0 && instance < INDEX[id].num_instances)
+                    if (/*instance >= 0 &&*/ instance < INDEX[id].num_instances)
                     {
                         if (value)
                         {
-                            // get the mutex
-                            xSemaphoreTake(private->semaphore, portMAX_DELAY);
-
-                            // get the value
+                            // finally, get the value
                             size_t instance_size = INDEX[id].size / INDEX[id].num_instances;
                             assert(instance_size * INDEX[id].num_instances == INDEX[id].size);
 
@@ -383,10 +375,8 @@ static datastore_error_t _get_value(const datastore_t * store, datastore_id_t id
                                      id, instance, value, INDEX[id].type, private, INDEX[id].offset, INDEX[id].size, instance_size, psrc);
                             esp_log_buffer_hex(TAG, psrc, instance_size);
 
-//                            INDEX[id].get_handler(psrc, (uint8_t *)value, INDEX[id].size);
+                            xSemaphoreTake(private->semaphore, portMAX_DELAY);
                             _get_handler(psrc, (uint8_t *)value, instance_size);
-
-                            // release the mutex
                             xSemaphoreGive(private->semaphore);
 
                             // TODO: call any registered callbacks with new value

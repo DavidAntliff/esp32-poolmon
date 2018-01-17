@@ -213,8 +213,7 @@ static void sensor_flow_task(void * pvParameter)
 
         ESP_LOGI(TAG, "counter %d, frequency %f Hz, rate %f LPM", count, frequency_hz, rate_lpm);
 
-        //vTaskDelayUntil(&last_wake_time, 1000 / portTICK_PERIOD_MS); -- not yet supported by ESP-IDF
-        vTaskDelay(task_inputs->sampling_period * 1000 / portTICK_PERIOD_MS - (xTaskGetTickCount() - last_wake_time));
+        vTaskDelayUntil(&last_wake_time, task_inputs->sampling_period * 1000 / portTICK_PERIOD_MS);
     }
 
     free(task_inputs);

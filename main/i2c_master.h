@@ -25,6 +25,9 @@
 #ifndef I2C_MASTER_H
 #define I2C_MASTER_H
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
 #include "driver/i2c.h"
 
 #define I2C_MASTER_NUM           I2C_NUM_0
@@ -37,12 +40,16 @@ typedef struct
 {
     i2c_port_t port;
     i2c_config_t config;
+    SemaphoreHandle_t semaphore;
 } i2c_master_info_t;
 
 i2c_master_info_t * i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed);
 
-int i2c_scan(const i2c_master_info_t * info);
+int i2c_master_scan(const i2c_master_info_t * info);
 
 void i2c_master_close(i2c_master_info_t * info);
+
+bool i2c_master_lock(const i2c_master_info_t * info, TickType_t ticks_to_wait);
+void i2c_master_unlock(const i2c_master_info_t * info);
 
 #endif // I2C_MASTER_H

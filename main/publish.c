@@ -75,6 +75,7 @@ static const value_info_t values_info[PUBLISH_VALUE_LAST] =
 // publish sensor readings
 static void publish_task(void * pvParameter)
 {
+    assert(pvParameter);
     QueueHandle_t publish_queue = (QueueHandle_t)pvParameter;
     ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
 

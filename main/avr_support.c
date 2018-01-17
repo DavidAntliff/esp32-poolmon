@@ -55,6 +55,9 @@ typedef struct
         }                                                                   \
     } while(0);
 
+static bool reset_pending = false;
+
+
 static uint8_t _read_register(const smbus_info_t * smbus_info, uint8_t address)
 {
     uint8_t value = 0;
@@ -117,8 +120,15 @@ static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_swit
 
 static void avr_support_task(void * pvParameter)
 {
+    assert(pvParameter);
+    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
+
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
-    i2c_port_t i2c_port = task_inputs->i2c_master_info->port;
+    i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
+    i2c_port_t i2c_port = i2c_master_info->port;
+
+    // before accessing I2C, use a lock to gain exclusive use of the bus
+    i2c_master_lock(i2c_master_info, portMAX_DELAY);
 
     // Set up the SMBus
     smbus_info_t * smbus_info = smbus_malloc();
@@ -130,43 +140,72 @@ static void avr_support_task(void * pvParameter)
     uint8_t switch_states = _decode_switch_states(status);
     _publish_switch_states(switch_states, task_inputs->publish_queue);
 
+    i2c_master_unlock(i2c_master_info);
+
+    int state = 0;
+
     while (1)
     {
-        // read control register
-        ESP_LOGI(TAG, "I2C %d, REG 0x00: 0x%02x", i2c_port, _read_register(smbus_info, REGISTER_CONTROL));
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        i2c_master_lock(i2c_master_info, portMAX_DELAY);
 
-        // write control register
-        _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER);
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        if (reset_pending)
+        {
+            reset_pending = false;
 
-        _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER | REGISTER_CONTROL_SSR1);
-        vTaskDelay(1000 / portTICK_RATE_MS);
+            ESP_LOGI(TAG, "do reset");
+            gpio_set_level(CONFIG_AVR_RESET_GPIO, 0);
+            vTaskDelay(1);
+            gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
+        }
+        else
+        {
+            // simple state machine for testing
+            switch (state)
+            {
+            case 0:
+                // read control register
+                ESP_LOGI(TAG, "I2C %d, REG 0x00: 0x%02x", i2c_port, _read_register(smbus_info, REGISTER_CONTROL));
+                break;
+            case 1:
+                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER);
+                break;
+            case 2:
+                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER | REGISTER_CONTROL_SSR1);
+                break;
+            case 3:
+                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER | REGISTER_CONTROL_SSR2);
+                break;
+            case 4:
+                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR1 | REGISTER_CONTROL_SSR2);
+                break;
+            case 5:
+                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR2);
+                break;
+            case 6:
+                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR1);
+                break;
+            case 7:
+                _write_register(smbus_info, REGISTER_CONTROL, 0);
+                break;
+            default:
+                state = 0;
+                break;
+            }
+            state = (state + 1) % 7;
 
-        _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER | REGISTER_CONTROL_SSR2);
-        vTaskDelay(1000 / portTICK_RATE_MS);
+            // read status register
+            status = _read_register(smbus_info, REGISTER_STATUS);
+            ESP_LOGI(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
+        }
 
-        _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR1 | REGISTER_CONTROL_SSR2);
-        vTaskDelay(1000 / portTICK_RATE_MS);
-
-        _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR2);
-        vTaskDelay(1000 / portTICK_RATE_MS);
-
-        _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR1);
-        vTaskDelay(1000 / portTICK_RATE_MS);
-
-        _write_register(smbus_info, REGISTER_CONTROL, 0);
-        vTaskDelay(1000 / portTICK_RATE_MS);
-
-        // read status register
-        status = _read_register(smbus_info, REGISTER_STATUS);
-        ESP_LOGI(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        i2c_master_unlock(i2c_master_info);
 
         // if any switches have changed state, publish them
         uint8_t new_switch_states = _decode_switch_states(status);
         _publish_switch_changes(switch_states, new_switch_states, task_inputs->publish_queue);
         switch_states = new_switch_states;
+
+        vTaskDelay(1000 / portTICK_RATE_MS);
     }
 
     free(task_inputs);
@@ -198,7 +237,6 @@ void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority,
 
 void avr_support_reset(void)
 {
-    gpio_set_level(CONFIG_AVR_RESET_GPIO, 0);
-    vTaskDelay(1);
-    gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
+    // set a flag to request an AVR reset
+    reset_pending = true;
 }

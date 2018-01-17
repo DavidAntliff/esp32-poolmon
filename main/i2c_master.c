@@ -52,27 +52,37 @@ i2c_master_info_t * i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, 
         ESP_ERROR_CHECK(i2c_driver_install(i2c_port, info->config.mode,
                                            I2C_MASTER_RX_BUF_LEN,
                                            I2C_MASTER_TX_BUF_LEN, 0));
+        info->semaphore = xSemaphoreCreateMutex();
     }
     return info;
 }
 
-int i2c_scan(const i2c_master_info_t * info)
+int i2c_master_scan(const i2c_master_info_t * info)
 {
     int num_detected = 0;
-    for (int address = 1; address < 0x7f; ++address)
+    if (info)
     {
-        i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-        i2c_master_start(cmd);
-        i2c_master_write_byte(cmd, address << 1, true /*ACK_CHECK*/);
-        i2c_master_stop(cmd);
-        esp_err_t err = i2c_master_cmd_begin(info->port, cmd, (1000 / portTICK_RATE_MS));
-        //ESP_LOGI(TAG, "address 0x%02x %d", address, err);
-        if (err == 0)
+        xSemaphoreTake(info->semaphore, portMAX_DELAY);
+        for (int address = 1; address < 0x7f; ++address)
         {
-            ++num_detected;
-            ESP_LOGI(TAG, "detected I2C address on master %d at address 0x%02x", info->port, address);
+            i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+            i2c_master_start(cmd);
+            i2c_master_write_byte(cmd, address << 1, true /*ACK_CHECK*/);
+            i2c_master_stop(cmd);
+            esp_err_t err = i2c_master_cmd_begin(info->port, cmd, (1000 / portTICK_RATE_MS));
+            //ESP_LOGI(TAG, "address 0x%02x %d", address, err);
+            if (err == 0)
+            {
+                ++num_detected;
+                ESP_LOGI(TAG, "detected I2C address on master %d at address 0x%02x", info->port, address);
+            }
+            i2c_cmd_link_delete(cmd);
         }
-        i2c_cmd_link_delete(cmd);
+        xSemaphoreGive(info->semaphore);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "info is NULL");
     }
     return num_detected;
 }
@@ -80,4 +90,29 @@ int i2c_scan(const i2c_master_info_t * info)
 void i2c_master_close(i2c_master_info_t * info)
 {
     free(info);
+}
+
+bool i2c_master_lock(const i2c_master_info_t * info, TickType_t ticks_to_wait)
+{
+    bool result = false;
+    if (info)
+    {
+        result = xSemaphoreTake(info->semaphore, ticks_to_wait) == pdTRUE ? true : false;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "info is NULL");
+    }    return result;
+}
+
+void i2c_master_unlock(const i2c_master_info_t * info)
+{
+    if (info)
+    {
+        xSemaphoreGive(info->semaphore);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "info is NULL");
+    }
 }

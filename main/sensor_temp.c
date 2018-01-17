@@ -41,7 +41,7 @@
 
 #define MAX_DEVICES          (8)
 #define DS18B20_RESOLUTION   (DS18B20_RESOLUTION_10_BIT)
-#define SAMPLE_PERIOD        (4000)  // sensor sampling period in milliseconds
+#define SAMPLE_PERIOD        (5000)  // sensor sampling period in milliseconds
 
 #define TAG "sensor_temp"
 

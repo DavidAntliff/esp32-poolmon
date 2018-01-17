@@ -39,7 +39,7 @@
 
 #define TAG "sensor_light"
 
-#define SAMPLE_PERIOD (10000)  // sensor sampling period in milliseconds
+#define SAMPLE_PERIOD (5000)  // sensor sampling period in milliseconds
 
 extern datastore_t * datastore;
 
@@ -55,10 +55,15 @@ static void sensor_light_task(void * pvParameter)
     ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
+    i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
+    i2c_port_t i2c_port = i2c_master_info->port;
+
+    // before accessing I2C, use a lock to gain exclusive use of the bus
+    i2c_master_lock(i2c_master_info, portMAX_DELAY);
 
     // Set up the SMBus
     smbus_info_t * smbus_info = smbus_malloc();
-    smbus_init(smbus_info, task_inputs->i2c_master_info->port, CONFIG_LIGHT_SENSOR_I2C_ADDRESS);
+    smbus_init(smbus_info, i2c_port, CONFIG_LIGHT_SENSOR_I2C_ADDRESS);
     smbus_set_timeout(smbus_info, 1000 / portTICK_RATE_MS);
 
     // Set up the TSL2561 device
@@ -69,6 +74,8 @@ static void sensor_light_task(void * pvParameter)
     tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_1X);
     //tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_16X);
 
+    i2c_master_unlock(i2c_master_info);
+
     TickType_t last_wake_time = xTaskGetTickCount();
 
     while (1)
@@ -77,7 +84,12 @@ static void sensor_light_task(void * pvParameter)
 
         tsl2561_visible_t visible = 0;
         tsl2561_infrared_t infrared = 0;
-        if (tsl2561_read(tsl2561_info, &visible, &infrared) == ESP_OK)
+
+        i2c_master_lock(i2c_master_info, portMAX_DELAY);
+        esp_err_t err = tsl2561_read(tsl2561_info, &visible, &infrared);
+        i2c_master_unlock(i2c_master_info);
+
+        if (err == ESP_OK)
         {
             uint32_t lux = tsl2561_compute_lux(tsl2561_info, visible, infrared);
 
@@ -102,8 +114,7 @@ static void sensor_light_task(void * pvParameter)
             ESP_LOGW(TAG, "sensor error");
         }
 
-        //vTaskDelayUntil(&last_wake_time, 1000 / portTICK_PERIOD_MS); -- not yet supported by ESP-IDF
-        vTaskDelay(SAMPLE_PERIOD / portTICK_PERIOD_MS - (xTaskGetTickCount() - last_wake_time));
+        vTaskDelayUntil(&last_wake_time, SAMPLE_PERIOD / portTICK_PERIOD_MS);
     }
 
     free(task_inputs);

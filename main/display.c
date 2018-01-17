@@ -41,7 +41,7 @@
 #define SMBUS_TIMEOUT     1000   // milliseconds
 #define DISPLAY_WIDTH     I2C_LCD1602_NUM_VISIBLE_COLUMNS
 #define ROW_STRING_WIDTH  (DISPLAY_WIDTH + 1)    // room for null terminator
-#define TICKS_PER_UPDATE  (10 / portTICK_RATE_MS)
+#define TICKS_PER_UPDATE  (1000 / portTICK_RATE_MS)
 #define TICKS_PER_POLL    (5)    // ticks per button poll
 
 #ifndef BUILD_TIMESTAMP
@@ -504,8 +504,15 @@ static page_id_t handle_transition(input_t input, page_id_t current_page)
 
 static void display_task(void * pvParameter)
 {
+    assert(pvParameter);
+    ESP_LOGW(TAG, "[display] Core ID %d", xPortGetCoreID());
+
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
-    i2c_port_t i2c_port = task_inputs->i2c_master_info->port;
+    i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
+    i2c_port_t i2c_port = i2c_master_info->port;
+
+    // before accessing I2C, use a lock to gain exclusive use of the bus
+    i2c_master_lock(i2c_master_info, portMAX_DELAY);
 
     // Set up the SMBus
     smbus_info_t * smbus_info = smbus_malloc();
@@ -521,13 +528,19 @@ static void display_task(void * pvParameter)
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
     i2c_lcd1602_write_char(lcd_info, 'B');
 
+    i2c_master_unlock(i2c_master_info);
+
     page_id_t current_page = PAGE_SPLASH;
 
     // update pages once per second
     while (1)
     {
         ESP_LOGD(TAG, "display loop");
+
+        i2c_master_lock(i2c_master_info, portMAX_DELAY);
         dispatch_to_handler(lcd_info, current_page);
+        i2c_master_unlock(i2c_master_info);
+
         input_t input = INPUT_NONE;
         BaseType_t rc = xQueueReceive(button_queue, &input, TICKS_PER_UPDATE);
         if (rc == pdTRUE)
@@ -561,6 +574,8 @@ static void display_task(void * pvParameter)
 
 static void button_task(void * pvParameter)
 {
+    ESP_LOGW(TAG, "[button] Core ID %d", xPortGetCoreID());
+
     // TODO: improve this, it's too naive
 
     // Configure button

@@ -128,6 +128,12 @@ static void echo_string(const char * topic, const char * value, void * context)
     esp_log_buffer_hex(TAG, value, strlen(value) + 1);
 }
 
+// brief delay during startup sequence
+static void _delay(void)
+{
+    vTaskDelay(1000 / portTICK_RATE_MS);
+}
+
 void app_main()
 {
 //    // Experiment: hold the AVR in reset briefly
@@ -143,8 +149,9 @@ void app_main()
 //    esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("*", ESP_LOG_WARN);
 //    esp_log_level_set("display", ESP_LOG_INFO);
+//    esp_log_level_set("avr_support", ESP_LOG_INFO);
 //    esp_log_level_set("datastore", ESP_LOG_DEBUG);
-    esp_log_level_set("mqtt", ESP_LOG_DEBUG);
+//    esp_log_level_set("mqtt", ESP_LOG_DEBUG);
     //esp_log_level_set("sensor_temp", ESP_LOG_INFO);
 
     // Priority of queue consumer should be higher than producers
@@ -155,6 +162,10 @@ void app_main()
 
     ESP_LOGI(TAG, "[APP] Startup..");
 
+    // round to nearest MHz (stored value is only precise to MHz)
+    uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
+    ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
+
     datastore = datastore_malloc();
     datastore_init(datastore);
     datastore_dump(datastore);
@@ -164,15 +175,15 @@ void app_main()
 
     // I2C bus
     i2c_master_info_t * i2c_master_info = i2c_master_init(I2C_MASTER_NUM, CONFIG_I2C_MASTER_SDA_GPIO, CONFIG_I2C_MASTER_SCL_GPIO, I2C_MASTER_FREQ_HZ);
-    int num_i2c_devices = i2c_scan(i2c_master_info);
+    int num_i2c_devices = i2c_master_scan(i2c_master_info);
     ESP_LOGI(TAG, "%d I2C devices detected", num_i2c_devices);
+
+    _delay();
 
     // bring up the display ASAP in case of error
     display_init(i2c_master_info, display_priority);
 
-    // round to nearest MHz (stored value is only precise to MHz)
-    uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
-    ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
+    _delay();
 
     QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
@@ -181,14 +192,23 @@ void app_main()
     // Temp sensors
     temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, publish_queue);
 
+    _delay();
+
     // I2C devices - AVR, Light Sensor, LCD
     avr_support_init(i2c_master_info, avr_priority, publish_queue);
+
+    _delay();
+
     sensor_light_init(i2c_master_info, sensor_priority, publish_queue);
+
+    _delay();
 
     // Flow Meter
     sensor_flow_init(CONFIG_FLOW_METER_PULSE_GPIO, FLOW_METER_PCNT_UNIT, FLOW_METER_PCNT_CHANNEL,
                      CONFIG_FLOW_METER_RMT_GPIO, FLOW_METER_RMT_CHANNEL, FLOW_METER_RMT_CLK_DIV,
                      FLOW_METER_SAMPLING_PERIOD, FLOW_METER_SAMPLING_WINDOW, FLOW_METER_FILTER_LENGTH, sensor_priority, publish_queue);
+
+    _delay();
 
     bool running = true;
 
@@ -263,6 +283,8 @@ void app_main()
 
     nvs_flash_init();
     wifi_support_init();
+
+    _delay();
 
     // Run forever...
     while (running)

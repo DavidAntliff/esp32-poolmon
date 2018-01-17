@@ -49,4 +49,6 @@
 #define FLOW_METER_MODEL_B          (0.619)  // based on flow meter measurements, October 2017
 #define FLOW_METER_MODEL_CUTOFF_HZ  (1.0)    // For values of x < cutoff, linear-interpolate to zero so that 0 Hz = 0 LPM
 
+// TODO: light and temp sensor sampling periods etc.
+
 #endif // CONSTANTS
