@@ -153,8 +153,11 @@ static void avr_support_task(void * pvParameter)
 
             ESP_LOGI(TAG, "do reset");
             gpio_set_level(CONFIG_AVR_RESET_GPIO, 0);
-            vTaskDelay(1);
+            vTaskDelay(10);
             gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
+
+            // give the I2C bus some time to stabilise after AVR reset
+            vTaskDelay(10);
         }
         else
         {
@@ -228,10 +231,6 @@ void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority,
     gpio_pad_select_gpio(CONFIG_AVR_RESET_GPIO);
     gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
     gpio_set_direction(CONFIG_AVR_RESET_GPIO, GPIO_MODE_OUTPUT);
-
-    // Notes:
-    //   Seems that the AVR reset causes issues, even when not actually driven by the ESP32. Causes I2C bus failure.
-
 }
 
 void avr_support_reset(void)

@@ -151,7 +151,7 @@ void app_main()
 //    esp_log_level_set("display", ESP_LOG_INFO);
 //    esp_log_level_set("avr_support", ESP_LOG_INFO);
 //    esp_log_level_set("datastore", ESP_LOG_DEBUG);
-//    esp_log_level_set("mqtt", ESP_LOG_DEBUG);
+    esp_log_level_set("mqtt", ESP_LOG_INFO);
     //esp_log_level_set("sensor_temp", ESP_LOG_INFO);
 
     // Priority of queue consumer should be higher than producers
@@ -196,6 +196,7 @@ void app_main()
 
     // I2C devices - AVR, Light Sensor, LCD
     avr_support_init(i2c_master_info, avr_priority, publish_queue);
+    avr_support_reset();
 
     _delay();
 
