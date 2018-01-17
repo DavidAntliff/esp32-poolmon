@@ -165,6 +165,7 @@ void app_main()
     // round to nearest MHz (stored value is only precise to MHz)
     uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
     ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
+    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
 
     datastore = datastore_malloc();
     datastore_init(datastore);
