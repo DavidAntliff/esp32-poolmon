@@ -57,7 +57,6 @@ typedef struct
 
 static bool reset_pending = false;
 
-
 static uint8_t _read_register(const smbus_info_t * smbus_info, uint8_t address)
 {
     uint8_t value = 0;

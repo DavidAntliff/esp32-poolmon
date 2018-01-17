@@ -34,7 +34,6 @@
 #define I2C_MASTER_TX_BUF_LEN    0                     // disabled
 #define I2C_MASTER_RX_BUF_LEN    0                     // disabled
 #define I2C_MASTER_FREQ_HZ       100000                // Hz
-//#define I2C_MASTER_FREQ_HZ       10000                 // Hz
 
 typedef struct
 {

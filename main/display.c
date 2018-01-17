@@ -378,7 +378,6 @@ static void _handle_page_alarm(const i2c_lcd1602_info_t * lcd_info, void * state
 {
     int * display_count = (int *)state;
     ++*display_count;
-    //I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
     char line[ROW_STRING_WIDTH] = "";
     snprintf(line, ROW_STRING_WIDTH, "ALARM %-6d    ", *display_count);
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
