@@ -59,12 +59,15 @@ static void sensor_light_task(void * pvParameter)
     i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
     i2c_port_t i2c_port = i2c_master_info->port;
 
+    uint8_t i2c_address = 0;
+    datastore_get_uint8(datastore, DATASTORE_ID_LIGHT_I2C_ADDRESS, 0, &i2c_address);
+
     // before accessing I2C, use a lock to gain exclusive use of the bus
     i2c_master_lock(i2c_master_info, portMAX_DELAY);
 
     // Set up the SMBus
     smbus_info_t * smbus_info = smbus_malloc();
-    smbus_init(smbus_info, i2c_port, CONFIG_LIGHT_SENSOR_I2C_ADDRESS);
+    smbus_init(smbus_info, i2c_port, i2c_address);
     smbus_set_timeout(smbus_info, 1000 / portTICK_RATE_MS);
 
     // Set up the TSL2561 device

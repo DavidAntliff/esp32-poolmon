@@ -48,8 +48,9 @@
 #include "mqtt.h"
 #include "avr_support.h"
 #include "display.h"
+#include "power.h"
 
-#define TAG "poolmon"
+#define TAG "app_main"
 
 //TODO: LED task, to blink LED when required
 // - count number of connected devices
@@ -150,6 +151,15 @@ static void load_datastore_defaults(datastore_t * datastore)
         // TODO: load from NV
         datastore_set_string(datastore, DATASTORE_ID_WIFI_SSID, 0, CONFIG_WIFI_SSID);
         datastore_set_string(datastore, DATASTORE_ID_WIFI_PASSWORD, 0, CONFIG_WIFI_PASSWORD);
+
+        datastore_set_uint8(datastore, DATASTORE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS);
+
+        // TODO
+        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 0, "LABEL1");
+        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 1, "LABEL2");
+        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 2, "LABEL3");
+        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 3, "LABEL4");
+        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 4, "LABEL5");
     }
 }
 
@@ -173,7 +183,7 @@ void app_main()
     UBaseType_t avr_priority = sensor_priority;
     UBaseType_t wifi_monitor_priority = sensor_priority;
 
-    ESP_LOGI(TAG, "[APP] Startup..");
+    ESP_LOGI(TAG, "Start");
 
     // round to nearest MHz (stored value is only precise to MHz)
     uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
@@ -189,8 +199,12 @@ void app_main()
     // Onboard LED
     led_init(CONFIG_ONBOARD_LED_GPIO);
 
+    _delay();
+
     // I2C bus
+    ESP_LOGE(TAG, "about to run i2c_master_init");
     i2c_master_info_t * i2c_master_info = i2c_master_init(I2C_MASTER_NUM, CONFIG_I2C_MASTER_SDA_GPIO, CONFIG_I2C_MASTER_SCL_GPIO, I2C_MASTER_FREQ_HZ);
+    ESP_LOGE(TAG, "about to run i2c_master_scan");
     int num_i2c_devices = i2c_master_scan(i2c_master_info);
     ESP_LOGI(TAG, "%d I2C devices detected", num_i2c_devices);
 
@@ -204,6 +218,8 @@ void app_main()
     QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
+
+    _delay();
 
     // Temp sensors
     temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, publish_queue);
@@ -305,6 +321,9 @@ void app_main()
 
     nvs_flash_init();
     wifi_support_init(wifi_monitor_priority);
+
+    _delay();
+    power_init(sensor_priority);
 
     _delay();
     datastore_dump(datastore);

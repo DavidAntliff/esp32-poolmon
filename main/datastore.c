@@ -65,12 +65,14 @@ struct _private_t
         struct temp
         {
             float value[DATASTORE_INSTANCES_TEMP];
+            uint32_t timestamp[DATASTORE_INSTANCES_TEMP];
             char label[DATASTORE_INSTANCES_TEMP][DATASTORE_LEN_TEMP_LABEL];
             datastore_temp_assignment_t assignment[DATASTORE_INSTANCES_TEMP];
         } temp;
 
         struct light
         {
+            uint8_t i2c_address;
             bool detected;
             uint32_t full;
             uint32_t infrared;
@@ -84,6 +86,12 @@ struct _private_t
             float frequency;  // Hz
             float rate;       // LPM
         } flow;
+
+        struct power
+        {
+            float value;   // Watts
+            uint32_t timestamp;
+        } power;
 
     } data;
 
@@ -137,26 +145,30 @@ static index_t INDEX[] = {
     { DATASTORE_ID_SYSTEM_BUILD_DATE_TIME, NAME(DATASTORE_ID_SYSTEM_BUILD_DATE_TIME), DATASTORE_TYPE_STRING, 1, offsetof(private_t, data.system.build_date_time), sizeof(((private_t *)0)->data.system.build_date_time) },
     { DATASTORE_ID_SYSTEM_UPTIME,          NAME(DATASTORE_ID_SYSTEM_UPTIME),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.system.uptime),          sizeof(((private_t *)0)->data.system.uptime) },
 
-    INDEX_ROW(DATASTORE_ID_WIFI_SSID,     DATASTORE_TYPE_STRING, 1, data.wifi.ssid),
-    INDEX_ROW(DATASTORE_ID_WIFI_PASSWORD, DATASTORE_TYPE_STRING, 1, data.wifi.password),
-    INDEX_ROW(DATASTORE_ID_WIFI_STATUS,   DATASTORE_TYPE_UINT32, 1, data.wifi.status),
-    INDEX_ROW(DATASTORE_ID_WIFI_RSSI,     DATASTORE_TYPE_INT8,   1, data.wifi.rssi),
-    INDEX_ROW(DATASTORE_ID_WIFI_ADDRESS,  DATASTORE_TYPE_UINT32, 1, data.wifi.address),
+    INDEX_ROW(DATASTORE_ID_WIFI_SSID,         DATASTORE_TYPE_STRING, 1, data.wifi.ssid),
+    INDEX_ROW(DATASTORE_ID_WIFI_PASSWORD,     DATASTORE_TYPE_STRING, 1, data.wifi.password),
+    INDEX_ROW(DATASTORE_ID_WIFI_STATUS,       DATASTORE_TYPE_UINT32, 1, data.wifi.status),
+    INDEX_ROW(DATASTORE_ID_WIFI_RSSI,         DATASTORE_TYPE_INT8,   1, data.wifi.rssi),
+    INDEX_ROW(DATASTORE_ID_WIFI_ADDRESS,      DATASTORE_TYPE_UINT32, 1, data.wifi.address),
 
-    { DATASTORE_ID_TEMP_VALUE,             NAME(DATASTORE_ID_TEMP_VALUE),             DATASTORE_TYPE_FLOAT,  DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.value),      sizeof(((private_t *)0)->data.temp.value) },
-    { DATASTORE_ID_TEMP_LABEL,             NAME(DATASTORE_ID_TEMP_LABEL),             DATASTORE_TYPE_STRING, DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.label),      sizeof(((private_t *)0)->data.temp.label) },
-    { DATASTORE_ID_TEMP_ASSIGNMENT,        NAME(DATASTORE_ID_TEMP_ASSIGNMENT),        DATASTORE_TYPE_UINT8,  DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.assignment), sizeof(((private_t *)0)->data.temp.assignment) },
+    INDEX_ROW(DATASTORE_ID_TEMP_VALUE,        DATASTORE_TYPE_FLOAT,  DATASTORE_INSTANCES_TEMP, data.temp.value),
+    INDEX_ROW(DATASTORE_ID_TEMP_TIMESTAMP,    DATASTORE_TYPE_UINT32, DATASTORE_INSTANCES_TEMP, data.temp.timestamp),
+    INDEX_ROW(DATASTORE_ID_TEMP_LABEL,        DATASTORE_TYPE_STRING, DATASTORE_INSTANCES_TEMP, data.temp.label),
+    INDEX_ROW(DATASTORE_ID_TEMP_ASSIGNMENT,   DATASTORE_TYPE_UINT8,  DATASTORE_INSTANCES_TEMP, data.temp.assignment),
 
-    INDEX_ROW(DATASTORE_ID_LIGHT_DETECTED,  DATASTORE_TYPE_BOOL, 1, data.light.detected),
-    { DATASTORE_ID_LIGHT_FULL,              NAME(DATASTORE_ID_LIGHT_FULL),             DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.full),             sizeof(((private_t *)0)->data.light.full) },
-    { DATASTORE_ID_LIGHT_VISIBLE,           NAME(DATASTORE_ID_LIGHT_VISIBLE),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.visible),          sizeof(((private_t *)0)->data.light.visible) },
-    { DATASTORE_ID_LIGHT_INFRARED,          NAME(DATASTORE_ID_LIGHT_INFRARED),         DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.infrared),         sizeof(((private_t *)0)->data.light.infrared) },
-    { DATASTORE_ID_LIGHT_ILLUMINANCE,       NAME(DATASTORE_ID_LIGHT_ILLUMINANCE),      DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.illuminance),      sizeof(((private_t *)0)->data.light.illuminance) },
-    INDEX_ROW(DATASTORE_ID_LIGHT_TIMESTAMP, DATASTORE_TYPE_UINT32, 1, data.light.timestamp),
+    INDEX_ROW(DATASTORE_ID_LIGHT_I2C_ADDRESS, DATASTORE_TYPE_UINT8,  1, data.light.i2c_address),
+    INDEX_ROW(DATASTORE_ID_LIGHT_DETECTED,    DATASTORE_TYPE_BOOL,   1, data.light.detected),
+    INDEX_ROW(DATASTORE_ID_LIGHT_FULL,        DATASTORE_TYPE_UINT32, 1, data.light.full),
+    INDEX_ROW(DATASTORE_ID_LIGHT_VISIBLE,     DATASTORE_TYPE_UINT32, 1, data.light.visible),
+    INDEX_ROW(DATASTORE_ID_LIGHT_INFRARED,    DATASTORE_TYPE_UINT32, 1, data.light.infrared),
+    INDEX_ROW(DATASTORE_ID_LIGHT_ILLUMINANCE, DATASTORE_TYPE_UINT32, 1, data.light.illuminance),
+    INDEX_ROW(DATASTORE_ID_LIGHT_TIMESTAMP,   DATASTORE_TYPE_UINT32, 1, data.light.timestamp),
 
     { DATASTORE_ID_FLOW_FREQUENCY,         NAME(DATASTORE_ID_FLOW_FREQUENCY),         DATASTORE_TYPE_FLOAT,  1, offsetof(private_t, data.flow.frequency),         sizeof(((private_t *)0)->data.flow.frequency) },
     { DATASTORE_ID_FLOW_RATE,              NAME(DATASTORE_ID_FLOW_RATE),              DATASTORE_TYPE_FLOAT,  1, offsetof(private_t, data.flow.rate),              sizeof(((private_t *)0)->data.flow.rate) },
 
+    INDEX_ROW(DATASTORE_ID_POWER_VALUE,       DATASTORE_TYPE_FLOAT,  1, data.power.value),
+    INDEX_ROW(DATASTORE_ID_POWER_TIMESTAMP,   DATASTORE_TYPE_UINT32, 1, data.power.timestamp),
 };
 
 

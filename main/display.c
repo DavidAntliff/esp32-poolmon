@@ -179,7 +179,7 @@ static const transition_t transitions[] = {
 static QueueHandle_t button_queue;
 
 static const char * BLANK_LINE = "                ";
-#define TIMESTAMP_TIMEOUT 15  // seconds after which a measurement is not displayed
+#define MEASUREMENT_EXPIRY 15  // seconds after which a measurement is not displayed
 
 typedef struct
 {
@@ -273,71 +273,87 @@ static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * stat
     *activity = !(*activity);
 }
 
-static void _get_temp_sensor(const datastore_t * store, instance_id_t instance, float * value, char * label)
+static void _get_temp_sensor(const datastore_t * store, instance_id_t instance, float * value, char * label, uint32_t * timestamp)
 {
+    assert(value);
+    assert(label);
+    assert(timestamp);
+    *value = 0.0f;
+    label[0] = '\0';
+    *timestamp = 0;
     datastore_get_float(datastore, DATASTORE_ID_TEMP_VALUE, instance, value);
     datastore_get_string(datastore, DATASTORE_ID_TEMP_LABEL, instance, label);
+    datastore_get_uint32(datastore, DATASTORE_ID_TEMP_TIMESTAMP, instance, timestamp);
+}
+
+static void _render_temp_line(char * line, unsigned int len, instance_id_t instance, uint32_t now)
+{
+    float value = 0.0f;
+    char label[DATASTORE_LEN_TEMP_LABEL] = "";
+    uint32_t timestamp = 0;
+
+    _get_temp_sensor(datastore, instance, &value, label, &timestamp);
+    if (now - timestamp < MEASUREMENT_EXPIRY)
+    {
+        snprintf(line, ROW_STRING_WIDTH, "T%d %-7s %4.1f"DEGREES_C, instance + 1, label, value);
+    }
+    else
+    {
+        snprintf(line, ROW_STRING_WIDTH, "T%d %-7s --.-"DEGREES_C, instance + 1, label);
+    }
 }
 
 static void _handle_page_sensors_temp_1_2(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    float value = 0.0f;
-    char label[DATASTORE_LEN_TEMP_LABEL] = "";
-    _get_temp_sensor(datastore, 0, &value, label);
+    char line[ROW_STRING_WIDTH] = "";
+    uint32_t now = seconds_since_boot();
 
-    char line0[ROW_STRING_WIDTH] = "";
-    _get_temp_sensor(datastore, 0, &value, label);
-    snprintf(line0, ROW_STRING_WIDTH, "T1 %-7s %4.1f"DEGREES_C, label, value);
-
-    char line1[ROW_STRING_WIDTH] = "";
-    _get_temp_sensor(datastore, 1, &value, label);
-    snprintf(line1, ROW_STRING_WIDTH, "T2 %-7s %4.1f"DEGREES_C, label, value);
-
+    _render_temp_line(line, ROW_STRING_WIDTH, 0, now);
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    _render_temp_line(line, ROW_STRING_WIDTH, 1, now);
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
  }
 
 static void _handle_page_sensors_temp_3_4(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    float value = 0.0f;
-    char label[DATASTORE_LEN_TEMP_LABEL] = "";
-    _get_temp_sensor(datastore, 0, &value, label);
+    char line[ROW_STRING_WIDTH] = "";
+    uint32_t now = seconds_since_boot();
 
-    char line0[ROW_STRING_WIDTH] = "";
-    _get_temp_sensor(datastore, 2, &value, label);
-    snprintf(line0, ROW_STRING_WIDTH, "T3 %-7s %4.1f"DEGREES_C, label, value);
-
-    char line1[ROW_STRING_WIDTH] = "";
-    _get_temp_sensor(datastore, 3, &value, label);
-    snprintf(line1, ROW_STRING_WIDTH, "T4 %-7s %4.1f"DEGREES_C, label, value);
-
+    _render_temp_line(line, ROW_STRING_WIDTH, 2, now);
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    _render_temp_line(line, ROW_STRING_WIDTH, 3, now);
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 }
 
 static void _handle_page_sensors_temp_5_P(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    float value = 0.0f;
-    char label[DATASTORE_LEN_TEMP_LABEL] = "";
-    _get_temp_sensor(datastore, 0, &value, label);
+    char line[ROW_STRING_WIDTH] = "";
+    uint32_t now = seconds_since_boot();
 
-    char line0[ROW_STRING_WIDTH] = "";
-    _get_temp_sensor(datastore, 2, &value, label);
-    snprintf(line0, ROW_STRING_WIDTH, "T5 %-7s %4.1f"DEGREES_C, label, value);
-
-    float power = 3456.7f;
-    char line1[ROW_STRING_WIDTH] = "";
-    //datastore_get_float(datastore, DATASTORE_ID_POWER_VALUE, 0, value);
-    snprintf(line1, ROW_STRING_WIDTH, "Power   %7.1fW", power);
-
+    _render_temp_line(line, ROW_STRING_WIDTH, 4, now);
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    float power = 0.0f;
+    uint32_t timestamp = 0;
+    datastore_get_uint32(datastore, DATASTORE_ID_POWER_TIMESTAMP, 0, &timestamp);
+    if (now - timestamp < MEASUREMENT_EXPIRY)
+    {
+        datastore_get_float(datastore, DATASTORE_ID_POWER_VALUE, 0, &power);
+        snprintf(line, ROW_STRING_WIDTH, "Power   %7.1fW", power);
+    }
+    else
+    {
+        snprintf(line, ROW_STRING_WIDTH, "Power      --.-W");
+    }
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 }
 
 static void _handle_page_sensors_light(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -351,7 +367,7 @@ static void _handle_page_sensors_light(const i2c_lcd1602_info_t * lcd_info, void
         uint32_t timestamp = 0;
         datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_TIMESTAMP, 0, &timestamp);
 
-        if (seconds_since_boot() - timestamp < TIMESTAMP_TIMEOUT)
+        if (seconds_since_boot() - timestamp < MEASUREMENT_EXPIRY)
         {
             datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, &full);
             datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, &visible);

@@ -32,6 +32,7 @@
 
 #include "sensor_temp.h"
 #include "constants.h"
+#include "utils.h"
 #include "datastore.h"
 #include "led.h"
 #include "publish.h"
@@ -61,9 +62,11 @@ typedef struct
     QueueHandle_t publish_queue;
 } task_inputs_t;
 
-static void read_temperatures(DS18B20_Info ** device_infos, float * readings, int num_devices)
+static void read_temperatures(DS18B20_Info ** device_infos, float * readings, DS18B20_ERROR * errors, int num_devices)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
+    assert(readings);
+    assert(errors);
 
     ds18b20_convert_all(device_infos[0]->bus);
 
@@ -75,7 +78,7 @@ static void read_temperatures(DS18B20_Info ** device_infos, float * readings, in
     // (using printf before reading may take too long)
     for (int i = 0; i < num_devices; ++i)
     {
-        readings[i] = ds18b20_read_temp(device_infos[i]);
+        errors[i] = ds18b20_read_temp(device_infos[i], &readings[i]);
     }
 }
 
@@ -147,12 +150,14 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
 
     if (rmt_driver_info)
     {
+        ESP_LOGE(TAG, "about to run owb_rmt_initialize");
         owb = owb_rmt_initialize(rmt_driver_info, gpio, OWB_RMT_CHANNEL_TX, OWB_RMT_CHANNEL_RX);
         owb_use_crc(owb, true);       // enable CRC check for ROM code and measurement readings
 
         // locate attached devices
         OneWireBus_ROMCode * device_rom_codes = calloc(MAX_DEVICES, sizeof(*device_rom_codes));
 
+        ESP_LOGE(TAG, "about to run find_owb_rom_codes");
         int num_devices = find_owb_rom_codes(owb, device_rom_codes, MAX_DEVICES);
 
         // free up unused space
@@ -160,6 +165,8 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
 
         // associate devices on bus with DS18B20 device driver
         DS18B20_Info ** device_infos = calloc(num_devices, sizeof(*device_infos));
+
+        ESP_LOGE(TAG, "about to run associate_ds18b20_devices");
         associate_ds18b20_devices(owb, device_rom_codes, device_infos, num_devices);
 
         sensors = malloc(sizeof(*sensors));
@@ -191,14 +198,7 @@ static void sensor_temp_task(void * pvParameter)
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     int sample_count = 0;
 
-    // TODO
-    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 0, "LABEL1");
-    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 1, "LABEL2");
-    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 2, "LABEL3");
-    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 3, "LABEL4");
-    datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 4, "LABEL5");
-
-    int errors[MAX_DEVICES] = {0};
+    int errors_count[MAX_DEVICES] = {0};
     if (task_inputs->sensors->num_ds18b20s > 0)
     {
         // wait a second before starting commencing sampling
@@ -213,31 +213,34 @@ static void sensor_temp_task(void * pvParameter)
             led_on();
 
             float readings[MAX_DEVICES] = { 0 };
+            DS18B20_ERROR errors[MAX_DEVICES] = { 0 };
 
-            read_temperatures(task_inputs->sensors->ds18b20_infos, readings, task_inputs->sensors->num_ds18b20s);
+            ESP_LOGE(TAG, "about to run read_temperatures");
+            read_temperatures(task_inputs->sensors->ds18b20_infos, readings, errors, task_inputs->sensors->num_ds18b20s);
             ++sample_count;
 
             led_off();
+            uint32_t now = seconds_since_boot();
 
             // print results in a separate loop, after all have been read
             ESP_LOGI(TAG, "Temperature readings (degrees C): sample %d", sample_count);
             for (int i = 0; i < task_inputs->sensors->num_ds18b20s; ++i)
             {
-                // filter out invalid readings
-                if (readings[i] != DS18B20_INVALID_READING)
+                // filter out errored readings
+                if (errors[i] == DS18B20_OK)
                 {
                     publish_value(PUBLISH_VALUE_TEMP_1 + i, readings[i], task_inputs->publish_queue);
                     datastore_set_float(datastore, DATASTORE_ID_TEMP_VALUE, i, readings[i]);
+                    datastore_set_uint32(datastore, DATASTORE_ID_TEMP_TIMESTAMP, i, now);
                 }
                 else
                 {
-                    ++errors[i];
+                    ++errors_count[i];
                 }
-                ESP_LOGI(TAG, "  %d: %.1f    %d errors", i, readings[i], errors[i]);
+                ESP_LOGI(TAG, "  %d: %.1f    %d errors", i, readings[i], errors_count[i]);
             }
 
-            //vTaskDelayUntil(&last_wake_time, 1000 / portTICK_PERIOD_MS); -- not yet supported by ESP-IDF
-            vTaskDelay(SAMPLE_PERIOD / portTICK_PERIOD_MS - (xTaskGetTickCount() - last_wake_time));
+            vTaskDelayUntil(&last_wake_time, SAMPLE_PERIOD / portTICK_PERIOD_MS);
         }
     }
     else

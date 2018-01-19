@@ -34,9 +34,9 @@
 #include "esp_mqtt.h"
 #include "datastore.h"
 
-extern datastore_t * datastore;
-
 #define TAG "wifi_support"
+
+extern datastore_t * datastore;
 
 static EventGroupHandle_t wifi_event_group;
 const static int CONNECTED_BIT = BIT0;
@@ -140,5 +140,4 @@ void wifi_support_init(UBaseType_t priority)
     wifi_conn_init();
 
     xTaskCreate(&wifi_monitor_task, "wifi_monitor_task", 4096, NULL, priority, NULL);
-
 }

@@ -51,4 +51,6 @@
 
 // TODO: light and temp sensor sampling periods etc.
 
+#define POWER_CALCULATION_RATE      (10.0)   // seconds
+
 #endif // CONSTANTS

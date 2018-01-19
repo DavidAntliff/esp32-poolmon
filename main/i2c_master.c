@@ -50,7 +50,13 @@ i2c_master_info_t * i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, 
         info->config.scl_io_num = scl_io_num;
         info->config.scl_pullup_en = GPIO_PULLUP_DISABLE;  // use external pullups
         info->config.master.clk_speed = clk_speed;         // Hz
+
+        ESP_LOGE(TAG, "about to run i2c_param_config");
+
         ESP_ERROR_CHECK(i2c_param_config(i2c_port, &info->config));
+
+        ESP_LOGE(TAG, "about to run i2c_driver_install");
+
         ESP_ERROR_CHECK(i2c_driver_install(i2c_port, info->config.mode,
                                            I2C_MASTER_RX_BUF_LEN,
                                            I2C_MASTER_TX_BUF_LEN, 0));

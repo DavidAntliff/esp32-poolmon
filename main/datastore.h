@@ -49,9 +49,11 @@ typedef enum
     DATASTORE_ID_WIFI_ADDRESS,
 
     DATASTORE_ID_TEMP_VALUE,
+    DATASTORE_ID_TEMP_TIMESTAMP,
     DATASTORE_ID_TEMP_LABEL,
     DATASTORE_ID_TEMP_ASSIGNMENT,
 
+    DATASTORE_ID_LIGHT_I2C_ADDRESS,
     DATASTORE_ID_LIGHT_DETECTED,
     DATASTORE_ID_LIGHT_FULL,
     DATASTORE_ID_LIGHT_VISIBLE,
@@ -61,6 +63,9 @@ typedef enum
 
     DATASTORE_ID_FLOW_FREQUENCY,
     DATASTORE_ID_FLOW_RATE,
+
+    DATASTORE_ID_POWER_VALUE,
+    DATASTORE_ID_POWER_TIMESTAMP,
 
     DATASTORE_ID_LAST,
 } datastore_id_t;
@@ -125,6 +130,7 @@ datastore_error_t datastore_set_double(datastore_t * store, datastore_id_t id, i
 datastore_error_t datastore_set_string(datastore_t * store, datastore_id_t id, instance_id_t instance, const char * value);
 
 datastore_error_t datastore_get_bool(const datastore_t * store, datastore_id_t id, instance_id_t instance, bool * value);
+datastore_error_t datastore_get_uint8(const datastore_t * store, datastore_id_t id, instance_id_t instance, uint8_t * value);
 datastore_error_t datastore_get_uint32(const datastore_t * store, datastore_id_t id, instance_id_t instance, uint32_t * value);
 datastore_error_t datastore_get_int8(const datastore_t * store, datastore_id_t id, instance_id_t instance, int8_t * value);
 datastore_error_t datastore_get_int32(const datastore_t * store, datastore_id_t id, instance_id_t instance, int32_t * value);

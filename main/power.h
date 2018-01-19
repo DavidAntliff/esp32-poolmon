@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2017 David Antliff
+ * Copyright (c) 2018 David Antliff
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,11 +22,11 @@
  * SOFTWARE.
  */
 
-#ifndef WIFI_SUPPORT_H
-#define WIFI_SUPPORT_H
+#ifndef POWER_H
+#define POWER_H
 
 #include "freertos/FreeRTOS.h"
 
-void wifi_support_init(UBaseType_t priority);
+void power_init(UBaseType_t priority);
 
-#endif // WIFI_SUPPORT_H
+#endif // POWER_H
