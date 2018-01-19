@@ -71,11 +71,12 @@ struct _private_t
 
         struct light
         {
+            bool detected;
             uint32_t full;
             uint32_t infrared;
             uint32_t visible;
             uint32_t illuminance;
-            bool detected;
+            uint32_t timestamp;
         } light;
 
         struct flow
@@ -146,11 +147,12 @@ static index_t INDEX[] = {
     { DATASTORE_ID_TEMP_LABEL,             NAME(DATASTORE_ID_TEMP_LABEL),             DATASTORE_TYPE_STRING, DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.label),      sizeof(((private_t *)0)->data.temp.label) },
     { DATASTORE_ID_TEMP_ASSIGNMENT,        NAME(DATASTORE_ID_TEMP_ASSIGNMENT),        DATASTORE_TYPE_UINT8,  DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.assignment), sizeof(((private_t *)0)->data.temp.assignment) },
 
-    INDEX_ROW(DATASTORE_ID_LIGHT_DETECTED, DATASTORE_TYPE_BOOL, 1, data.light.detected),
-    { DATASTORE_ID_LIGHT_FULL,             NAME(DATASTORE_ID_LIGHT_FULL),             DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.full),             sizeof(((private_t *)0)->data.light.full) },
-    { DATASTORE_ID_LIGHT_VISIBLE,          NAME(DATASTORE_ID_LIGHT_VISIBLE),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.visible),          sizeof(((private_t *)0)->data.light.visible) },
-    { DATASTORE_ID_LIGHT_INFRARED,         NAME(DATASTORE_ID_LIGHT_INFRARED),         DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.infrared),         sizeof(((private_t *)0)->data.light.infrared) },
-    { DATASTORE_ID_LIGHT_ILLUMINANCE,      NAME(DATASTORE_ID_LIGHT_ILLUMINANCE),      DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.illuminance),      sizeof(((private_t *)0)->data.light.illuminance) },
+    INDEX_ROW(DATASTORE_ID_LIGHT_DETECTED,  DATASTORE_TYPE_BOOL, 1, data.light.detected),
+    { DATASTORE_ID_LIGHT_FULL,              NAME(DATASTORE_ID_LIGHT_FULL),             DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.full),             sizeof(((private_t *)0)->data.light.full) },
+    { DATASTORE_ID_LIGHT_VISIBLE,           NAME(DATASTORE_ID_LIGHT_VISIBLE),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.visible),          sizeof(((private_t *)0)->data.light.visible) },
+    { DATASTORE_ID_LIGHT_INFRARED,          NAME(DATASTORE_ID_LIGHT_INFRARED),         DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.infrared),         sizeof(((private_t *)0)->data.light.infrared) },
+    { DATASTORE_ID_LIGHT_ILLUMINANCE,       NAME(DATASTORE_ID_LIGHT_ILLUMINANCE),      DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.illuminance),      sizeof(((private_t *)0)->data.light.illuminance) },
+    INDEX_ROW(DATASTORE_ID_LIGHT_TIMESTAMP, DATASTORE_TYPE_UINT32, 1, data.light.timestamp),
 
     { DATASTORE_ID_FLOW_FREQUENCY,         NAME(DATASTORE_ID_FLOW_FREQUENCY),         DATASTORE_TYPE_FLOAT,  1, offsetof(private_t, data.flow.frequency),         sizeof(((private_t *)0)->data.flow.frequency) },
     { DATASTORE_ID_FLOW_RATE,              NAME(DATASTORE_ID_FLOW_RATE),              DATASTORE_TYPE_FLOAT,  1, offsetof(private_t, data.flow.rate),              sizeof(((private_t *)0)->data.flow.rate) },

@@ -179,6 +179,7 @@ static const transition_t transitions[] = {
 static QueueHandle_t button_queue;
 
 static const char * BLANK_LINE = "                ";
+#define TIMESTAMP_TIMEOUT 15  // seconds after which a measurement is not displayed
 
 typedef struct
 {
@@ -347,28 +348,39 @@ static void _handle_page_sensors_light(const i2c_lcd1602_info_t * lcd_info, void
 
     if (detected)
     {
-//        uint32_t timestamp = 0;
-//        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_TIMESTAMP, 0, &timestamp);
+        uint32_t timestamp = 0;
+        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_TIMESTAMP, 0, &timestamp);
 
-        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, &full);
-        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, &visible);
-        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, &infrared);
-        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, &illuminance);
+        if (seconds_since_boot() - timestamp < TIMESTAMP_TIMEOUT)
+        {
+            datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, &full);
+            datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, &visible);
+            datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, &infrared);
+            datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, &illuminance);
 
-        char line[ROW_STRING_WIDTH] = "";
-        snprintf(line, ROW_STRING_WIDTH, "Li F%5d L%5d", full, illuminance);
-        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+            char line[ROW_STRING_WIDTH] = "";
+            snprintf(line, ROW_STRING_WIDTH, "Li F%5d L%5d", full, illuminance);
+            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
-        snprintf(line, ROW_STRING_WIDTH, "   I%5d V%5d", infrared, visible);
-        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+            snprintf(line, ROW_STRING_WIDTH, "   I%5d V%5d", infrared, visible);
+            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+        }
+        else
+        {
+            // measurement timed out
+            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "Li F ---- L ----"));
+            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "   I ---- V ----"));
+        }
     }
     else
     {
+        // sensor not detected at boot
         I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
         I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "Li F ???? L ????"));
-
         I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
         I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "   I ???? V ????"));
     }

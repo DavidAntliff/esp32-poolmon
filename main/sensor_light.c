@@ -32,6 +32,7 @@
 
 #include "sensor_light.h"
 #include "constants.h"
+#include "utils.h"
 #include "datastore.h"
 #include "smbus.h"
 #include "tsl2561.h"
@@ -109,6 +110,7 @@ static void sensor_light_task(void * pvParameter)
                 datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, infrared);
                 datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, visible);
                 datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, lux);
+                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_TIMESTAMP, 0, seconds_since_boot());
             }
             else
             {
