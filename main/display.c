@@ -28,9 +28,11 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
+#include "esp_wifi.h"
 
 #include "display.h"
 #include "constants.h"
+#include "utils.h"
 #include "datastore.h"
 #include "i2c_master.h"
 #include "smbus.h"
@@ -115,6 +117,7 @@ static void _handle_page_avr_status(const i2c_lcd1602_info_t * lcd_info, void * 
 
 static int alarm_display_count = 0;
 static bool splash_activity = false;
+static int esp32_status_state = 0;
 
 static const page_spec_t page_specs[] = {
     // ID                       handler                        state
@@ -135,7 +138,7 @@ static const page_spec_t page_specs[] = {
     { PAGE_SENSORS_STATUS_2,    _handle_page_sensors_status_2, NULL },
     { PAGE_SENSORS_STATUS_3,    _handle_page_sensors_status_3, NULL },
     { PAGE_SENSORS_STATUS_4,    _handle_page_sensors_status_4, NULL },
-    { PAGE_ESP32_STATUS,        _handle_page_esp32_status,     NULL },
+    { PAGE_ESP32_STATUS,        _handle_page_esp32_status,     &esp32_status_state },
     { PAGE_AVR_STATUS,          _handle_page_avr_status,       NULL },
 };
 
@@ -174,6 +177,8 @@ static const transition_t transitions[] = {
 };
 
 static QueueHandle_t button_queue;
+
+static const char * BLANK_LINE = "                ";
 
 typedef struct
 {
@@ -336,20 +341,37 @@ static void _handle_page_sensors_temp_5_P(const i2c_lcd1602_info_t * lcd_info, v
 
 static void _handle_page_sensors_light(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
+    bool detected = false;
     uint32_t full = 0, visible = 0, infrared = 0, illuminance = 0;
-    datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, &full);
-    datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, &visible);
-    datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, &infrared);
-    datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, &illuminance);
+    datastore_get_bool(datastore, DATASTORE_ID_LIGHT_DETECTED, 0, &detected);
 
-    char line[ROW_STRING_WIDTH] = "";
-    snprintf(line, ROW_STRING_WIDTH, "Li F%5d L%5d", full, illuminance);
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    if (detected)
+    {
+//        uint32_t timestamp = 0;
+//        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_TIMESTAMP, 0, &timestamp);
 
-    snprintf(line, ROW_STRING_WIDTH, "   I%5d V%5d", infrared, visible);
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, &full);
+        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, &visible);
+        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, &infrared);
+        datastore_get_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, &illuminance);
+
+        char line[ROW_STRING_WIDTH] = "";
+        snprintf(line, ROW_STRING_WIDTH, "Li F%5d L%5d", full, illuminance);
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+        snprintf(line, ROW_STRING_WIDTH, "   I%5d V%5d", infrared, visible);
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    }
+    else
+    {
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "Li F ???? L ????"));
+
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "   I ???? V ????"));
+    }
 }
 
 static void _handle_page_sensors_flow(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -400,8 +422,62 @@ static void _handle_page_last_error(const i2c_lcd1602_info_t * lcd_info, void * 
 
 static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "WIFI_STATUS"));
+    datastore_wifi_status_t wifi_status = 0;
+    datastore_get_uint32(datastore, DATASTORE_ID_WIFI_STATUS, 0, &wifi_status);
+
+    char line[ROW_STRING_WIDTH] = "";
+
+    char ssid[DATASTORE_LEN_WIFI_SSID] = "";
+    int8_t rssi = 0;
+
+    datastore_get_string(datastore, DATASTORE_ID_WIFI_SSID, 0, ssid);
+    datastore_get_int8(datastore, DATASTORE_ID_WIFI_RSSI, 0, &rssi);
+
+    // truncate ssid at 7 characters
+    ssid[8] = '\0';
+
+    switch (wifi_status)
+    {
+        case DATASTORE_WIFI_STATUS_DISCONNECTED:
+            snprintf(line, ROW_STRING_WIDTH, "WiFi %-11s", "disconnect");
+            break;
+        case DATASTORE_WIFI_STATUS_CONNECTED:
+        case DATASTORE_WIFI_STATUS_GOT_ADDRESS:
+            snprintf(line, ROW_STRING_WIDTH, "WiFi %-7s %3d", ssid, rssi);
+            break;
+        default:
+            ESP_LOGE(TAG, "unhandled wifi status %d", wifi_status);
+            break;
+    }
+
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    switch (wifi_status)
+    {
+        case DATASTORE_WIFI_STATUS_DISCONNECTED:
+            snprintf(line, ROW_STRING_WIDTH, BLANK_LINE);
+            break;
+        case DATASTORE_WIFI_STATUS_CONNECTED:
+            snprintf(line, ROW_STRING_WIDTH, "  waiting for IP");
+            break;
+        case DATASTORE_WIFI_STATUS_GOT_ADDRESS:
+        {
+            uint32_t ip_address = 0;
+            datastore_get_uint32(datastore, DATASTORE_ID_WIFI_ADDRESS, 0, &ip_address);
+            snprintf(line, ROW_STRING_WIDTH, "%d.%d.%d.%d        ",
+                     (ip_address & 0xff),
+                     (ip_address & 0xff00) >> 8,
+                     (ip_address & 0xff0000) >> 16,
+                     (ip_address & 0xff000000) >> 24);
+            break;
+        }
+        default:
+            ESP_LOGE(TAG, "unhandled wifi status %d", wifi_status);
+            break;
+    }
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 }
 
 static void _handle_page_mqtt_status(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -436,8 +512,41 @@ static void _handle_page_sensors_status_4(const i2c_lcd1602_info_t * lcd_info, v
 
 static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "ESP32_STATUS"));
+    int * page_state = (int *)state;
+    char line[ROW_STRING_WIDTH] = "";
+    if (*page_state < 4)
+    {
+        char version[DATASTORE_LEN_VERSION] = "";
+        datastore_get_string(datastore, DATASTORE_ID_SYSTEM_VERSION, 0, version);
+
+        snprintf(line, ROW_STRING_WIDTH, "ESP32 v%3s      ", version);
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+        uint32_t uptime = seconds_since_boot(); // in seconds
+        uint32_t days = uptime / 60 / 60 / 24;
+        uint32_t hours = uptime / 60 / 60 % 24;
+        uint32_t minutes = uptime / 60 % 60;
+        uint32_t seconds = uptime % 60;
+        snprintf(line, ROW_STRING_WIDTH, "Up%4dd %02d:%02d:%02d", days, hours, minutes, seconds);
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    }
+    else if (*page_state < 6)
+    {
+        snprintf(line, ROW_STRING_WIDTH, "MEM Free %7d", esp_get_free_heap_size());
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+        snprintf(line, ROW_STRING_WIDTH, "IRAM Free %6d", heap_caps_get_free_size(MALLOC_CAP_32BIT));
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    }
+    else
+    {
+        *page_state = -1;
+    }
+    ++*page_state;
 }
 
 static void _handle_page_avr_status(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -608,16 +717,16 @@ static void button_task(void * pvParameter)
                 input_t input = INPUT_NONE;
                 if (!debounced_state)
                 {
-                    ESP_LOGI(TAG, "pressed for %d ticks", now - last_pressed);
+                    ESP_LOGD(TAG, "pressed for %d ticks", now - last_pressed);
                     if (now - last_pressed < SHORT_PRESS_THRESHOLD)
                     {
                         input = INPUT_SHORT;
-                        ESP_LOGI(TAG, "short");
+                        ESP_LOGD(TAG, "short");
                     }
                     else
                     {
                         input = INPUT_LONG;
-                        ESP_LOGI(TAG, "long");
+                        ESP_LOGD(TAG, "long");
                     }
                     //last_released = now;
                 }

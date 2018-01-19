@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2017 David Antliff
+ * Copyright (c) 2018 David Antliff
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,24 @@
  * SOFTWARE.
  */
 
-#ifndef WIFI_SUPPORT_H
-#define WIFI_SUPPORT_H
+#include <time.h>
+#include <sys/time.h>
 
-void wifi_support_init(UBaseType_t priority);
+#include "utils.h"
 
-#endif // WIFI_SUPPORT_H
+static struct timeval _boot_tv = { 0 };
+
+void init_boot_time_reference(void)
+{
+    gettimeofday(&_boot_tv, NULL);
+}
+
+uint32_t seconds_since_boot(void)
+{
+    // ignore sub-seconds
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec - _boot_tv.tv_sec;
+//    printf("%ld\n", (((tv.tv_sec * 1000000 + tv.tv_usec)
+//            - (tv_start.tv_sec * 1000000 + tv_start.tv_usec))));
+}

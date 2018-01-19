@@ -28,7 +28,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
-
 #include "datastore.h"
 #include "constants.h"
 
@@ -54,6 +53,15 @@ struct _private_t
             uint32_t error_timestamp;
         } i2c_master;
 
+        struct wifi
+        {
+            uint8_t ssid[DATASTORE_LEN_WIFI_SSID];
+            uint8_t password[DATASTORE_LEN_WIFI_PASSWORD];
+            datastore_wifi_status_t status;
+            int8_t rssi;
+            uint32_t address;
+        } wifi;
+
         struct temp
         {
             float value[DATASTORE_INSTANCES_TEMP];
@@ -67,6 +75,7 @@ struct _private_t
             uint32_t infrared;
             uint32_t visible;
             uint32_t illuminance;
+            bool detected;
         } light;
 
         struct flow
@@ -83,6 +92,7 @@ typedef struct _private_t private_t;
 typedef enum
 {
     DATASTORE_TYPE_INVALID = 0,
+    DATASTORE_TYPE_BOOL,
     DATASTORE_TYPE_UINT8,
     DATASTORE_TYPE_UINT32,
     DATASTORE_TYPE_INT8,
@@ -119,15 +129,24 @@ typedef struct
 
 #define NAME(X) #X
 
+#define INDEX_ROW(name, type, num_instances, field) { name, NAME(name), type, num_instances, offsetof(private_t, field), sizeof(((private_t *)0)->field) }
+
 static index_t INDEX[] = {
     { DATASTORE_ID_SYSTEM_VERSION,         NAME(DATASTORE_ID_SYSTEM_VERSION),         DATASTORE_TYPE_STRING, 1, offsetof(private_t, data.system.version),         sizeof(((private_t *)0)->data.system.version) },
     { DATASTORE_ID_SYSTEM_BUILD_DATE_TIME, NAME(DATASTORE_ID_SYSTEM_BUILD_DATE_TIME), DATASTORE_TYPE_STRING, 1, offsetof(private_t, data.system.build_date_time), sizeof(((private_t *)0)->data.system.build_date_time) },
     { DATASTORE_ID_SYSTEM_UPTIME,          NAME(DATASTORE_ID_SYSTEM_UPTIME),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.system.uptime),          sizeof(((private_t *)0)->data.system.uptime) },
 
+    INDEX_ROW(DATASTORE_ID_WIFI_SSID,     DATASTORE_TYPE_STRING, 1, data.wifi.ssid),
+    INDEX_ROW(DATASTORE_ID_WIFI_PASSWORD, DATASTORE_TYPE_STRING, 1, data.wifi.password),
+    INDEX_ROW(DATASTORE_ID_WIFI_STATUS,   DATASTORE_TYPE_UINT32, 1, data.wifi.status),
+    INDEX_ROW(DATASTORE_ID_WIFI_RSSI,     DATASTORE_TYPE_INT8,   1, data.wifi.rssi),
+    INDEX_ROW(DATASTORE_ID_WIFI_ADDRESS,  DATASTORE_TYPE_UINT32, 1, data.wifi.address),
+
     { DATASTORE_ID_TEMP_VALUE,             NAME(DATASTORE_ID_TEMP_VALUE),             DATASTORE_TYPE_FLOAT,  DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.value),      sizeof(((private_t *)0)->data.temp.value) },
     { DATASTORE_ID_TEMP_LABEL,             NAME(DATASTORE_ID_TEMP_LABEL),             DATASTORE_TYPE_STRING, DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.label),      sizeof(((private_t *)0)->data.temp.label) },
     { DATASTORE_ID_TEMP_ASSIGNMENT,        NAME(DATASTORE_ID_TEMP_ASSIGNMENT),        DATASTORE_TYPE_UINT8,  DATASTORE_INSTANCES_TEMP, offsetof(private_t, data.temp.assignment), sizeof(((private_t *)0)->data.temp.assignment) },
 
+    INDEX_ROW(DATASTORE_ID_LIGHT_DETECTED, DATASTORE_TYPE_BOOL, 1, data.light.detected),
     { DATASTORE_ID_LIGHT_FULL,             NAME(DATASTORE_ID_LIGHT_FULL),             DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.full),             sizeof(((private_t *)0)->data.light.full) },
     { DATASTORE_ID_LIGHT_VISIBLE,          NAME(DATASTORE_ID_LIGHT_VISIBLE),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.visible),          sizeof(((private_t *)0)->data.light.visible) },
     { DATASTORE_ID_LIGHT_INFRARED,         NAME(DATASTORE_ID_LIGHT_INFRARED),         DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.light.infrared),         sizeof(((private_t *)0)->data.light.infrared) },
@@ -314,6 +333,11 @@ static datastore_error_t _set_value(const datastore_t * store, datastore_id_t id
     return err;
 }
 
+datastore_error_t datastore_set_bool(datastore_t * store, datastore_id_t id, instance_id_t instance, bool value)
+{
+    return _set_value(store, id, instance, &value, DATASTORE_TYPE_BOOL);
+}
+
 datastore_error_t datastore_set_uint8(datastore_t * store, datastore_id_t id, instance_id_t instance, uint8_t value)
 {
     return _set_value(store, id, instance, &value, DATASTORE_TYPE_UINT8);
@@ -421,6 +445,11 @@ static datastore_error_t _get_value(const datastore_t * store, datastore_id_t id
     return err;
 }
 
+datastore_error_t datastore_get_bool(const datastore_t * store, datastore_id_t id, instance_id_t instance, bool * value)
+{
+    return _get_value(store, id, instance, value, DATASTORE_TYPE_BOOL);
+}
+
 datastore_error_t datastore_get_uint8(const datastore_t * store, datastore_id_t id, instance_id_t instance, uint8_t * value)
 {
     return _get_value(store, id, instance, value, DATASTORE_TYPE_UINT8);
@@ -463,6 +492,14 @@ datastore_error_t _to_string(const datastore_t * store, datastore_id_t id, insta
     {
         switch (INDEX[id].type)
         {
+            case DATASTORE_TYPE_BOOL:
+            {
+                bool value = 0;
+                datastore_get_bool(store, id, instance, &value);
+                snprintf(buffer, len, "%s", value ? "true" : "false");
+                err = DATASTORE_OK;
+                break;
+            }
             case DATASTORE_TYPE_UINT8:
             {
                 uint8_t value = 0;

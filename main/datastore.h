@@ -28,6 +28,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "esp_wifi.h"
+
 #define DATASTORE_INSTANCES_TEMP 5
 
 typedef enum
@@ -40,10 +42,17 @@ typedef enum
 //    DATASTORE_ID_I2C_ERROR_COUNT,
 //    DATASTORE_ID_I2C_ERROR_TIMESTAMP,
 //
+    DATASTORE_ID_WIFI_SSID,
+    DATASTORE_ID_WIFI_PASSWORD,
+    DATASTORE_ID_WIFI_STATUS,
+    DATASTORE_ID_WIFI_RSSI,
+    DATASTORE_ID_WIFI_ADDRESS,
+
     DATASTORE_ID_TEMP_VALUE,
     DATASTORE_ID_TEMP_LABEL,
     DATASTORE_ID_TEMP_ASSIGNMENT,
 
+    DATASTORE_ID_LIGHT_DETECTED,
     DATASTORE_ID_LIGHT_FULL,
     DATASTORE_ID_LIGHT_VISIBLE,
     DATASTORE_ID_LIGHT_INFRARED,
@@ -59,6 +68,8 @@ typedef enum
 #define DATASTORE_LEN_VERSION          4
 #define DATASTORE_LEN_BUILD_DATE_TIME 16
 #define DATASTORE_LEN_TEMP_LABEL       8
+#define DATASTORE_LEN_WIFI_SSID        (sizeof(((wifi_sta_config_t *)0)->ssid))
+#define DATASTORE_LEN_WIFI_PASSWORD    (sizeof(((wifi_sta_config_t *)0)->password))
 
 typedef enum
 {
@@ -70,6 +81,13 @@ typedef enum
     DATASTORE_ERROR_INVALID_ID,
     DATASTORE_ERROR_INVALID_INSTANCE,
 } datastore_error_t;
+
+typedef enum
+{
+    DATASTORE_WIFI_STATUS_DISCONNECTED = 0,
+    DATASTORE_WIFI_STATUS_CONNECTED,
+    DATASTORE_WIFI_STATUS_GOT_ADDRESS,
+} datastore_wifi_status_t;
 
 typedef enum
 {
@@ -96,6 +114,7 @@ datastore_error_t datastore_init(datastore_t * store);
 datastore_error_t datastore_load(void);
 datastore_error_t datastore_save(void);
 
+datastore_error_t datastore_set_bool(datastore_t * store, datastore_id_t id, instance_id_t instance, bool value);
 datastore_error_t datastore_set_uint8(datastore_t * store, datastore_id_t id, instance_id_t instance, uint8_t value);
 datastore_error_t datastore_set_uint32(datastore_t * store, datastore_id_t id, instance_id_t instance, uint32_t value);
 datastore_error_t datastore_set_int8(datastore_t * store, datastore_id_t id, instance_id_t instance, int8_t value);
@@ -104,7 +123,7 @@ datastore_error_t datastore_set_float(datastore_t * store, datastore_id_t id, in
 datastore_error_t datastore_set_double(datastore_t * store, datastore_id_t id, instance_id_t instance, double value);
 datastore_error_t datastore_set_string(datastore_t * store, datastore_id_t id, instance_id_t instance, const char * value);
 
-datastore_error_t datastore_get_uint8(const datastore_t * store, datastore_id_t id, instance_id_t instance, uint8_t * value);
+datastore_error_t datastore_get_bool(const datastore_t * store, datastore_id_t id, instance_id_t instance, bool * value);
 datastore_error_t datastore_get_uint32(const datastore_t * store, datastore_id_t id, instance_id_t instance, uint32_t * value);
 datastore_error_t datastore_get_int8(const datastore_t * store, datastore_id_t id, instance_id_t instance, int8_t * value);
 datastore_error_t datastore_get_int32(const datastore_t * store, datastore_id_t id, instance_id_t instance, int32_t * value);

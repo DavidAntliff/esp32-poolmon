@@ -36,6 +36,7 @@
 #include "esp_heap_caps.h"
 
 #include "constants.h"
+#include "utils.h"
 #include "datastore.h"
 #include "led.h"
 #include "i2c_master.h"
@@ -76,6 +77,14 @@ static void do_avr_reset(const char * topic, bool value, void * context)
         ESP_LOGW(TAG, "AVR restart requested");
         avr_support_reset();
 
+    }
+}
+
+static void do_datastore_dump(const char * topic, bool value, void * context)
+{
+    if (value)
+    {
+        datastore_dump(datastore);
     }
 }
 
@@ -131,13 +140,25 @@ static void echo_string(const char * topic, const char * value, void * context)
 // brief delay during startup sequence
 static void _delay(void)
 {
-    vTaskDelay(5000 / portTICK_RATE_MS);
+    vTaskDelay(2000 / portTICK_RATE_MS);
+}
+
+static void load_datastore_defaults(datastore_t * datastore)
+{
+    if (datastore)
+    {
+        // TODO: load from NV
+        datastore_set_string(datastore, DATASTORE_ID_WIFI_SSID, 0, CONFIG_WIFI_SSID);
+        datastore_set_string(datastore, DATASTORE_ID_WIFI_PASSWORD, 0, CONFIG_WIFI_PASSWORD);
+    }
 }
 
 void app_main()
 {
-    //    esp_log_level_set("*", ESP_LOG_INFO);
-    esp_log_level_set("*", ESP_LOG_DEBUG);
+    init_boot_time_reference();
+
+    esp_log_level_set("*", ESP_LOG_INFO);
+//    esp_log_level_set("*", ESP_LOG_DEBUG);
 //    esp_log_level_set("display", ESP_LOG_DEBUG);
 //    esp_log_level_set("avr_support", ESP_LOG_INFO);
 //    esp_log_level_set("datastore", ESP_LOG_DEBUG);
@@ -150,6 +171,7 @@ void app_main()
     UBaseType_t display_priority = publish_priority - 1;
     UBaseType_t sensor_priority = publish_priority - 1;
     UBaseType_t avr_priority = sensor_priority;
+    UBaseType_t wifi_monitor_priority = sensor_priority;
 
     ESP_LOGI(TAG, "[APP] Startup..");
 
@@ -160,6 +182,8 @@ void app_main()
 
     datastore = datastore_malloc();
     datastore_init(datastore);
+    load_datastore_defaults(datastore);
+
     datastore_dump(datastore);
 
     // Onboard LED
@@ -268,6 +292,11 @@ void app_main()
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
+
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/datastore/dump", &do_datastore_dump, NULL)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+        }
     }
     else
     {
@@ -275,17 +304,18 @@ void app_main()
     }
 
     nvs_flash_init();
-    wifi_support_init();
+    wifi_support_init(wifi_monitor_priority);
 
     _delay();
+    datastore_dump(datastore);
 
-    // Run forever...
     while (running)
     {
         ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());  // byte-addressable heap memory
         ESP_LOGI(TAG, "32bit aligned RAM left %d", heap_caps_get_free_size(MALLOC_CAP_32BIT));  // IRAM 32-bit aligned heap
+        ESP_LOGI(TAG, "uptime %d seconds", seconds_since_boot());
 
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        vTaskDelay(10000 / portTICK_RATE_MS);
     }
 
     // TODO: signal to all tasks to close and wait for them to do so

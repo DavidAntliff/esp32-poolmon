@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2017 David Antliff
+ * Copyright (c) 2018 David Antliff
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,17 @@
  * SOFTWARE.
  */
 
-#ifndef WIFI_SUPPORT_H
-#define WIFI_SUPPORT_H
+#ifndef UTILS_H
+#define UTILS_H
 
-void wifi_support_init(UBaseType_t priority);
+#include <stdint.h>
 
-#endif // WIFI_SUPPORT_H
+void init_boot_time_reference(void);
+
+/**
+ * @brief Obtain current timestamp in seconds.
+ */
+uint32_t seconds_since_boot(void);
+
+
+#endif // UTILS_H

@@ -68,55 +68,64 @@ static void sensor_light_task(void * pvParameter)
 
     // Set up the TSL2561 device
     tsl2561_info_t * tsl2561_info = tsl2561_malloc();
-    tsl2561_init(tsl2561_info, smbus_info);
-
-    // Set sensor integration time and gain
-    tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_1X);
-    //tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_16X);
-
-    i2c_master_unlock(i2c_master_info);
-
-    TickType_t last_wake_time = xTaskGetTickCount();
-
-    while (1)
+    if (tsl2561_init(tsl2561_info, smbus_info) == ESP_OK)
     {
-        last_wake_time = xTaskGetTickCount();
+        // Set sensor integration time and gain
+        tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_1X);
+        //tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_16X);
 
-        tsl2561_visible_t visible = 0;
-        tsl2561_infrared_t infrared = 0;
-
-        i2c_master_lock(i2c_master_info, portMAX_DELAY);
-        esp_err_t err = tsl2561_read(tsl2561_info, &visible, &infrared);
+        datastore_set_bool(datastore, DATASTORE_ID_LIGHT_DETECTED, 0, true);
         i2c_master_unlock(i2c_master_info);
 
-        if (err == ESP_OK)
+        TickType_t last_wake_time = xTaskGetTickCount();
+
+        while (1)
         {
-            uint32_t lux = tsl2561_compute_lux(tsl2561_info, visible, infrared);
+            last_wake_time = xTaskGetTickCount();
 
-            publish_value(PUBLISH_VALUE_LIGHT_FULL_SPECTRUM, visible + infrared, task_inputs->publish_queue);
-            publish_value(PUBLISH_VALUE_LIGHT_VISIBLE, visible, task_inputs->publish_queue);
-            publish_value(PUBLISH_VALUE_LIGHT_INFRARED, infrared, task_inputs->publish_queue);
-            publish_value(PUBLISH_VALUE_LIGHT_LUX, lux, task_inputs->publish_queue);
+            tsl2561_visible_t visible = 0;
+            tsl2561_infrared_t infrared = 0;
 
-            ESP_LOGI(TAG, "Light Sensor Readings:")
-            ESP_LOGI(TAG, "  Full spectrum: %d", visible + infrared);
-            ESP_LOGI(TAG, "  Infrared:      %d", infrared);
-            ESP_LOGI(TAG, "  Visible:       %d", visible);
-            ESP_LOGI(TAG, "  Illuminance:   %d lux", lux);
+            i2c_master_lock(i2c_master_info, portMAX_DELAY);
+            esp_err_t err = tsl2561_read(tsl2561_info, &visible, &infrared);
+            i2c_master_unlock(i2c_master_info);
 
-            datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, visible + infrared);
-            datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, infrared);
-            datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, visible);
-            datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, lux);
+            if (err == ESP_OK)
+            {
+                uint32_t lux = tsl2561_compute_lux(tsl2561_info, visible, infrared);
+
+                publish_value(PUBLISH_VALUE_LIGHT_FULL_SPECTRUM, visible + infrared, task_inputs->publish_queue);
+                publish_value(PUBLISH_VALUE_LIGHT_VISIBLE, visible, task_inputs->publish_queue);
+                publish_value(PUBLISH_VALUE_LIGHT_INFRARED, infrared, task_inputs->publish_queue);
+                publish_value(PUBLISH_VALUE_LIGHT_LUX, lux, task_inputs->publish_queue);
+
+                ESP_LOGI(TAG, "Light Sensor Readings:")
+                ESP_LOGI(TAG, "  Full spectrum: %d", visible + infrared);
+                ESP_LOGI(TAG, "  Infrared:      %d", infrared);
+                ESP_LOGI(TAG, "  Visible:       %d", visible);
+                ESP_LOGI(TAG, "  Illuminance:   %d lux", lux);
+
+                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, visible + infrared);
+                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, infrared);
+                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, visible);
+                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, lux);
+            }
+            else
+            {
+                ESP_LOGW(TAG, "sensor error");
+            }
+
+            vTaskDelayUntil(&last_wake_time, SAMPLE_PERIOD / portTICK_PERIOD_MS);
         }
-        else
-        {
-            ESP_LOGW(TAG, "sensor error");
-        }
-
-        vTaskDelayUntil(&last_wake_time, SAMPLE_PERIOD / portTICK_PERIOD_MS);
+    }
+    else
+    {
+        datastore_set_bool(datastore, DATASTORE_ID_LIGHT_DETECTED, 0, false);
+        i2c_master_unlock(i2c_master_info);
     }
 
+    smbus_free(&smbus_info);
+    tsl2561_free(&tsl2561_info);
     free(task_inputs);
     vTaskDelete(NULL);
 }
