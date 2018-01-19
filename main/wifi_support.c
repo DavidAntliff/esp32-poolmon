@@ -40,6 +40,8 @@ const static int CONNECTED_BIT = BIT0;
 
 static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     switch(event->event_id) {
         case SYSTEM_EVENT_STA_START:
             esp_wifi_connect();
@@ -83,5 +85,7 @@ static void wifi_conn_init(void)
 
 void wifi_support_init(void)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     wifi_conn_init();
 }

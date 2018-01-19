@@ -63,6 +63,8 @@ typedef struct
 
 static void read_temperatures(DS18B20_Info ** device_infos, float * readings, int num_devices)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     ds18b20_convert_all(device_infos[0]->bus);
 
     // in this application all devices use the same resolution,
@@ -86,6 +88,8 @@ static void read_temperatures(DS18B20_Info ** device_infos, float * readings, in
  */
 static int find_owb_rom_codes(const OneWireBus * owb, OneWireBus_ROMCode * rom_codes, int max_codes)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     int num_devices = 0;
     OneWireBus_SearchState search_state = {0};
     bool found = false;
@@ -109,6 +113,8 @@ static void associate_ds18b20_devices(const OneWireBus * owb,
                                       DS18B20_Info ** device_infos,
                                       int num_devices)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     for (int i = 0; i < num_devices; ++i)
     {
         DS18B20_Info * ds18b20_info = ds18b20_malloc();
@@ -130,6 +136,8 @@ static void associate_ds18b20_devices(const OneWireBus * owb,
 
 static temp_sensors_t * detect_sensors(uint8_t gpio)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     // set up the One Wire Bus
     OneWireBus * owb = NULL;
     temp_sensors_t * sensors = NULL;
@@ -178,7 +186,7 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
 static void sensor_temp_task(void * pvParameter)
 {
     assert(pvParameter);
-    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     int sample_count = 0;
@@ -243,6 +251,8 @@ static void sensor_temp_task(void * pvParameter)
 
 temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandle_t publish_queue)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     // Assume that new devices are not connected during operation.
     temp_sensors_t * sensors = detect_sensors(gpio);
 
@@ -263,6 +273,8 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandl
 
 void sensor_temp_close(temp_sensors_t * sensors)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     if (sensors != NULL)
     {
         // clean up dynamically allocated data

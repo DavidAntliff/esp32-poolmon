@@ -52,7 +52,7 @@ typedef struct
 static void sensor_light_task(void * pvParameter)
 {
     assert(pvParameter);
-    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
@@ -123,6 +123,8 @@ static void sensor_light_task(void * pvParameter)
 
 void sensor_light_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     // task will take ownership of this struct
     task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
     if (task_inputs)

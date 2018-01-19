@@ -76,8 +76,8 @@ static const value_info_t values_info[PUBLISH_VALUE_LAST] =
 static void publish_task(void * pvParameter)
 {
     assert(pvParameter);
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
     QueueHandle_t publish_queue = (QueueHandle_t)pvParameter;
-    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
 
     while (1)
     {
@@ -148,6 +148,8 @@ void publish_value(publish_value_id_t value_id, float value, QueueHandle_t publi
 
 QueueHandle_t publish_init(unsigned int queue_depth, UBaseType_t priority)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     assert(sizeof(values_info) / sizeof(values_info[0]) == PUBLISH_VALUE_LAST);
 
     // Create a queue for the sensor task to publish sensor readings

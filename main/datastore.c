@@ -204,6 +204,8 @@ void datastore_free(datastore_t ** store)
 
 datastore_error_t datastore_init(datastore_t * store)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     // check that the index is correct
     assert(sizeof(INDEX) / sizeof(INDEX[0]) == DATASTORE_ID_LAST);
     for (datastore_id_t id = 0; id < DATASTORE_ID_LAST; ++id)
@@ -269,7 +271,7 @@ static datastore_error_t _set_value(const datastore_t * store, datastore_id_t id
 
                             xSemaphoreTake(private->semaphore, portMAX_DELAY);
                             _set_handler((uint8_t *)value, pdest, instance_size);
-                            esp_log_buffer_hex(TAG, pdest, instance_size);
+                            ESP_LOG_BUFFER_HEXDUMP(TAG, pdest, instance_size, ESP_LOG_DEBUG);
                             xSemaphoreGive(private->semaphore);
 
                             // TODO: call any registered callbacks with new value
@@ -373,7 +375,7 @@ static datastore_error_t _get_value(const datastore_t * store, datastore_id_t id
                             uint8_t * psrc = (uint8_t *)private + INDEX[id].offset + instance * instance_size;
                             ESP_LOGD(TAG, "_get_value: id %d, instance %d, value %p, type %d, private %p, offset 0x%x, size 0x%x, instance_size 0x%x, psrc %p",
                                      id, instance, value, INDEX[id].type, private, INDEX[id].offset, INDEX[id].size, instance_size, psrc);
-                            esp_log_buffer_hex(TAG, psrc, instance_size);
+                            ESP_LOG_BUFFER_HEXDUMP(TAG, psrc, instance_size, ESP_LOG_DEBUG);
 
                             xSemaphoreTake(private->semaphore, portMAX_DELAY);
                             _get_handler(psrc, (uint8_t *)value, instance_size);
@@ -544,7 +546,7 @@ datastore_error_t datastore_dump(const datastore_t * store)
             {
                 char value[256] = "";
                 err = _to_string(store, id, instance, value, 256);
-                ESP_LOGW(TAG, LOG_COLOR(LOG_COLOR_PURPLE)"%2d %-40s %d %s", id, INDEX[id].name, instance, value);
+                ESP_LOGI(TAG, LOG_COLOR(LOG_COLOR_PURPLE)"%2d %-40s %d %s", id, INDEX[id].name, instance, value);
             }
             if (err != DATASTORE_OK)
             {

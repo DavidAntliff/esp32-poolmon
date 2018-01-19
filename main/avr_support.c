@@ -82,7 +82,7 @@ static uint8_t _decode_switch_states(uint8_t status)
 
 static void _publish_switch_states(uint8_t switch_states, QueueHandle_t publish_queue)
 {
-    ESP_LOGI(TAG, "Publishing all switch states");
+    ESP_LOGD(TAG, "Publishing all switch states");
     publish_value(PUBLISH_VALUE_SWITCH_1, switch_states & 0b0001 ? 1.0 : 0.0, publish_queue);
     publish_value(PUBLISH_VALUE_SWITCH_2, switch_states & 0b0010 ? 1.0 : 0.0, publish_queue);
     publish_value(PUBLISH_VALUE_SWITCH_3, switch_states & 0b0100 ? 1.0 : 0.0, publish_queue);
@@ -92,7 +92,7 @@ static void _publish_switch_states(uint8_t switch_states, QueueHandle_t publish_
 static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_switch_states, QueueHandle_t publish_queue)
 {
     uint8_t changed = last_switch_states ^ new_switch_states;
-    ESP_LOGI(TAG, "last_switch_states 0x%02x, new_switch_states 0x%02x, changed 0x%02x", last_switch_states, new_switch_states, changed);
+    ESP_LOGD(TAG, "last_switch_states 0x%02x, new_switch_states 0x%02x, changed 0x%02x", last_switch_states, new_switch_states, changed);
 
     // Switches 1 and 3 report "0" when in Auto position, and "1" in Manual position
     // Switches 2 and 4 report "0" when in Off position, and "1" in On position.
@@ -120,7 +120,7 @@ static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_swit
 static void avr_support_task(void * pvParameter)
 {
     assert(pvParameter);
-    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
@@ -135,7 +135,7 @@ static void avr_support_task(void * pvParameter)
     I2C_ERROR_CHECK(smbus_set_timeout(smbus_info, SMBUS_TIMEOUT / portTICK_RATE_MS));
 
     uint8_t status = _read_register(smbus_info, REGISTER_STATUS);
-    ESP_LOGI(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
+    ESP_LOGD(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
     uint8_t switch_states = _decode_switch_states(status);
     _publish_switch_states(switch_states, task_inputs->publish_queue);
 
@@ -151,7 +151,7 @@ static void avr_support_task(void * pvParameter)
         {
             reset_pending = false;
 
-            ESP_LOGI(TAG, "do reset");
+            ESP_LOGD(TAG, "do reset");
             gpio_set_level(CONFIG_AVR_RESET_GPIO, 0);
             vTaskDelay(10);
             gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
@@ -166,7 +166,7 @@ static void avr_support_task(void * pvParameter)
             {
             case 0:
                 // read control register
-                ESP_LOGI(TAG, "I2C %d, REG 0x00: 0x%02x", i2c_port, _read_register(smbus_info, REGISTER_CONTROL));
+                ESP_LOGD(TAG, "I2C %d, REG 0x00: 0x%02x", i2c_port, _read_register(smbus_info, REGISTER_CONTROL));
                 break;
             case 1:
                 _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER);
@@ -197,7 +197,7 @@ static void avr_support_task(void * pvParameter)
 
             // read status register
             status = _read_register(smbus_info, REGISTER_STATUS);
-            ESP_LOGI(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
+            ESP_LOGD(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
         }
 
         i2c_master_unlock(i2c_master_info);
@@ -216,6 +216,8 @@ static void avr_support_task(void * pvParameter)
 
 void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     // task will take ownership of this struct
     task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
     if (task_inputs)
@@ -235,6 +237,8 @@ void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority,
 
 void avr_support_reset(void)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     // set a flag to request an AVR reset
     reset_pending = true;
 }

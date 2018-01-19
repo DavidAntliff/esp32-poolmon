@@ -131,28 +131,19 @@ static void echo_string(const char * topic, const char * value, void * context)
 // brief delay during startup sequence
 static void _delay(void)
 {
-    vTaskDelay(1000 / portTICK_RATE_MS);
+    vTaskDelay(5000 / portTICK_RATE_MS);
 }
 
 void app_main()
 {
-//    // Experiment: hold the AVR in reset briefly
-//    gpio_pad_select_gpio(CONFIG_AVR_RESET_GPIO);
-//    gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
-//    gpio_set_direction(CONFIG_AVR_RESET_GPIO, GPIO_MODE_OUTPUT);
-//
-//    gpio_set_level(CONFIG_AVR_RESET_GPIO, 0);
-////    //vTaskDelay(1000 / portTICK_RATE_MS);
-//    gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
-//    vTaskDelay(5000 / portTICK_RATE_MS);
-
-//    esp_log_level_set("*", ESP_LOG_INFO);
-    esp_log_level_set("*", ESP_LOG_WARN);
-//    esp_log_level_set("display", ESP_LOG_INFO);
+    //    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("*", ESP_LOG_DEBUG);
+//    esp_log_level_set("display", ESP_LOG_DEBUG);
 //    esp_log_level_set("avr_support", ESP_LOG_INFO);
 //    esp_log_level_set("datastore", ESP_LOG_DEBUG);
-    esp_log_level_set("mqtt", ESP_LOG_INFO);
-    //esp_log_level_set("sensor_temp", ESP_LOG_INFO);
+//    esp_log_level_set("mqtt", ESP_LOG_INFO);
+//    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
+    esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_ESP_MQTT_TASK_STACK_PRIORITY;
@@ -165,7 +156,7 @@ void app_main()
     // round to nearest MHz (stored value is only precise to MHz)
     uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
     ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
-    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     datastore = datastore_malloc();
     datastore_init(datastore);

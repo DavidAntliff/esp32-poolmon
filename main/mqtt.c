@@ -87,7 +87,7 @@ static void _status_callback(esp_mqtt_status_t status)
     switch (status)
     {
         case ESP_MQTT_STATUS_CONNECTED:
-            ESP_LOGI(TAG, "MQTT Connected");
+            ESP_LOGI(TAG, "MQTT connected");
 
             // send a device status update
             const char * value = "MQTT connected";
@@ -95,7 +95,7 @@ static void _status_callback(esp_mqtt_status_t status)
             esp_mqtt_subscribe("poolmon/#", 0);
             break;
         case ESP_MQTT_STATUS_DISCONNECTED:
-            ESP_LOGI(TAG, "MQTT Disconnected");
+            ESP_LOGI(TAG, "MQTT disconnected");
             break;
         default:
             break;
@@ -104,8 +104,9 @@ static void _status_callback(esp_mqtt_status_t status)
 
 static void _message_callback(const char * topic, uint8_t * payload, size_t len)
 {
-    ESP_LOGI(TAG, "_message_callback: topic '%s', len %d", topic, len);
-    esp_log_buffer_hex(TAG, payload, len);
+    ESP_LOGD(TAG, "_message_callback: topic '%s', len %d", topic, len);
+    ESP_LOG_BUFFER_HEXDUMP(TAG, payload, len, ESP_LOG_DEBUG);
+
     const char * data = (const char *)payload;
 
     // TODO: use g_trie until we add a context pointer to the message callback
@@ -113,7 +114,7 @@ static void _message_callback(const char * topic, uint8_t * payload, size_t len)
     if (topic_info)
     {
         uint8_t value = atoi(data);
-        ESP_LOGI(TAG, "%s %d", topic, value);
+        ESP_LOGD(TAG, "%s %d", topic, value);
         if (topic_info->rcb)
         {
             // dispatch based on type
@@ -237,7 +238,7 @@ static void _message_callback(const char * topic, uint8_t * payload, size_t len)
     }
     else
     {
-        ESP_LOGI(TAG, "topic %s not handled", topic);
+        ESP_LOGW(TAG, "topic %s not handled", topic);
     }
 }
 
@@ -317,6 +318,8 @@ static mqtt_error_t _is_init(const mqtt_info_t * mqtt_info)
 
 mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     mqtt_error_t err = MQTT_ERROR_UNKNOWN;
     if (mqtt_info != NULL)
     {

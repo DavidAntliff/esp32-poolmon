@@ -504,7 +504,7 @@ static page_id_t handle_transition(input_t input, page_id_t current_page)
 static void display_task(void * pvParameter)
 {
     assert(pvParameter);
-    ESP_LOGW(TAG, "[display] Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "[display] Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
@@ -573,7 +573,7 @@ static void display_task(void * pvParameter)
 
 static void button_task(void * pvParameter)
 {
-    ESP_LOGW(TAG, "[button] Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "[button] Core ID %d", xPortGetCoreID());
 
     // TODO: improve this, it's too naive
 
@@ -646,6 +646,8 @@ static void button_task(void * pvParameter)
 
 void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     static bool init = false;
     if (!init)
     {

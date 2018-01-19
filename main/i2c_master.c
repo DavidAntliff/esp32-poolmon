@@ -37,6 +37,8 @@
 
 i2c_master_info_t * i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     i2c_master_info_t * info = malloc(sizeof(*info));
     if (info)
     {
@@ -59,6 +61,8 @@ i2c_master_info_t * i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, 
 
 int i2c_master_scan(const i2c_master_info_t * info)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     int num_detected = 0;
     if (info)
     {
@@ -94,6 +98,8 @@ void i2c_master_close(i2c_master_info_t * info)
 
 bool i2c_master_lock(const i2c_master_info_t * info, TickType_t ticks_to_wait)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     bool result = false;
     if (info)
     {
@@ -107,6 +113,8 @@ bool i2c_master_lock(const i2c_master_info_t * info, TickType_t ticks_to_wait)
 
 void i2c_master_unlock(const i2c_master_info_t * info)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     if (info)
     {
         xSemaphoreGive(info->semaphore);

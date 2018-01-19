@@ -57,6 +57,8 @@ typedef struct
 
 static void init_rmt(uint8_t tx_gpio, rmt_channel_t channel, uint8_t clk_div)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     rmt_config_t rmt_tx = {
         .rmt_mode = RMT_MODE_TX,
         .channel = channel,
@@ -74,6 +76,8 @@ static void init_rmt(uint8_t tx_gpio, rmt_channel_t channel, uint8_t clk_div)
 
 static int create_rmt_window(rmt_item32_t * items, double sampling_window, double rmt_period)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     int num_items = 0;
 
     // enable counter for exactly x seconds:
@@ -114,6 +118,8 @@ static int create_rmt_window(rmt_item32_t * items, double sampling_window, doubl
 
 static void init_pcnt(uint8_t pulse_gpio, uint8_t ctrl_gpio, pcnt_unit_t unit, pcnt_channel_t channel, uint16_t filter_length)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     // set up counter
     pcnt_config_t pcnt_config = {
         .pulse_gpio_num = pulse_gpio,
@@ -167,7 +173,7 @@ static double calc_flow_rate_lpm(double hz)
 static void sensor_flow_task(void * pvParameter)
 {
     assert(pvParameter);
-    ESP_LOGW(TAG, "Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
 
@@ -224,6 +230,8 @@ void sensor_flow_init(uint8_t pcnt_gpio, pcnt_unit_t pcnt_unit, pcnt_channel_t p
                       uint8_t rmt_gpio, rmt_channel_t rmt_channel, uint8_t rmt_clk_div,
                       float sampling_period, float sampling_window, uint16_t filter_length, UBaseType_t priority, QueueHandle_t publish_queue)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+
     // task will take ownership of this struct
     task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
     if (task_inputs)
