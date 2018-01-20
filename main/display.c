@@ -729,20 +729,23 @@ static void button_task(void * pvParameter)
     TickType_t last_pressed = xTaskGetTickCount();
     //TickType_t last_released = last_pressed;
 
+    bool long_sent = false;
+
     while (1)
     {
         // debounce first
         bool raw_state = gpio_get_level(CONFIG_DISPLAY_BUTTON_GPIO) ? false : true;
         if (raw_state == last_raw_state)
         {
+            input_t input = INPUT_NONE;
+            TickType_t now = xTaskGetTickCount();
+
             // detect edges
             if (raw_state != debounced_state)
             {
                 debounced_state = raw_state;
-                TickType_t now = xTaskGetTickCount();
 
                 // if a falling edge, measure time since rising edge
-                input_t input = INPUT_NONE;
                 if (!debounced_state)
                 {
                     ESP_LOGD(TAG, "pressed for %d ticks", now - last_pressed);
@@ -751,26 +754,34 @@ static void button_task(void * pvParameter)
                         input = INPUT_SHORT;
                         ESP_LOGD(TAG, "short");
                     }
-                    else
-                    {
-                        input = INPUT_LONG;
-                        ESP_LOGD(TAG, "long");
-                    }
+//                    else
+//                    {
+//                        input = INPUT_LONG;
+//                        ESP_LOGD(TAG, "long");
+//                    }
                     //last_released = now;
+                    long_sent = false;
                 }
                 else
                 {
                     last_pressed = now;
                 }
+            }
 
-                if (input != INPUT_NONE)
+            // detect long press
+            if (!long_sent && debounced_state && now - last_pressed > SHORT_PRESS_THRESHOLD)
+            {
+                input = INPUT_LONG;
+                ESP_LOGD(TAG, "long");
+                long_sent = true;
+            }
+
+            if (input != INPUT_NONE)
+            {
+                if (xQueueSendToBack(button_queue, &input, 0) != pdTRUE)
                 {
-                    if (xQueueSendToBack(button_queue, &input, 0) != pdTRUE)
-                    {
-                        ESP_LOGE(TAG, "xQueueSendToBack failed");
-                    }
+                    ESP_LOGE(TAG, "xQueueSendToBack failed");
                 }
-
             }
         }
         last_raw_state = raw_state;
