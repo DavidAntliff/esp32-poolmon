@@ -150,14 +150,14 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
 
     if (rmt_driver_info)
     {
-        ESP_LOGE(TAG, "about to run owb_rmt_initialize");
+        ESP_LOGW(TAG, "about to run owb_rmt_initialize");
         owb = owb_rmt_initialize(rmt_driver_info, gpio, OWB_RMT_CHANNEL_TX, OWB_RMT_CHANNEL_RX);
         owb_use_crc(owb, true);       // enable CRC check for ROM code and measurement readings
 
         // locate attached devices
         OneWireBus_ROMCode * device_rom_codes = calloc(MAX_DEVICES, sizeof(*device_rom_codes));
 
-        ESP_LOGE(TAG, "about to run find_owb_rom_codes");
+        ESP_LOGW(TAG, "about to run find_owb_rom_codes");
         int num_devices = find_owb_rom_codes(owb, device_rom_codes, MAX_DEVICES);
 
         // free up unused space
@@ -166,7 +166,7 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
         // associate devices on bus with DS18B20 device driver
         DS18B20_Info ** device_infos = calloc(num_devices, sizeof(*device_infos));
 
-        ESP_LOGE(TAG, "about to run associate_ds18b20_devices");
+        ESP_LOGW(TAG, "about to run associate_ds18b20_devices");
         associate_ds18b20_devices(owb, device_rom_codes, device_infos, num_devices);
 
         sensors = malloc(sizeof(*sensors));
@@ -215,7 +215,6 @@ static void sensor_temp_task(void * pvParameter)
             float readings[MAX_DEVICES] = { 0 };
             DS18B20_ERROR errors[MAX_DEVICES] = { 0 };
 
-            ESP_LOGE(TAG, "about to run read_temperatures");
             read_temperatures(task_inputs->sensors->ds18b20_infos, readings, errors, task_inputs->sensors->num_ds18b20s);
             ++sample_count;
 

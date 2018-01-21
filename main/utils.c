@@ -24,6 +24,7 @@
 
 #include <time.h>
 #include <sys/time.h>
+#include <stdlib.h>
 
 #include "utils.h"
 
@@ -42,4 +43,27 @@ uint32_t seconds_since_boot(void)
     return tv.tv_sec - _boot_tv.tv_sec;
 //    printf("%ld\n", (((tv.tv_sec * 1000000 + tv.tv_usec)
 //            - (tv_start.tv_sec * 1000000 + tv_start.tv_usec))));
+}
+
+// Based on https://stackoverflow.com/a/3974138/143397
+// assumes little endian
+char * bits_to_string(char * buffer, size_t buffer_size, void const * const ptr, size_t const size)
+{
+    unsigned char *b = (unsigned char*) ptr;
+    unsigned char byte;
+    size_t idx = 0;
+
+    for (size_t i = size; i-- > 0; )
+    {
+        for (int j = 7 ; j >= 0; j--)
+        {
+            byte = (b[i] >> j) & 1;
+            if (idx < buffer_size - 1)  // leave room for null terminator
+            {
+                buffer[idx++] = '0' + byte;
+            }
+        }
+    }
+    buffer[idx] = '\0';
+    return buffer;
 }

@@ -50,9 +50,20 @@ typedef enum
     AVR_PUMP_STATE_ON = 1,
 } avr_pump_state_t;
 
+typedef enum
+{
+    AVR_ALARM_STATE_OFF = 0,
+    AVR_ALARM_STATE_ON = 1,
+} avr_alarm_state_t;
+
 void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue);
 
 // reset the AVR
 void avr_support_reset(void);
+
+void avr_support_set_cp_pump(avr_pump_state_t state);
+void avr_support_set_pp_pump(avr_pump_state_t state);
+void avr_support_set_alarm(avr_alarm_state_t state);
+
 
 #endif // AVR_SUPPORT_H

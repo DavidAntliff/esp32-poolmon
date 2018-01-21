@@ -81,6 +81,21 @@ static void do_avr_reset(const char * topic, bool value, void * context)
     }
 }
 
+static void do_avr_cp(const char * topic, bool value, void * context)
+{
+    avr_support_set_cp_pump(value ? AVR_PUMP_STATE_ON : AVR_PUMP_STATE_OFF);
+}
+
+static void do_avr_pp(const char * topic, bool value, void * context)
+{
+    avr_support_set_pp_pump(value ? AVR_PUMP_STATE_ON : AVR_PUMP_STATE_OFF);
+}
+
+static void do_avr_alarm(const char * topic, bool value, void * context)
+{
+    avr_support_set_alarm(value ? AVR_ALARM_STATE_ON : AVR_ALARM_STATE_OFF);
+}
+
 static void do_datastore_dump(const char * topic, bool value, void * context)
 {
     if (value)
@@ -163,18 +178,59 @@ static void load_datastore_defaults(datastore_t * datastore)
     }
 }
 
+static void avr_test_sequence(void)
+{
+    static int state = 0;
+
+    // simple state machine for testing
+    switch (state)
+    {
+    case 0:
+        avr_support_set_cp_pump(AVR_PUMP_STATE_OFF);
+        avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
+        avr_support_set_alarm(AVR_ALARM_STATE_OFF);
+        break;
+    case 1:
+        avr_support_set_alarm(AVR_ALARM_STATE_ON);
+        break;
+    case 2:
+        avr_support_set_cp_pump(AVR_PUMP_STATE_ON);
+        break;
+    case 3:
+        avr_support_set_cp_pump(AVR_PUMP_STATE_OFF);
+        avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
+        break;
+    case 4:
+        avr_support_set_cp_pump(AVR_PUMP_STATE_ON);
+        avr_support_set_alarm(AVR_ALARM_STATE_OFF);
+        break;
+    case 5:
+        avr_support_set_cp_pump(AVR_PUMP_STATE_OFF);
+        break;
+    case 6:
+        avr_support_set_cp_pump(AVR_PUMP_STATE_ON);
+        avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
+        break;
+    default:
+        state = 0;
+        break;
+    }
+    state = (state + 1) % 7;
+}
+
 void app_main()
 {
     init_boot_time_reference();
 
-    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("*", ESP_LOG_WARN);
+//    esp_log_level_set("*", ESP_LOG_INFO);
 //    esp_log_level_set("*", ESP_LOG_DEBUG);
-    esp_log_level_set("display", ESP_LOG_DEBUG);
-//    esp_log_level_set("avr_support", ESP_LOG_INFO);
+//   esp_log_level_set("display", ESP_LOG_DEBUG);
+    esp_log_level_set("avr_support", ESP_LOG_DEBUG);
 //    esp_log_level_set("datastore", ESP_LOG_DEBUG);
 //    esp_log_level_set("mqtt", ESP_LOG_INFO);
 //    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
-    esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);
+    esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_ESP_MQTT_TASK_STACK_PRIORITY;
@@ -202,9 +258,9 @@ void app_main()
     _delay();
 
     // I2C bus
-    ESP_LOGE(TAG, "about to run i2c_master_init");
+    ESP_LOGW(TAG, "about to run i2c_master_init");
     i2c_master_info_t * i2c_master_info = i2c_master_init(I2C_MASTER_NUM, CONFIG_I2C_MASTER_SDA_GPIO, CONFIG_I2C_MASTER_SCL_GPIO, I2C_MASTER_FREQ_HZ);
-    ESP_LOGE(TAG, "about to run i2c_master_scan");
+    ESP_LOGW(TAG, "about to run i2c_master_scan");
     int num_i2c_devices = i2c_master_scan(i2c_master_info);
     ESP_LOGI(TAG, "%d I2C devices detected", num_i2c_devices);
 
@@ -309,6 +365,21 @@ void app_main()
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
 
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/avr/cp", &do_avr_cp, NULL)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/avr/pp", &do_avr_pp, NULL)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+        }
+
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/avr/alarm", &do_avr_alarm, NULL)) != MQTT_OK)
+        {
+            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+        }
+
         if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/datastore/dump", &do_datastore_dump, NULL)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
@@ -328,13 +399,22 @@ void app_main()
     _delay();
     datastore_dump(datastore);
 
+    TickType_t last_wake_time = xTaskGetTickCount();
+
     while (running)
     {
-        ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());  // byte-addressable heap memory
-        ESP_LOGI(TAG, "32bit aligned RAM left %d", heap_caps_get_free_size(MALLOC_CAP_32BIT));  // IRAM 32-bit aligned heap
-        ESP_LOGI(TAG, "uptime %d seconds", seconds_since_boot());
+        last_wake_time = xTaskGetTickCount();
 
-        vTaskDelay(10000 / portTICK_RATE_MS);
+        if (seconds_since_boot() % 10 == 0)
+        {
+            ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());  // byte-addressable heap memory
+            ESP_LOGI(TAG, "32bit aligned RAM left %d", heap_caps_get_free_size(MALLOC_CAP_32BIT));  // IRAM 32-bit aligned heap
+            ESP_LOGI(TAG, "uptime %d seconds", seconds_since_boot());
+        }
+
+        avr_test_sequence();
+
+        vTaskDelayUntil(&last_wake_time, 1000 / portTICK_RATE_MS);
     }
 
     // TODO: signal to all tasks to close and wait for them to do so

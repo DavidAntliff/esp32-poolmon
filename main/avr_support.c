@@ -42,9 +42,29 @@
 
 #define TAG "avr_support"
 
-#define SMBUS_TIMEOUT 1000   // milliseconds
+#define SMBUS_TIMEOUT     1000   // milliseconds
+#define TICKS_PER_UPDATE  (1000 / portTICK_RATE_MS)
 
 extern datastore_t * datastore;
+
+// use as bitwise OR combinations
+typedef enum
+{
+    // AVR reset command
+    COMMAND_AVR_RESET    = 0b10000000,
+
+    // control commands
+    COMMAND_OFF          = 0b01000000,
+    COMMAND_ON           = 0b00100000,
+
+    // select commands
+    COMMAND_SELECT_ALARM = 0b00000001,
+    COMMAND_SELECT_CP    = 0b00000010,
+    COMMAND_SELECT_PP    = 0b00000100,
+
+} command_t;
+
+static QueueHandle_t command_queue;
 
 typedef struct
 {
@@ -58,8 +78,6 @@ typedef struct
             ESP_LOGW(TAG, "I2C error %d at %s:%d", rc, __FILE__, __LINE__); \
         }                                                                   \
     } while(0);
-
-static bool reset_pending = false;
 
 static uint8_t _read_register(const smbus_info_t * smbus_info, uint8_t address)
 {
@@ -179,6 +197,12 @@ static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_sta
 //    }
 }
 
+static bool _test_command(command_t command, command_t flag)
+{
+    // handle multi-bit flags
+    return (command & flag) == flag;
+}
+
 static void avr_support_task(void * pvParameter)
 {
     assert(pvParameter);
@@ -206,64 +230,85 @@ static void avr_support_task(void * pvParameter)
 
     i2c_master_unlock(i2c_master_info);
 
-    int state = 0;
+    uint8_t control_reg = 0x0;
+
+    TickType_t last_wake_time = xTaskGetTickCount();
 
     while (1)
     {
+        last_wake_time = xTaskGetTickCount();
+
+        command_t command = 0;
+        while (xQueueReceive(command_queue, &command, 0) == pdTRUE)
+        {
+            char binary_digits[9] = "";
+            uint8_t command8 = command;
+            ESP_LOGD(TAG, "command 0x%02x, 0b%s", command, bits_to_string(binary_digits, 9, &command8, sizeof(command8)));
+
+            if (_test_command(command, COMMAND_ON))
+            {
+                if (_test_command(command, COMMAND_SELECT_CP))
+                {
+                    ESP_LOGI(TAG, "CP on");
+                    control_reg |= REGISTER_CONTROL_SSR1;
+                }
+                if (_test_command(command, COMMAND_SELECT_PP))
+                {
+                    ESP_LOGI(TAG, "PP on");
+                    control_reg |= REGISTER_CONTROL_SSR2;
+                }
+                if (_test_command(command, COMMAND_SELECT_ALARM))
+                {
+                    ESP_LOGI(TAG, "Alarm on");
+                    control_reg |= REGISTER_CONTROL_BUZZER;
+                }
+                i2c_master_lock(i2c_master_info, portMAX_DELAY);
+                _write_register(smbus_info, REGISTER_CONTROL, control_reg);
+                i2c_master_unlock(i2c_master_info);
+            }
+            else if (_test_command(command, COMMAND_OFF))
+            {
+                if (_test_command(command, COMMAND_SELECT_CP))
+                {
+                    ESP_LOGI(TAG, "CP off");
+                    control_reg &= ~REGISTER_CONTROL_SSR1;
+                }
+                if (_test_command(command, COMMAND_SELECT_PP))
+                {
+                    ESP_LOGI(TAG, "PP off");
+                    control_reg &= ~REGISTER_CONTROL_SSR2;
+                }
+                if (_test_command(command, COMMAND_SELECT_ALARM))
+                {
+                    ESP_LOGI(TAG, "Alarm off");
+                    control_reg &= ~REGISTER_CONTROL_BUZZER;
+                }
+                i2c_master_lock(i2c_master_info, portMAX_DELAY);
+                _write_register(smbus_info, REGISTER_CONTROL, control_reg);
+                i2c_master_unlock(i2c_master_info);            }
+
+            if (_test_command(command, COMMAND_AVR_RESET))
+            {
+                ESP_LOGI(TAG, "AVR reset");
+                i2c_master_lock(i2c_master_info, portMAX_DELAY);
+                gpio_set_level(CONFIG_AVR_RESET_GPIO, 0);
+                vTaskDelay(10);
+                gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
+
+                // give the I2C bus some time to stabilise after AVR reset
+                vTaskDelay(10);
+                i2c_master_unlock(i2c_master_info);
+            }
+        }
+
         i2c_master_lock(i2c_master_info, portMAX_DELAY);
 
-        if (reset_pending)
-        {
-            reset_pending = false;
+        // read control register
+        ESP_LOGD(TAG, "I2C %d, REG 0x00: 0x%02x", i2c_port, _read_register(smbus_info, REGISTER_CONTROL));
 
-            ESP_LOGD(TAG, "do reset");
-            gpio_set_level(CONFIG_AVR_RESET_GPIO, 0);
-            vTaskDelay(10);
-            gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
-
-            // give the I2C bus some time to stabilise after AVR reset
-            vTaskDelay(10);
-        }
-        else
-        {
-            // simple state machine for testing
-            switch (state)
-            {
-            case 0:
-                // read control register
-                ESP_LOGD(TAG, "I2C %d, REG 0x00: 0x%02x", i2c_port, _read_register(smbus_info, REGISTER_CONTROL));
-                break;
-            case 1:
-                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER);
-                break;
-            case 2:
-                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER | REGISTER_CONTROL_SSR1);
-                break;
-            case 3:
-                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_BUZZER | REGISTER_CONTROL_SSR2);
-                break;
-            case 4:
-                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR1 | REGISTER_CONTROL_SSR2);
-                break;
-            case 5:
-                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR2);
-                break;
-            case 6:
-                _write_register(smbus_info, REGISTER_CONTROL, REGISTER_CONTROL_SSR1);
-                break;
-            case 7:
-                _write_register(smbus_info, REGISTER_CONTROL, 0);
-                break;
-            default:
-                state = 0;
-                break;
-            }
-            state = (state + 1) % 7;
-
-            // read status register
-            status = _read_register(smbus_info, REGISTER_STATUS);
-            ESP_LOGD(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
-        }
+        // read status register
+        status = _read_register(smbus_info, REGISTER_STATUS);
+        ESP_LOGD(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
 
         i2c_master_unlock(i2c_master_info);
 
@@ -277,7 +322,7 @@ static void avr_support_task(void * pvParameter)
         _publish_pump_changes(pump_states, new_pump_states, task_inputs->publish_queue);
         pump_states = new_pump_states;
 
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        vTaskDelayUntil(&last_wake_time, TICKS_PER_UPDATE);
     }
 
     free(task_inputs);
@@ -287,6 +332,8 @@ static void avr_support_task(void * pvParameter)
 void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
+
+    command_queue = xQueueCreate(10, sizeof(command_t));
 
     // task will take ownership of this struct
     task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
@@ -307,8 +354,41 @@ void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority,
 
 void avr_support_reset(void)
 {
-    ESP_LOGD(TAG, "%s", __FUNCTION__);
+    ESP_LOGD(TAG, "request AVR reset");
 
-    // set a flag to request an AVR reset
-    reset_pending = true;
+    command_t cmd = COMMAND_OFF | COMMAND_SELECT_CP | COMMAND_SELECT_PP | COMMAND_SELECT_ALARM | COMMAND_AVR_RESET;
+    if (xQueueSendToBack(command_queue, &cmd, 0) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "xQueueSendToBack failed");
+    }
+}
+
+void avr_support_set_cp_pump(avr_pump_state_t state)
+{
+    ESP_LOGD(TAG, "request set CP pump %s", state == AVR_PUMP_STATE_ON ? "on" : "off");
+    command_t cmd = (state == AVR_PUMP_STATE_ON ? COMMAND_ON : COMMAND_OFF) | COMMAND_SELECT_CP;
+    if (xQueueSendToBack(command_queue, &cmd, 0) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "xQueueSendToBack failed");
+    }
+}
+
+void avr_support_set_pp_pump(avr_pump_state_t state)
+{
+    ESP_LOGD(TAG, "request set PP pump %s", state == AVR_PUMP_STATE_ON ? "on" : "off");
+    command_t cmd = (state == AVR_PUMP_STATE_ON ? COMMAND_ON : COMMAND_OFF) | COMMAND_SELECT_PP;
+    if (xQueueSendToBack(command_queue, &cmd, 0) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "xQueueSendToBack failed");
+    }
+}
+
+void avr_support_set_alarm(avr_alarm_state_t state)
+{
+    ESP_LOGD(TAG, "request set alarm %s", state == AVR_ALARM_STATE_ON ? "on" : "off");
+    command_t cmd = (state == AVR_ALARM_STATE_ON ? COMMAND_ON : COMMAND_OFF) | COMMAND_SELECT_ALARM;
+    if (xQueueSendToBack(command_queue, &cmd, 0) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "xQueueSendToBack failed");
+    }
 }

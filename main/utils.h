@@ -34,5 +34,10 @@ void init_boot_time_reference(void);
  */
 uint32_t seconds_since_boot(void);
 
+/**
+ * @brief Render any value as a string of binary digits.
+ */
+char * bits_to_string(char * buffer, size_t buffer_size, void const * const ptr, size_t const size);
+
 
 #endif // UTILS_H
