@@ -30,6 +30,7 @@
 #include "esp_log.h"
 #include "datastore.h"
 #include "constants.h"
+#include "avr_support.h"
 
 #define TAG "datastore"
 
@@ -39,21 +40,21 @@ struct _private_t
 
     struct data
     {
-        struct system
+        struct
         {
             char version[DATASTORE_LEN_VERSION];
             char build_date_time[DATASTORE_LEN_BUILD_DATE_TIME];
             uint32_t uptime;
         } system;
 
-        struct i2c_master
+        struct
         {
             uint8_t device_count;
             uint32_t error_count;
             uint32_t error_timestamp;
         } i2c_master;
 
-        struct wifi
+        struct
         {
             uint8_t ssid[DATASTORE_LEN_WIFI_SSID];
             uint8_t password[DATASTORE_LEN_WIFI_PASSWORD];
@@ -62,7 +63,7 @@ struct _private_t
             uint32_t address;
         } wifi;
 
-        struct temp
+        struct
         {
             float value[DATASTORE_INSTANCES_TEMP];
             uint32_t timestamp[DATASTORE_INSTANCES_TEMP];
@@ -70,7 +71,7 @@ struct _private_t
             datastore_temp_assignment_t assignment[DATASTORE_INSTANCES_TEMP];
         } temp;
 
-        struct light
+        struct
         {
             uint8_t i2c_address;
             bool detected;
@@ -81,17 +82,60 @@ struct _private_t
             uint32_t timestamp;
         } light;
 
-        struct flow
+        struct
         {
             float frequency;  // Hz
             float rate;       // LPM
         } flow;
 
-        struct power
+        struct
         {
             float value;   // Watts
             uint32_t timestamp;
         } power;
+
+        struct
+        {
+            struct
+            {
+                struct
+                {
+                    avr_switch_mode_t value;
+                    uint32_t count;
+                } mode;
+                struct
+                {
+                    avr_switch_manual_t value;
+                    uint32_t count;
+                } manual;
+            } cp;
+            struct pp
+            {
+                struct
+                {
+                    avr_switch_mode_t value;
+                    uint32_t count;
+                } mode;
+                struct
+                {
+                    avr_switch_manual_t value;
+                    uint32_t count;
+                } manual;
+            } pp;
+            uint32_t timestamp;
+        } switches;
+
+        struct
+        {
+            struct
+            {
+                avr_pump_state_t state;
+            } cp;
+            struct
+            {
+                avr_pump_state_t state;
+            } pp;
+        } pumps;
 
     } data;
 
@@ -141,34 +185,48 @@ typedef struct
 #define INDEX_ROW(name, type, num_instances, field) { name, NAME(name), type, num_instances, offsetof(private_t, field), sizeof(((private_t *)0)->field) }
 
 static index_t INDEX[] = {
-    { DATASTORE_ID_SYSTEM_VERSION,         NAME(DATASTORE_ID_SYSTEM_VERSION),         DATASTORE_TYPE_STRING, 1, offsetof(private_t, data.system.version),         sizeof(((private_t *)0)->data.system.version) },
-    { DATASTORE_ID_SYSTEM_BUILD_DATE_TIME, NAME(DATASTORE_ID_SYSTEM_BUILD_DATE_TIME), DATASTORE_TYPE_STRING, 1, offsetof(private_t, data.system.build_date_time), sizeof(((private_t *)0)->data.system.build_date_time) },
-    { DATASTORE_ID_SYSTEM_UPTIME,          NAME(DATASTORE_ID_SYSTEM_UPTIME),          DATASTORE_TYPE_UINT32, 1, offsetof(private_t, data.system.uptime),          sizeof(((private_t *)0)->data.system.uptime) },
+    INDEX_ROW(DATASTORE_ID_SYSTEM_VERSION,             DATASTORE_TYPE_STRING, 1, data.system.version),
+    INDEX_ROW(DATASTORE_ID_SYSTEM_BUILD_DATE_TIME,     DATASTORE_TYPE_STRING, 1, data.system.build_date_time),
+    INDEX_ROW(DATASTORE_ID_SYSTEM_UPTIME,              DATASTORE_TYPE_UINT32, 1, data.system.uptime),
 
-    INDEX_ROW(DATASTORE_ID_WIFI_SSID,         DATASTORE_TYPE_STRING, 1, data.wifi.ssid),
-    INDEX_ROW(DATASTORE_ID_WIFI_PASSWORD,     DATASTORE_TYPE_STRING, 1, data.wifi.password),
-    INDEX_ROW(DATASTORE_ID_WIFI_STATUS,       DATASTORE_TYPE_UINT32, 1, data.wifi.status),
-    INDEX_ROW(DATASTORE_ID_WIFI_RSSI,         DATASTORE_TYPE_INT8,   1, data.wifi.rssi),
-    INDEX_ROW(DATASTORE_ID_WIFI_ADDRESS,      DATASTORE_TYPE_UINT32, 1, data.wifi.address),
+    INDEX_ROW(DATASTORE_ID_WIFI_SSID,                  DATASTORE_TYPE_STRING, 1, data.wifi.ssid),
+    INDEX_ROW(DATASTORE_ID_WIFI_PASSWORD,              DATASTORE_TYPE_STRING, 1, data.wifi.password),
+    INDEX_ROW(DATASTORE_ID_WIFI_STATUS,                DATASTORE_TYPE_UINT32, 1, data.wifi.status),
+    INDEX_ROW(DATASTORE_ID_WIFI_RSSI,                  DATASTORE_TYPE_INT8,   1, data.wifi.rssi),
+    INDEX_ROW(DATASTORE_ID_WIFI_ADDRESS,               DATASTORE_TYPE_UINT32, 1, data.wifi.address),
 
-    INDEX_ROW(DATASTORE_ID_TEMP_VALUE,        DATASTORE_TYPE_FLOAT,  DATASTORE_INSTANCES_TEMP, data.temp.value),
-    INDEX_ROW(DATASTORE_ID_TEMP_TIMESTAMP,    DATASTORE_TYPE_UINT32, DATASTORE_INSTANCES_TEMP, data.temp.timestamp),
-    INDEX_ROW(DATASTORE_ID_TEMP_LABEL,        DATASTORE_TYPE_STRING, DATASTORE_INSTANCES_TEMP, data.temp.label),
-    INDEX_ROW(DATASTORE_ID_TEMP_ASSIGNMENT,   DATASTORE_TYPE_UINT8,  DATASTORE_INSTANCES_TEMP, data.temp.assignment),
+    INDEX_ROW(DATASTORE_ID_TEMP_VALUE,                 DATASTORE_TYPE_FLOAT,  DATASTORE_INSTANCES_TEMP, data.temp.value),
+    INDEX_ROW(DATASTORE_ID_TEMP_TIMESTAMP,             DATASTORE_TYPE_UINT32, DATASTORE_INSTANCES_TEMP, data.temp.timestamp),
+    INDEX_ROW(DATASTORE_ID_TEMP_LABEL,                 DATASTORE_TYPE_STRING, DATASTORE_INSTANCES_TEMP, data.temp.label),
+    INDEX_ROW(DATASTORE_ID_TEMP_ASSIGNMENT,            DATASTORE_TYPE_UINT8,  DATASTORE_INSTANCES_TEMP, data.temp.assignment),
 
-    INDEX_ROW(DATASTORE_ID_LIGHT_I2C_ADDRESS, DATASTORE_TYPE_UINT8,  1, data.light.i2c_address),
-    INDEX_ROW(DATASTORE_ID_LIGHT_DETECTED,    DATASTORE_TYPE_BOOL,   1, data.light.detected),
-    INDEX_ROW(DATASTORE_ID_LIGHT_FULL,        DATASTORE_TYPE_UINT32, 1, data.light.full),
-    INDEX_ROW(DATASTORE_ID_LIGHT_VISIBLE,     DATASTORE_TYPE_UINT32, 1, data.light.visible),
-    INDEX_ROW(DATASTORE_ID_LIGHT_INFRARED,    DATASTORE_TYPE_UINT32, 1, data.light.infrared),
-    INDEX_ROW(DATASTORE_ID_LIGHT_ILLUMINANCE, DATASTORE_TYPE_UINT32, 1, data.light.illuminance),
-    INDEX_ROW(DATASTORE_ID_LIGHT_TIMESTAMP,   DATASTORE_TYPE_UINT32, 1, data.light.timestamp),
+    INDEX_ROW(DATASTORE_ID_LIGHT_I2C_ADDRESS,          DATASTORE_TYPE_UINT8,  1, data.light.i2c_address),
+    INDEX_ROW(DATASTORE_ID_LIGHT_DETECTED,             DATASTORE_TYPE_BOOL,   1, data.light.detected),
+    INDEX_ROW(DATASTORE_ID_LIGHT_FULL,                 DATASTORE_TYPE_UINT32, 1, data.light.full),
+    INDEX_ROW(DATASTORE_ID_LIGHT_VISIBLE,              DATASTORE_TYPE_UINT32, 1, data.light.visible),
+    INDEX_ROW(DATASTORE_ID_LIGHT_INFRARED,             DATASTORE_TYPE_UINT32, 1, data.light.infrared),
+    INDEX_ROW(DATASTORE_ID_LIGHT_ILLUMINANCE,          DATASTORE_TYPE_UINT32, 1, data.light.illuminance),
+    INDEX_ROW(DATASTORE_ID_LIGHT_TIMESTAMP,            DATASTORE_TYPE_UINT32, 1, data.light.timestamp),
 
-    { DATASTORE_ID_FLOW_FREQUENCY,         NAME(DATASTORE_ID_FLOW_FREQUENCY),         DATASTORE_TYPE_FLOAT,  1, offsetof(private_t, data.flow.frequency),         sizeof(((private_t *)0)->data.flow.frequency) },
-    { DATASTORE_ID_FLOW_RATE,              NAME(DATASTORE_ID_FLOW_RATE),              DATASTORE_TYPE_FLOAT,  1, offsetof(private_t, data.flow.rate),              sizeof(((private_t *)0)->data.flow.rate) },
+    INDEX_ROW(DATASTORE_ID_FLOW_FREQUENCY,             DATASTORE_TYPE_FLOAT,  1, data.flow.frequency),
+    INDEX_ROW(DATASTORE_ID_FLOW_RATE,                  DATASTORE_TYPE_FLOAT,  1, data.flow.rate),
 
-    INDEX_ROW(DATASTORE_ID_POWER_VALUE,       DATASTORE_TYPE_FLOAT,  1, data.power.value),
-    INDEX_ROW(DATASTORE_ID_POWER_TIMESTAMP,   DATASTORE_TYPE_UINT32, 1, data.power.timestamp),
+    INDEX_ROW(DATASTORE_ID_POWER_VALUE,                DATASTORE_TYPE_FLOAT,  1, data.power.value),
+    INDEX_ROW(DATASTORE_ID_POWER_TIMESTAMP,            DATASTORE_TYPE_UINT32, 1, data.power.timestamp),
+
+    INDEX_ROW(DATASTORE_ID_SWITCHES_CP_MODE_VALUE,     DATASTORE_TYPE_UINT32, 1, data.switches.cp.mode.value),
+    //INDEX_ROW(DATASTORE_ID_SWITCHES_CP_MODE_COUNT,     DATASTORE_TYPE_UINT32, 1, data.switches.cp.mode.count),
+    INDEX_ROW(DATASTORE_ID_SWITCHES_CP_MAN_VALUE,      DATASTORE_TYPE_UINT32, 1, data.switches.cp.manual.value),
+    //INDEX_ROW(DATASTORE_ID_SWITCHES_CP_MAN_COUNT,      DATASTORE_TYPE_UINT32, 1, data.switches.cp.man.count),
+    INDEX_ROW(DATASTORE_ID_SWITCHES_PP_MODE_VALUE,     DATASTORE_TYPE_UINT32, 1, data.switches.pp.mode.value),
+    //INDEX_ROW(DATASTORE_ID_SWITCHES_PP_MODE_COUNT,     DATASTORE_TYPE_UINT32, 1, data.switches.pp.mode.count),
+    INDEX_ROW(DATASTORE_ID_SWITCHES_PP_MAN_VALUE,      DATASTORE_TYPE_UINT32, 1, data.switches.pp.manual.value),
+    //INDEX_ROW(DATASTORE_ID_SWITCHES_PP_MAN_COUNT,      DATASTORE_TYPE_UINT32, 1, data.switches.pp.man.count),
+    INDEX_ROW(DATASTORE_ID_SWITCHES_TIMESTAMP,         DATASTORE_TYPE_UINT32, 1, data.switches.timestamp),
+
+    INDEX_ROW(DATASTORE_ID_PUMPS_CP_STATE,             DATASTORE_TYPE_UINT32, 1, data.pumps.cp.state),
+    INDEX_ROW(DATASTORE_ID_PUMPS_PP_STATE,             DATASTORE_TYPE_UINT32, 1, data.pumps.pp.state),
+
 };
 
 

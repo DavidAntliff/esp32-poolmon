@@ -169,7 +169,7 @@ void app_main()
 
     esp_log_level_set("*", ESP_LOG_INFO);
 //    esp_log_level_set("*", ESP_LOG_DEBUG);
-//    esp_log_level_set("display", ESP_LOG_DEBUG);
+    esp_log_level_set("display", ESP_LOG_DEBUG);
 //    esp_log_level_set("avr_support", ESP_LOG_INFO);
 //    esp_log_level_set("datastore", ESP_LOG_DEBUG);
 //    esp_log_level_set("mqtt", ESP_LOG_INFO);

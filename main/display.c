@@ -37,6 +37,7 @@
 #include "i2c_master.h"
 #include "smbus.h"
 #include "i2c-lcd1602.h"
+#include "avr_support.h"
 
 #define TAG "display"
 
@@ -418,10 +419,67 @@ static void _handle_page_sensors_flow(const i2c_lcd1602_info_t * lcd_info, void 
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 }
 
+static void _build_switch_string(char * string, uint8_t len, datastore_id_t mode, datastore_id_t man)
+{
+    avr_switch_mode_t mode_value = 0;
+    datastore_get_uint32(datastore, mode, 0, &mode_value);
+
+    avr_switch_manual_t manual_value = 0;
+    datastore_get_uint32(datastore, man, 0, &manual_value);
+
+    // TODO: when in AUTO mode, the ON/OFF should be the currently
+    // requested mode, not the Manual switch position. This allows the user
+    // to compare the requested mode with the actual pump state.
+
+    if (mode_value == AVR_SWITCH_MODE_MANUAL)
+    {
+        snprintf(string, len, "M:%s", manual_value == AVR_SWITCH_MANUAL_OFF ? "OFF" : "ON");
+    }
+    else
+    {
+//        avr_pump_state_t requested_state = 0;
+//        datastore_get_uint32(datastore, state, 0, &requested_state);
+//        snprintf(string, len, "A:%s", requested_state == AVR_PUMP_STATE_OFF ? "OFF" : "ON");
+        snprintf(string, len, "A:---");
+    }
+}
+
+static void _build_pump_string(char * string, uint8_t len, datastore_id_t id)
+{
+    avr_pump_state_t state = 0;
+    datastore_get_uint32(datastore, id, 0, &state);
+
+    snprintf(string, len, "%-3s", state == AVR_PUMP_STATE_OFF ? "OFF" : "ON");
+}
+
 static void _handle_page_pump_ssrs(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "PUMPS_SSRS"));
+    uint32_t switches_timestamp = 0;
+    datastore_get_uint32(datastore, DATASTORE_ID_SWITCHES_TIMESTAMP, 0, &switches_timestamp);
+
+    static const uint8_t MODE_LEN = 6;
+    char cp_switches[MODE_LEN];
+    char pp_switches[MODE_LEN];
+
+    _build_switch_string(cp_switches, MODE_LEN, DATASTORE_ID_SWITCHES_CP_MODE_VALUE, DATASTORE_ID_SWITCHES_CP_MAN_VALUE);
+    _build_switch_string(pp_switches, MODE_LEN, DATASTORE_ID_SWITCHES_PP_MODE_VALUE, DATASTORE_ID_SWITCHES_PP_MAN_VALUE);
+
+    static const uint8_t PUMP_LEN = 4;
+    char cp_pump[PUMP_LEN];
+    char pp_pump[PUMP_LEN];
+
+    _build_pump_string(cp_pump, PUMP_LEN, DATASTORE_ID_PUMPS_CP_STATE);
+    _build_pump_string(pp_pump, PUMP_LEN, DATASTORE_ID_PUMPS_PP_STATE);
+
+    char line[ROW_STRING_WIDTH] = "";
+    snprintf(line, ROW_STRING_WIDTH, "Pu CP %-5s  %-3s", cp_switches, cp_pump);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    snprintf(line, ROW_STRING_WIDTH, "   PP %-5s  %-3s", pp_switches, pp_pump);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
 }
 
 static void _handle_page_alarm(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -727,7 +785,6 @@ static void button_task(void * pvParameter)
     bool debounced_state = false;
 
     TickType_t last_pressed = xTaskGetTickCount();
-    //TickType_t last_released = last_pressed;
 
     bool long_sent = false;
 
@@ -745,7 +802,7 @@ static void button_task(void * pvParameter)
             {
                 debounced_state = raw_state;
 
-                // if a falling edge, measure time since rising edge
+                // if a falling edge, measure time since rising edge to detect short press
                 if (!debounced_state)
                 {
                     ESP_LOGD(TAG, "pressed for %d ticks", now - last_pressed);
@@ -754,12 +811,6 @@ static void button_task(void * pvParameter)
                         input = INPUT_SHORT;
                         ESP_LOGD(TAG, "short");
                     }
-//                    else
-//                    {
-//                        input = INPUT_LONG;
-//                        ESP_LOGD(TAG, "long");
-//                    }
-                    //last_released = now;
                     long_sent = false;
                 }
                 else
@@ -768,7 +819,7 @@ static void button_task(void * pvParameter)
                 }
             }
 
-            // detect long press
+            // detect long hold
             if (!long_sent && debounced_state && now - last_pressed > SHORT_PRESS_THRESHOLD)
             {
                 input = INPUT_LONG;

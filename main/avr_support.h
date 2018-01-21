@@ -31,6 +31,25 @@
 
 #include "i2c_master.h"
 
+// switch states
+typedef enum
+{
+    AVR_SWITCH_MODE_AUTO = 0,
+    AVR_SWITCH_MODE_MANUAL = 1,
+} avr_switch_mode_t;
+
+typedef enum
+{
+    AVR_SWITCH_MANUAL_OFF = 0,
+    AVR_SWITCH_MANUAL_ON = 1,
+} avr_switch_manual_t;
+
+typedef enum
+{
+    AVR_PUMP_STATE_OFF = 0,
+    AVR_PUMP_STATE_ON = 1,
+} avr_pump_state_t;
+
 void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue);
 
 // reset the AVR

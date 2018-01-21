@@ -31,8 +31,10 @@
 #include "driver/i2c.h"
 #include "esp_log.h"
 
-#include "constants.h"
 #include "avr_support.h"
+#include "constants.h"
+#include "utils.h"
+#include "datastore.h"
 #include "i2c_master.h"
 #include "smbus.h"
 #include "publish.h"
@@ -41,6 +43,8 @@
 #define TAG "avr_support"
 
 #define SMBUS_TIMEOUT 1000   // milliseconds
+
+extern datastore_t * datastore;
 
 typedef struct
 {
@@ -87,6 +91,12 @@ static void _publish_switch_states(uint8_t switch_states, QueueHandle_t publish_
     publish_value(PUBLISH_VALUE_SWITCH_2, switch_states & 0b0010 ? 1.0 : 0.0, publish_queue);
     publish_value(PUBLISH_VALUE_SWITCH_3, switch_states & 0b0100 ? 1.0 : 0.0, publish_queue);
     publish_value(PUBLISH_VALUE_SWITCH_4, switch_states & 0b1000 ? 1.0 : 0.0, publish_queue);
+
+    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_CP_MODE_VALUE, 0, switch_states & 0b0001 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_CP_MAN_VALUE,  0, switch_states & 0b0010 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_PP_MODE_VALUE, 0, switch_states & 0b0100 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_PP_MAN_VALUE,  0, switch_states & 0b1000 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
 }
 
 static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_switch_states, QueueHandle_t publish_queue)
@@ -99,22 +109,74 @@ static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_swit
     if (changed & 0b0001)
     {
         publish_value(PUBLISH_VALUE_SWITCH_1, new_switch_states & 0b0001 ? 1.0 : 0.0, publish_queue);
+        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_CP_MODE_VALUE, 0, new_switch_states & 0b0001 ? 1.0 : 0.0);
     }
 
     if (changed & 0b0010)
     {
         publish_value(PUBLISH_VALUE_SWITCH_2, new_switch_states & 0b0010 ? 1.0 : 0.0, publish_queue);
+        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_CP_MAN_VALUE,  0, new_switch_states & 0b0010 ? 1.0 : 0.0);
     }
 
     if (changed & 0b0100)
     {
         publish_value(PUBLISH_VALUE_SWITCH_3, new_switch_states & 0b0100 ? 1.0 : 0.0, publish_queue);
+        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_PP_MODE_VALUE, 0, new_switch_states & 0b0100 ? 1.0 : 0.0);
     }
 
     if (changed & 0b1000)
     {
         publish_value(PUBLISH_VALUE_SWITCH_4, new_switch_states & 0b1000 ? 1.0 : 0.0, publish_queue);
+        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_PP_MAN_VALUE,  0, new_switch_states & 0b1000 ? 1.0 : 0.0);
     }
+
+    if (changed & 0b1111)
+    {
+        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
+    }
+}
+
+static uint8_t _decode_pump_states(uint8_t status)
+{
+    uint8_t new_states = 0;
+    new_states |= status & REGISTER_STATUS_SSR1 ? 0b0001 : 0b0000;
+    new_states |= status & REGISTER_STATUS_SSR2 ? 0b0010 : 0b0000;
+    return new_states;
+}
+
+static void _publish_pump_states(uint8_t pump_states, QueueHandle_t publish_queue)
+{
+    ESP_LOGD(TAG, "Publishing all pump states");
+    publish_value(PUBLISH_VALUE_SSR_1, pump_states & 0b0001 ? 1.0 : 0.0, publish_queue);
+    publish_value(PUBLISH_VALUE_SSR_2, pump_states & 0b0010 ? 1.0 : 0.0, publish_queue);
+
+    datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_CP_STATE, 0, pump_states & 0b0001 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_PP_STATE, 0, pump_states & 0b0010 ? 1.0 : 0.0);
+//    datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_TIMESTAMP, 0, seconds_since_boot());
+}
+
+static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_states, QueueHandle_t publish_queue)
+{
+    uint8_t changed = last_pump_states ^ new_pump_states;
+    ESP_LOGD(TAG, "last_pump_states 0x%02x, new_pump_states 0x%02x, changed 0x%02x", last_pump_states, new_pump_states, changed);
+
+    // Pumps report "0" when in Off position, and "1" in On position.
+    if (changed & 0b0001)
+    {
+        publish_value(PUBLISH_VALUE_SSR_1, new_pump_states & 0b0001 ? 1.0 : 0.0, publish_queue);
+        datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_CP_STATE, 0, new_pump_states & 0b0001 ? 1.0 : 0.0);
+    }
+
+    if (changed & 0b0010)
+    {
+        publish_value(PUBLISH_VALUE_SSR_2, new_pump_states & 0b0010 ? 1.0 : 0.0, publish_queue);
+        datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_PP_STATE,  0, new_pump_states & 0b0010 ? 1.0 : 0.0);
+    }
+
+//    if (changed & 0b1111)
+//    {
+//        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
+//    }
 }
 
 static void avr_support_task(void * pvParameter)
@@ -138,6 +200,9 @@ static void avr_support_task(void * pvParameter)
     ESP_LOGD(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
     uint8_t switch_states = _decode_switch_states(status);
     _publish_switch_states(switch_states, task_inputs->publish_queue);
+
+    uint8_t pump_states = _decode_pump_states(status);
+    _publish_pump_states(pump_states, task_inputs->publish_queue);
 
     i2c_master_unlock(i2c_master_info);
 
@@ -206,6 +271,11 @@ static void avr_support_task(void * pvParameter)
         uint8_t new_switch_states = _decode_switch_states(status);
         _publish_switch_changes(switch_states, new_switch_states, task_inputs->publish_queue);
         switch_states = new_switch_states;
+
+        // if any pumps have changed state, publish them
+        uint8_t new_pump_states = _decode_pump_states(status);
+        _publish_pump_changes(pump_states, new_pump_states, task_inputs->publish_queue);
+        pump_states = new_pump_states;
 
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
