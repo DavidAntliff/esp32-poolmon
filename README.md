@@ -1,9 +1,11 @@
-# PoolMon ESP32 Application.
+# Pool Monitoring & Control - ESP32 Application
+
+Requires ESP IDF v3.0rc1.
 
 
+## Notes
 
-
-## One Wire Bus
+### One Wire Bus
 
 The DS18B20 needs extra current for EEPROM writes and Temperature measurements.
 
