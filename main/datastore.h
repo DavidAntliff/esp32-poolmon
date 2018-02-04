@@ -45,8 +45,17 @@ typedef enum
     DATASTORE_ID_WIFI_SSID,
     DATASTORE_ID_WIFI_PASSWORD,
     DATASTORE_ID_WIFI_STATUS,
+    DATASTORE_ID_WIFI_TIMESTAMP,
     DATASTORE_ID_WIFI_RSSI,
     DATASTORE_ID_WIFI_ADDRESS,
+
+    DATASTORE_ID_MQTT_STATUS,
+    DATASTORE_ID_MQTT_TIMESTAMP,
+    DATASTORE_ID_MQTT_BROKER_ADDRESS,
+    DATASTORE_ID_MQTT_BROKER_PORT,
+    DATASTORE_ID_MQTT_CONNECTION_COUNT,
+    DATASTORE_ID_MQTT_MESSAGE_TX_COUNT,
+    DATASTORE_ID_MQTT_MESSAGE_RX_COUNT,
 
     DATASTORE_ID_TEMP_VALUE,
     DATASTORE_ID_TEMP_TIMESTAMP,
@@ -89,6 +98,7 @@ typedef enum
 #define DATASTORE_LEN_TEMP_LABEL       8
 #define DATASTORE_LEN_WIFI_SSID        (sizeof(((wifi_sta_config_t *)0)->ssid))
 #define DATASTORE_LEN_WIFI_PASSWORD    (sizeof(((wifi_sta_config_t *)0)->password))
+#define DATASTORE_LEN_MQTT_BROKER_ADDRESS 64
 
 typedef enum
 {
@@ -107,6 +117,13 @@ typedef enum
     DATASTORE_WIFI_STATUS_CONNECTED,
     DATASTORE_WIFI_STATUS_GOT_ADDRESS,
 } datastore_wifi_status_t;
+
+typedef enum
+{
+    DATASTORE_MQTT_STATUS_DISCONNECTED = 0,
+    DATASTORE_MQTT_STATUS_CONNECTING,
+    DATASTORE_MQTT_STATUS_CONNECTED,
+} datastore_mqtt_status_t;
 
 typedef enum
 {
@@ -150,6 +167,9 @@ datastore_error_t datastore_get_int32(const datastore_t * store, datastore_id_t 
 datastore_error_t datastore_get_float(const datastore_t * store, datastore_id_t id, instance_id_t instance, float * value);
 datastore_error_t datastore_get_double(const datastore_t * store, datastore_id_t id, instance_id_t instance, double * value);
 datastore_error_t datastore_get_string(const datastore_t * store, datastore_id_t id, instance_id_t instance, char * value);
+
+datastore_error_t datastore_toggle(datastore_t * store, datastore_id_t id, instance_id_t instance);
+datastore_error_t datastore_increment(datastore_t * store, datastore_id_t id, instance_id_t instance);
 
 datastore_error_t datastore_dump(const datastore_t * store);
 

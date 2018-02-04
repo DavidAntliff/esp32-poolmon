@@ -38,13 +38,14 @@
 #include "smbus.h"
 #include "i2c-lcd1602.h"
 #include "avr_support.h"
+#include "convert_string.h"
 
 #define TAG "display"
 
 #define SMBUS_TIMEOUT     1000   // milliseconds
 #define DISPLAY_WIDTH     I2C_LCD1602_NUM_VISIBLE_COLUMNS
 #define ROW_STRING_WIDTH  (DISPLAY_WIDTH + 1)    // room for null terminator
-#define TICKS_PER_UPDATE  (1000 / portTICK_RATE_MS)
+#define TICKS_PER_UPDATE  (500 / portTICK_RATE_MS)
 #define TICKS_PER_POLL    (5)    // ticks per button poll
 
 #ifndef BUILD_TIMESTAMP
@@ -78,6 +79,9 @@ typedef enum
     PAGE_AVR_STATUS,
     PAGE_LAST,
 } page_id_t;
+
+//#define INITIAL_PAGE PAGE_SPLASH
+#define INITIAL_PAGE PAGE_MQTT_STATUS
 
 typedef enum
 {
@@ -119,6 +123,7 @@ static void _handle_page_avr_status(const i2c_lcd1602_info_t * lcd_info, void * 
 static int alarm_display_count = 0;
 static bool splash_activity = false;
 static int esp32_status_state = 0;
+static int mqtt_status_state = 0;
 
 static const page_spec_t page_specs[] = {
     // ID                       handler                        state
@@ -134,7 +139,7 @@ static const page_spec_t page_specs[] = {
     { PAGE_ADVANCED,            _handle_page_advanced,         NULL },
     { PAGE_LAST_ERROR,          _handle_page_last_error,       NULL },
     { PAGE_WIFI_STATUS,         _handle_page_wifi_status,      NULL },
-    { PAGE_MQTT_STATUS,         _handle_page_mqtt_status,      NULL },
+    { PAGE_MQTT_STATUS,         _handle_page_mqtt_status,      &mqtt_status_state },
     { PAGE_SENSORS_STATUS_1,    _handle_page_sensors_status_1, NULL },
     { PAGE_SENSORS_STATUS_2,    _handle_page_sensors_status_2, NULL },
     { PAGE_SENSORS_STATUS_3,    _handle_page_sensors_status_3, NULL },
@@ -156,15 +161,15 @@ typedef struct
 
 static const transition_t transitions[] = {
     // ID                       short                  long
-    { PAGE_BLANK,               PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_SPLASH,              PAGE_SENSORS_TEMP_1_2, PAGE_IGNORE },
-    { PAGE_SENSORS_TEMP_1_2,    PAGE_SENSORS_TEMP_3_4, PAGE_IGNORE },
-    { PAGE_SENSORS_TEMP_3_4,    PAGE_SENSORS_TEMP_5_P, PAGE_IGNORE },
-    { PAGE_SENSORS_TEMP_5_P,    PAGE_SENSORS_LIGHT,    PAGE_IGNORE },
-    { PAGE_SENSORS_LIGHT,       PAGE_SENSORS_FLOW,     PAGE_IGNORE },
-    { PAGE_SENSORS_FLOW,        PAGE_PUMPS_SSRS,       PAGE_IGNORE },
-    { PAGE_PUMPS_SSRS,          PAGE_ALARM,            PAGE_IGNORE },
-    { PAGE_ALARM,               PAGE_ADVANCED,         PAGE_IGNORE },
+    { PAGE_BLANK,               PAGE_IGNORE,           PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
+    { PAGE_SPLASH,              PAGE_SENSORS_TEMP_1_2, PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
+    { PAGE_SENSORS_TEMP_1_2,    PAGE_SENSORS_TEMP_3_4, PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
+    { PAGE_SENSORS_TEMP_3_4,    PAGE_SENSORS_TEMP_5_P, PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
+    { PAGE_SENSORS_TEMP_5_P,    PAGE_SENSORS_LIGHT,    PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
+    { PAGE_SENSORS_LIGHT,       PAGE_SENSORS_FLOW,     PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
+    { PAGE_SENSORS_FLOW,        PAGE_PUMPS_SSRS,       PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
+    { PAGE_PUMPS_SSRS,          PAGE_ALARM,            PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
+    { PAGE_ALARM,               PAGE_ADVANCED,         PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
     { PAGE_ADVANCED,            PAGE_SENSORS_TEMP_1_2, PAGE_LAST_ERROR },
     { PAGE_LAST_ERROR,          PAGE_WIFI_STATUS,      PAGE_SENSORS_TEMP_1_2 },
     { PAGE_WIFI_STATUS,         PAGE_MQTT_STATUS,      PAGE_SENSORS_TEMP_1_2 },
@@ -566,10 +571,94 @@ static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void *
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 }
 
+static void _handle_page_mqtt_status_1(const i2c_lcd1602_info_t * lcd_info, void * state)
+{
+    datastore_mqtt_status_t mqtt_status = 0;
+    datastore_get_uint32(datastore, DATASTORE_ID_MQTT_STATUS, 0, &mqtt_status);
+
+    char line[ROW_STRING_WIDTH] = "";
+
+    switch (mqtt_status)
+    {
+        case DATASTORE_MQTT_STATUS_DISCONNECTED:
+            snprintf(line, ROW_STRING_WIDTH, "MQTT disconnect");
+            break;
+        case DATASTORE_MQTT_STATUS_CONNECTING:
+            snprintf(line, ROW_STRING_WIDTH, "MQTT connecting");
+            break;
+        case DATASTORE_MQTT_STATUS_CONNECTED:
+        {
+            uint32_t connection_count = 0;
+            datastore_get_uint32(datastore, DATASTORE_ID_MQTT_CONNECTION_COUNT, 0, &connection_count);
+            snprintf(line, ROW_STRING_WIDTH, "MQTT connect %-3d", connection_count);
+            break;
+        }
+        default:
+            ESP_LOGE(TAG, "unhandled mqtt status %d", mqtt_status);
+            break;
+    }
+
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    uint32_t count_rx = 0, count_tx = 0;
+    datastore_get_uint32(datastore, DATASTORE_ID_MQTT_MESSAGE_RX_COUNT, 0, &count_rx);
+    datastore_get_uint32(datastore, DATASTORE_ID_MQTT_MESSAGE_TX_COUNT, 0, &count_tx);
+
+    snprintf(line, ROW_STRING_WIDTH, "RX %-4d TX %-4d ", count_rx, count_tx);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+}
+
+static void _handle_page_mqtt_status_2(const i2c_lcd1602_info_t * lcd_info, void * state)
+{
+    char broker_address[DATASTORE_LEN_MQTT_BROKER_ADDRESS] = "";
+    uint32_t broker_port = 0;
+    datastore_get_string(datastore, DATASTORE_ID_MQTT_BROKER_ADDRESS, 0, broker_address);
+    datastore_get_uint32(datastore, DATASTORE_ID_MQTT_BROKER_PORT, 0, &broker_port);
+
+    char line[ROW_STRING_WIDTH] = "";
+
+    char port[6] = "";
+    snprintf(port, 6, "%d", broker_port);
+    int port_len = strlen(port);
+    int addr_len = DISPLAY_WIDTH - port_len - 1;  // space for the colon
+    snprintf(line, ROW_STRING_WIDTH, "%.*s:%-*d", addr_len, broker_address, port_len, broker_port);
+
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    // calculate time since last connection
+    uint32_t timestamp = 0;
+    datastore_get_uint32(datastore, DATASTORE_ID_MQTT_TIMESTAMP, 0, &timestamp);
+    uint32_t connected_time = seconds_since_boot() - timestamp;
+    uint32_t days = connected_time / 60 / 60 / 24;
+    uint32_t hours = connected_time / 60 / 60 % 24;
+    uint32_t minutes = connected_time / 60 % 60;
+    uint32_t seconds = connected_time % 60;
+    snprintf(line, ROW_STRING_WIDTH, "Up%4dd %02d:%02d:%02d", days, hours, minutes, seconds);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+}
+
 static void _handle_page_mqtt_status(const i2c_lcd1602_info_t * lcd_info, void * state)
 {
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "MQTT_STATUS"));
+    int * page_state = (int *)state;
+    datastore_mqtt_status_t mqtt_status = 0;
+    datastore_get_uint32(datastore, DATASTORE_ID_MQTT_STATUS, 0, &mqtt_status);
+    if (*page_state < 8 || mqtt_status != DATASTORE_MQTT_STATUS_CONNECTED)
+    {
+        _handle_page_mqtt_status_1(lcd_info, state);
+    }
+    else if (*page_state < 16)
+    {
+        _handle_page_mqtt_status_2(lcd_info, state);
+    }
+    else
+    {
+        *page_state = -1;
+    }
+    ++*page_state;
 }
 
 static void _handle_page_sensors_status_1(const i2c_lcd1602_info_t * lcd_info, void * state)
@@ -600,7 +689,7 @@ static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void 
 {
     int * page_state = (int *)state;
     char line[ROW_STRING_WIDTH] = "";
-    if (*page_state < 4)
+    if (*page_state < 8)
     {
         char version[DATASTORE_LEN_VERSION] = "";
         datastore_get_string(datastore, DATASTORE_ID_SYSTEM_VERSION, 0, version);
@@ -618,7 +707,7 @@ static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void 
         I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
         I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
     }
-    else if (*page_state < 6)
+    else if (*page_state < 10)
     {
         snprintf(line, ROW_STRING_WIDTH, "MEM Free %7d", esp_get_free_heap_size());
         I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
@@ -724,7 +813,7 @@ static void display_task(void * pvParameter)
 
     i2c_master_unlock(i2c_master_info);
 
-    page_id_t current_page = PAGE_SPLASH;
+    page_id_t current_page = INITIAL_PAGE;
 
     // update pages once per second
     while (1)

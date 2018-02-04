@@ -59,9 +59,21 @@ struct _private_t
             uint8_t ssid[DATASTORE_LEN_WIFI_SSID];
             uint8_t password[DATASTORE_LEN_WIFI_PASSWORD];
             datastore_wifi_status_t status;
+            uint32_t timestamp;
             int8_t rssi;
             uint32_t address;
         } wifi;
+
+        struct
+        {
+            uint32_t status;
+            uint32_t timestamp;
+            uint8_t broker_address[DATASTORE_LEN_MQTT_BROKER_ADDRESS];
+            uint32_t broker_port;
+            uint32_t connection_count;
+            uint32_t message_tx_count;
+            uint32_t message_rx_count;
+        } mqtt;
 
         struct
         {
@@ -192,8 +204,17 @@ static index_t INDEX[] = {
     INDEX_ROW(DATASTORE_ID_WIFI_SSID,                  DATASTORE_TYPE_STRING, 1, data.wifi.ssid),
     INDEX_ROW(DATASTORE_ID_WIFI_PASSWORD,              DATASTORE_TYPE_STRING, 1, data.wifi.password),
     INDEX_ROW(DATASTORE_ID_WIFI_STATUS,                DATASTORE_TYPE_UINT32, 1, data.wifi.status),
+    INDEX_ROW(DATASTORE_ID_WIFI_TIMESTAMP,             DATASTORE_TYPE_UINT32, 1, data.wifi.timestamp),
     INDEX_ROW(DATASTORE_ID_WIFI_RSSI,                  DATASTORE_TYPE_INT8,   1, data.wifi.rssi),
     INDEX_ROW(DATASTORE_ID_WIFI_ADDRESS,               DATASTORE_TYPE_UINT32, 1, data.wifi.address),
+
+    INDEX_ROW(DATASTORE_ID_MQTT_STATUS,                DATASTORE_TYPE_UINT32, 1, data.mqtt.status),
+    INDEX_ROW(DATASTORE_ID_MQTT_TIMESTAMP,             DATASTORE_TYPE_UINT32, 1, data.mqtt.timestamp),
+    INDEX_ROW(DATASTORE_ID_MQTT_BROKER_ADDRESS,        DATASTORE_TYPE_STRING, 1, data.mqtt.broker_address),
+    INDEX_ROW(DATASTORE_ID_MQTT_BROKER_PORT,           DATASTORE_TYPE_UINT32, 1, data.mqtt.broker_port),
+    INDEX_ROW(DATASTORE_ID_MQTT_CONNECTION_COUNT,      DATASTORE_TYPE_UINT32, 1, data.mqtt.connection_count),
+    INDEX_ROW(DATASTORE_ID_MQTT_MESSAGE_TX_COUNT,      DATASTORE_TYPE_UINT32, 1, data.mqtt.message_tx_count),
+    INDEX_ROW(DATASTORE_ID_MQTT_MESSAGE_RX_COUNT,      DATASTORE_TYPE_UINT32, 1, data.mqtt.message_rx_count),
 
     INDEX_ROW(DATASTORE_ID_TEMP_VALUE,                 DATASTORE_TYPE_FLOAT,  DATASTORE_INSTANCES_TEMP, data.temp.value),
     INDEX_ROW(DATASTORE_ID_TEMP_TIMESTAMP,             DATASTORE_TYPE_UINT32, DATASTORE_INSTANCES_TEMP, data.temp.timestamp),
@@ -555,6 +576,154 @@ datastore_error_t datastore_get_double(const datastore_t * store, datastore_id_t
 datastore_error_t datastore_get_string(const datastore_t * store, datastore_id_t id, instance_id_t instance, char * value)
 {
     return _get_value(store, id, instance, value, DATASTORE_TYPE_STRING);
+}
+
+datastore_error_t datastore_toggle(datastore_t * store, datastore_id_t id, instance_id_t instance)
+{
+    ESP_LOGD(TAG":datastore_toggle", "id %d, instance %d", id, instance);
+    datastore_error_t err = DATASTORE_ERROR_UNKNOWN;
+    if ((err = _is_init(store)) == DATASTORE_OK)
+    {
+        private_t * private = (private_t *)store->private;
+        if (private != NULL)
+        {
+            if (id >= 0 && id < DATASTORE_ID_LAST)
+            {
+                // check type
+                if (INDEX[id].type == DATASTORE_TYPE_BOOL)
+                {
+                    // check instance
+                    if (/*instance >= 0 &&*/ instance < INDEX[id].num_instances)
+                    {
+                        bool value;
+
+                        size_t instance_size = INDEX[id].size / INDEX[id].num_instances;
+                        assert(instance_size * INDEX[id].num_instances == INDEX[id].size);
+
+                        uint8_t * psrc = (uint8_t *)private + INDEX[id].offset + instance * instance_size;
+//                        ESP_LOGD(TAG, "_get_value: id %d, instance %d, value %p, type %d, private %p, offset 0x%x, size 0x%x, instance_size 0x%x, psrc %p",
+//                                 id, instance, value, INDEX[id].type, private, INDEX[id].offset, INDEX[id].size, instance_size, psrc);
+                        ESP_LOG_BUFFER_HEXDUMP(TAG, psrc, instance_size, ESP_LOG_DEBUG);
+
+                        xSemaphoreTake(private->semaphore, portMAX_DELAY);
+                        _get_handler(psrc, (uint8_t *)&value, instance_size);
+                        value = !value;
+                        _set_handler((uint8_t *)&value, psrc, instance_size);
+                        xSemaphoreGive(private->semaphore);
+
+                        // TODO: call any registered callbacks with new value
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "_get_value: instance %d is invalid", instance);
+                        err = DATASTORE_ERROR_INVALID_INSTANCE;
+                    }
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "_get_value: bad type %d (expected bool)", INDEX[id].type);
+                    err = DATASTORE_ERROR_INVALID_TYPE;
+                }
+            }
+            else
+            {
+                ESP_LOGE(TAG, "_get_value: bad id %d", id);
+                err = DATASTORE_ERROR_INVALID_ID;
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "_get_value: private is NULL");
+            err = DATASTORE_ERROR_NULL_POINTER;
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "_get_value: datastore is not initialised");
+        err = DATASTORE_ERROR_NOT_INITIALISED;
+    }
+    return err;
+}
+
+datastore_error_t datastore_increment(datastore_t * store, datastore_id_t id, instance_id_t instance)
+{
+    ESP_LOGD(TAG":datastore_increment", "id %d, instance %d", id, instance);
+    datastore_error_t err = DATASTORE_ERROR_UNKNOWN;
+    if ((err = _is_init(store)) == DATASTORE_OK)
+    {
+        private_t * private = (private_t *)store->private;
+        if (private != NULL)
+        {
+            if (id >= 0 && id < DATASTORE_ID_LAST)
+            {
+                if (/*instance >= 0 &&*/ instance < INDEX[id].num_instances)
+                {
+                    switch (INDEX[id].type)
+                    {
+                        case DATASTORE_TYPE_UINT8:
+                        {
+                            uint8_t value = 0;
+                            _get_value(store, id, instance, &value, DATASTORE_TYPE_UINT8);
+                            ++value;
+                            _set_value(store, id, instance, &value, DATASTORE_TYPE_UINT8);
+                            break;
+                        }
+                        case DATASTORE_TYPE_UINT32:
+                        {
+                            uint32_t value = 0;
+                            _get_value(store, id, instance, &value, DATASTORE_TYPE_UINT32);
+                            ++value;
+                            _set_value(store, id, instance, &value, DATASTORE_TYPE_UINT32);
+                            break;
+                        }
+
+                        case DATASTORE_TYPE_INT8:
+                        {
+                            uint8_t value = 0;
+                            _get_value(store, id, instance, &value, DATASTORE_TYPE_INT8);
+                            ++value;
+                            _set_value(store, id, instance, &value, DATASTORE_TYPE_INT8);
+                            break;
+                        }
+                        case DATASTORE_TYPE_INT32:
+                        {
+                            uint32_t value = 0;
+                            _get_value(store, id, instance, &value, DATASTORE_TYPE_INT32);
+                            ++value;
+                            _set_value(store, id, instance, &value, DATASTORE_TYPE_INT32);
+                            break;
+                        }
+
+                        default:
+                            ESP_LOGE(TAG, "Cannot increment type %d", INDEX[id].type);
+                            err = DATASTORE_ERROR_INVALID_TYPE;
+                            break;
+                    }
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "_get_value: instance %d is invalid", instance);
+                    err = DATASTORE_ERROR_INVALID_INSTANCE;
+                }
+            }
+            else
+            {
+                ESP_LOGE(TAG, "_get_value: bad id %d", id);
+                err = DATASTORE_ERROR_INVALID_ID;
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "_get_value: private is NULL");
+            err = DATASTORE_ERROR_NULL_POINTER;
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "_get_value: datastore is not initialised");
+        err = DATASTORE_ERROR_NOT_INITIALISED;
+    }
+    return err;
 }
 
 datastore_error_t _to_string(const datastore_t * store, datastore_id_t id, instance_id_t instance, char * buffer, size_t len)

@@ -156,7 +156,7 @@ static void echo_string(const char * topic, const char * value, void * context)
 // brief delay during startup sequence
 static void _delay(void)
 {
-    vTaskDelay(2000 / portTICK_RATE_MS);
+    vTaskDelay(100 / portTICK_RATE_MS);
 }
 
 static void load_datastore_defaults(datastore_t * datastore)
@@ -166,6 +166,9 @@ static void load_datastore_defaults(datastore_t * datastore)
         // TODO: load from NV
         datastore_set_string(datastore, DATASTORE_ID_WIFI_SSID, 0, CONFIG_WIFI_SSID);
         datastore_set_string(datastore, DATASTORE_ID_WIFI_PASSWORD, 0, CONFIG_WIFI_PASSWORD);
+
+        datastore_set_string(datastore, DATASTORE_ID_MQTT_BROKER_ADDRESS, 0, CONFIG_MQTT_BROKER_IP_ADDRESS);
+        datastore_set_uint32(datastore, DATASTORE_ID_MQTT_BROKER_PORT, 0, CONFIG_MQTT_BROKER_TCP_PORT);
 
         datastore_set_uint8(datastore, DATASTORE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS);
 
@@ -226,9 +229,10 @@ void app_main()
 //    esp_log_level_set("*", ESP_LOG_INFO);
 //    esp_log_level_set("*", ESP_LOG_DEBUG);
 //   esp_log_level_set("display", ESP_LOG_DEBUG);
-    esp_log_level_set("avr_support", ESP_LOG_DEBUG);
-//    esp_log_level_set("datastore", ESP_LOG_DEBUG);
-//    esp_log_level_set("mqtt", ESP_LOG_INFO);
+//    esp_log_level_set("avr_support", ESP_LOG_DEBUG);
+    esp_log_level_set("wifi_support", ESP_LOG_INFO);
+    esp_log_level_set("datastore", ESP_LOG_INFO);
+    esp_log_level_set("mqtt", ESP_LOG_INFO);
 //    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
 
@@ -255,49 +259,44 @@ void app_main()
     // Onboard LED
     led_init(CONFIG_ONBOARD_LED_GPIO);
 
-    _delay();
 
     // I2C bus
     ESP_LOGW(TAG, "about to run i2c_master_init");
+    _delay();
     i2c_master_info_t * i2c_master_info = i2c_master_init(I2C_MASTER_NUM, CONFIG_I2C_MASTER_SDA_GPIO, CONFIG_I2C_MASTER_SCL_GPIO, I2C_MASTER_FREQ_HZ);
+
     ESP_LOGW(TAG, "about to run i2c_master_scan");
+    _delay();
     int num_i2c_devices = i2c_master_scan(i2c_master_info);
     ESP_LOGI(TAG, "%d I2C devices detected", num_i2c_devices);
 
-    _delay();
-
     // bring up the display ASAP in case of error
+    _delay();
     display_init(i2c_master_info, display_priority);
 
-    _delay();
 
     QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
 
-    _delay();
-
     // Temp sensors
+    _delay();
     temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, publish_queue);
 
-    _delay();
-
     // I2C devices - AVR, Light Sensor, LCD
+    _delay();
     avr_support_init(i2c_master_info, avr_priority, publish_queue);
     avr_support_reset();
 
     _delay();
-
     sensor_light_init(i2c_master_info, sensor_priority, publish_queue);
 
-    _delay();
 
     // Flow Meter
+    _delay();
     sensor_flow_init(CONFIG_FLOW_METER_PULSE_GPIO, FLOW_METER_PCNT_UNIT, FLOW_METER_PCNT_CHANNEL,
                      CONFIG_FLOW_METER_RMT_GPIO, FLOW_METER_RMT_CHANNEL, FLOW_METER_RMT_CLK_DIV,
                      FLOW_METER_SAMPLING_PERIOD, FLOW_METER_SAMPLING_WINDOW, FLOW_METER_FILTER_LENGTH, sensor_priority, publish_queue);
-
-    _delay();
 
     bool running = true;
 
@@ -390,6 +389,7 @@ void app_main()
         ESP_LOGE(TAG, "mqtt_init failed: %d", mqtt_error);
     }
 
+    _delay();
     nvs_flash_init();
     wifi_support_init(wifi_monitor_priority);
 

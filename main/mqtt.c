@@ -45,8 +45,12 @@
 #include "mqtt.h"
 #include "trie.h"
 #include "convert_string.h"
+#include "datastore.h"
+#include "utils.h"
 
 #define TAG "mqtt"
+
+extern datastore_t * datastore;
 
 typedef struct
 {
@@ -88,14 +92,19 @@ static void _status_callback(esp_mqtt_status_t status)
     {
         case ESP_MQTT_STATUS_CONNECTED:
             ESP_LOGI(TAG, "MQTT connected");
+            datastore_set_uint32(datastore, DATASTORE_ID_MQTT_STATUS, 0, DATASTORE_MQTT_STATUS_CONNECTED);
+            datastore_set_uint32(datastore, DATASTORE_ID_MQTT_TIMESTAMP, 0, seconds_since_boot());
+            datastore_increment(datastore, DATASTORE_ID_MQTT_CONNECTION_COUNT, 0);
 
             // send a device status update
             const char * value = "MQTT connected";
-            esp_mqtt_publish("poolmon/device/status", (uint8_t*)value, strlen(value), 0, false);
+            mqtt_publish("poolmon/device/status", (uint8_t*)value, strlen(value), 0, false);
             esp_mqtt_subscribe("poolmon/#", 0);
             break;
+
         case ESP_MQTT_STATUS_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT disconnected");
+            datastore_set_uint32(datastore, DATASTORE_ID_MQTT_STATUS, 0, DATASTORE_MQTT_STATUS_DISCONNECTED);
             break;
         default:
             break;
@@ -108,6 +117,8 @@ static void _message_callback(const char * topic, uint8_t * payload, size_t len)
     ESP_LOG_BUFFER_HEXDUMP(TAG, payload, len, ESP_LOG_DEBUG);
 
     const char * data = (const char *)payload;
+
+    datastore_increment(datastore, DATASTORE_ID_MQTT_MESSAGE_RX_COUNT, 0);
 
     // TODO: use g_trie until we add a context pointer to the message callback
     topic_info_t * topic_info = trie_search(g_trie, topic);
@@ -328,6 +339,7 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
         {
             // sadly the esp_mqtt component only supports a single instance
             esp_mqtt_init(_status_callback, _message_callback, 256 /*buffer size*/, 2000 /*timeout*/);
+            datastore_set_uint32(datastore, DATASTORE_ID_MQTT_STATUS, 0, DATASTORE_MQTT_STATUS_CONNECTING);
             private->trie = trie_create();
 
             if (private->trie)
@@ -355,6 +367,16 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
         err = MQTT_ERROR_NULL_POINTER;
     }
     return err;
+}
+
+bool mqtt_publish(const char * topic, uint8_t * payload, size_t len, int qos, bool retained)
+{
+    bool result = false;
+    if ((result = esp_mqtt_publish(topic, payload, len, qos, retained)) != false)
+    {
+        datastore_increment(datastore, DATASTORE_ID_MQTT_MESSAGE_TX_COUNT, 0);
+    }
+    return result;
 }
 
 static mqtt_error_t _register_topic(mqtt_info_t * mqtt_info, const char * topic, generic_callback rcb, void * context, mqtt_type_t type)
