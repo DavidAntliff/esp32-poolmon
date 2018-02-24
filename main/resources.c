@@ -22,13 +22,30 @@
  * SOFTWARE.
  */
 
+#include "esp_log.h"
+
 #include "resources.h"
 #include "constants.h"
 #include "wifi_support.h"
 #include "mqtt.h"
 #include "sensor_temp.h"
 
+#define TAG "resources"
+
 datastore_t * g_datastore = NULL;
+
+#define ERROR_CHECK(x) do {                                                       \
+        esp_err_t rc = (x);                                                       \
+        if (rc != DATASTORE_STATUS_OK) {                                          \
+            ESP_LOGW(TAG, "Datastore error %d at %s:%d", rc, __FILE__, __LINE__); \
+        }                                                                         \
+    } while(0);
+
+static void _add_resource(const datastore_t * datastore, datastore_resource_id_t id, const char * name, datastore_resource_t resource)
+{
+    ERROR_CHECK(datastore_add_resource(datastore, id, resource));
+    ERROR_CHECK(datastore_set_name(datastore, id, name));
+}
 
 datastore_t * resources_init(void)
 {
@@ -36,55 +53,55 @@ datastore_t * resources_init(void)
 
     if (datastore)
     {
-        datastore_add_resource(datastore, RESOURCE_ID_SYSTEM_VERSION,         datastore_create_string_resource(SYSTEM_LEN_VERSION, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, datastore_create_string_resource(SYSTEM_LEN_BUILD_DATE_TIME, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_SYSTEM_UPTIME,          datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_SYSTEM_VERSION,         "SYSTEM_VERSION",         datastore_create_string_resource(SYSTEM_LEN_VERSION, 1));
+        _add_resource(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, "SYSTEM_BUILD_DATE_TIME", datastore_create_string_resource(SYSTEM_LEN_BUILD_DATE_TIME, 1));
+        _add_resource(datastore, RESOURCE_ID_SYSTEM_UPTIME,          "SYSTEM_UPTIME",          datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
-        datastore_add_resource(datastore, RESOURCE_ID_WIFI_SSID,              datastore_create_string_resource(WIFI_LEN_SSID, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_WIFI_PASSWORD,          datastore_create_string_resource(WIFI_LEN_PASSWORD, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_WIFI_STATUS,            datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_WIFI_TIMESTAMP,         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_WIFI_RSSI,              datastore_create_resource(DATASTORE_TYPE_INT8,   1));
-        datastore_add_resource(datastore, RESOURCE_ID_WIFI_ADDRESS,           datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_WIFI_SSID,              "WIFI_SSID",              datastore_create_string_resource(WIFI_LEN_SSID, 1));
+        _add_resource(datastore, RESOURCE_ID_WIFI_PASSWORD,          "WIFI_PASSWORD",          datastore_create_string_resource(WIFI_LEN_PASSWORD, 1));
+        _add_resource(datastore, RESOURCE_ID_WIFI_STATUS,            "WIFI_STATUS",            datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_WIFI_TIMESTAMP,         "WIFI_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_WIFI_RSSI,              "WIFI_RSSI",              datastore_create_resource(DATASTORE_TYPE_INT8,   1));
+        _add_resource(datastore, RESOURCE_ID_WIFI_ADDRESS,           "WIFI_ADDRESS",           datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
-        datastore_add_resource(datastore, RESOURCE_ID_MQTT_STATUS,            datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_MQTT_TIMESTAMP,         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_MQTT_BROKER_ADDRESS,    datastore_create_string_resource(MQTT_LEN_BROKER_ADDRESS, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_MQTT_BROKER_PORT,       datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_MQTT_CONNECTION_COUNT,  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_MQTT_MESSAGE_TX_COUNT,  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_MQTT_MESSAGE_RX_COUNT,  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_MQTT_STATUS,            "MQTT_STATUS",            datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_MQTT_TIMESTAMP,         "MQTT_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_MQTT_BROKER_ADDRESS,    "MQTT_BROKER_ADDRESS",    datastore_create_string_resource(MQTT_LEN_BROKER_ADDRESS, 1));
+        _add_resource(datastore, RESOURCE_ID_MQTT_BROKER_PORT,       "MQTT_BROKER_PORT",       datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_MQTT_CONNECTION_COUNT,  "MQTT_CONNECTION_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_MQTT_MESSAGE_TX_COUNT,  "MQTT_MESSAGE_TX_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_MQTT_MESSAGE_RX_COUNT,  "MQTT_MESSAGE_RX_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
-        datastore_add_resource(datastore, RESOURCE_ID_TEMP_VALUE,             datastore_create_resource(DATASTORE_TYPE_FLOAT,  SENSOR_TEMP_INSTANCES));
-        datastore_add_resource(datastore, RESOURCE_ID_TEMP_TIMESTAMP,         datastore_create_resource(DATASTORE_TYPE_UINT32, SENSOR_TEMP_INSTANCES));
-        datastore_add_resource(datastore, RESOURCE_ID_TEMP_LABEL,             datastore_create_string_resource(SENSOR_TEMP_LEN_LABEL, SENSOR_TEMP_INSTANCES));
-        datastore_add_resource(datastore, RESOURCE_ID_TEMP_ASSIGNMENT,        datastore_create_resource(DATASTORE_TYPE_UINT8,  SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_VALUE,             "TEMP_VALUE",             datastore_create_resource(DATASTORE_TYPE_FLOAT,  SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_TIMESTAMP,         "TEMP_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32, SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_LABEL,             "TEMP_LABEL",             datastore_create_string_resource(SENSOR_TEMP_LEN_LABEL, SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_ASSIGNMENT,        "TEMP_ASSIGNMENT",        datastore_create_resource(DATASTORE_TYPE_UINT8,  SENSOR_TEMP_INSTANCES));
 
-        datastore_add_resource(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS,      datastore_create_resource(DATASTORE_TYPE_UINT8,  1));
-        datastore_add_resource(datastore, RESOURCE_ID_LIGHT_DETECTED,         datastore_create_resource(DATASTORE_TYPE_BOOL,   1));
-        datastore_add_resource(datastore, RESOURCE_ID_LIGHT_FULL,             datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_LIGHT_VISIBLE,          datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_LIGHT_INFRARED,         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_LIGHT_ILLUMINANCE,      datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_LIGHT_TIMESTAMP,        datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_FLOW_FREQUENCY,         datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
-        datastore_add_resource(datastore, RESOURCE_ID_FLOW_RATE,              datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
+        _add_resource(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS,      "LIGHT_I2C_ADDRESS",      datastore_create_resource(DATASTORE_TYPE_UINT8,  1));
+        _add_resource(datastore, RESOURCE_ID_LIGHT_DETECTED,         "LIGHT_DETECTED",         datastore_create_resource(DATASTORE_TYPE_BOOL,   1));
+        _add_resource(datastore, RESOURCE_ID_LIGHT_FULL,             "LIGHT_FULL",             datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_LIGHT_VISIBLE,          "LIGHT_VISIBLE",          datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_LIGHT_INFRARED,         "LIGHT_INFRARED",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_LIGHT_ILLUMINANCE,      "LIGHT_ILLUMINANCE",      datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_LIGHT_TIMESTAMP,        "LIGHT_TIMESTAMP",        datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_FLOW_FREQUENCY,         "FLOW_FREQUENCY",         datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
+        _add_resource(datastore, RESOURCE_ID_FLOW_RATE,              "FLOW_RATE",              datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
 
-        datastore_add_resource(datastore, RESOURCE_ID_POWER_VALUE,            datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
-        datastore_add_resource(datastore, RESOURCE_ID_POWER_TIMESTAMP,        datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_POWER_VALUE,            "POWER_VALUE",            datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
+        _add_resource(datastore, RESOURCE_ID_POWER_TIMESTAMP,        "POWER_TIMESTAMP",        datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
-        datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        //datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_COUNT, datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        //datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MAN_COUNT,  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        //datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MODE_COUNT, datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        //datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MAN_COUNT,  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP,     datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, "SWITCHES_CP_MODE_VALUE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        //_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_COUNT, "SWITCHES_CP_MODE_COUNT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  "SWITCHES_CP_MAN_VALUE",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        //_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MAN_COUNT, "SWITCHES_CP_MAN_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, "SWITCHES_PP_MODE_VALUE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        //_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MODE_COUNT, "SWITCHES_PP_MODE_COUNT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  "SWITCHES_PP_MAN_VALUE",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        //_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MAN_COUNT, "SWITCHES_PP_MAN_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP,     "SWITCHES_TIMESTAMP",     datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
-        datastore_add_resource(datastore, RESOURCE_ID_PUMPS_CP_STATE,         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        datastore_add_resource(datastore, RESOURCE_ID_PUMPS_PP_STATE,         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_PUMPS_CP_STATE,         "PUMPS_CP_STATE",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_PUMPS_PP_STATE,         "PUMPS_PP_STATE",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
     }
 
     return datastore;
@@ -94,23 +111,23 @@ void resources_load(const datastore_t * datastore)
 {
     if (datastore)
     {
-        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, VERSION);
-        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, 0, BUILD_TIMESTAMP);
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, VERSION));
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, 0, BUILD_TIMESTAMP));
 
         // TODO: load from NV
-        datastore_set_string(datastore, RESOURCE_ID_WIFI_SSID, 0, CONFIG_WIFI_SSID);
-        datastore_set_string(datastore, RESOURCE_ID_WIFI_PASSWORD, 0, CONFIG_WIFI_PASSWORD);
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_WIFI_SSID, 0, CONFIG_WIFI_SSID));
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_WIFI_PASSWORD, 0, CONFIG_WIFI_PASSWORD));
 
-        datastore_set_string(datastore, RESOURCE_ID_MQTT_BROKER_ADDRESS, 0, CONFIG_MQTT_BROKER_IP_ADDRESS);
-        datastore_set_uint32(datastore, RESOURCE_ID_MQTT_BROKER_PORT, 0, CONFIG_MQTT_BROKER_TCP_PORT);
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_MQTT_BROKER_ADDRESS, 0, CONFIG_MQTT_BROKER_IP_ADDRESS));
+        ERROR_CHECK(datastore_set_uint32(datastore, RESOURCE_ID_MQTT_BROKER_PORT, 0, CONFIG_MQTT_BROKER_TCP_PORT));
 
-        datastore_set_uint8(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS);
+        ERROR_CHECK(datastore_set_uint8(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS));
 
         // TODO
-        datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 0, "LABEL1");
-        datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 1, "LABEL2");
-        datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 2, "LABEL3");
-        datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 3, "LABEL4");
-        datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 4, "LABEL5");
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 0, "Temp 1"));
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 1, "Temp 2"));
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 2, "Temp 3"));
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 3, "Temp 4"));
+        ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 4, "Temp 5"));
     }
 }
