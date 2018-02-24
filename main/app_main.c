@@ -36,8 +36,8 @@
 #include "esp_heap_caps.h"
 
 #include "constants.h"
+#include "resources.h"
 #include "utils.h"
-#include "datastore.h"
 #include "led.h"
 #include "i2c_master.h"
 #include "sensor_temp.h"
@@ -49,6 +49,7 @@
 #include "avr_support.h"
 #include "display.h"
 #include "power.h"
+#include "datastore/datastore.h"
 
 #define TAG "app_main"
 
@@ -57,9 +58,6 @@
 // - indicate when sampling
 // - indicate MQTT connection state
 // - indicate MQTT activity (publish, receive)
-
-// TODO: make this non-global!
-datastore_t * datastore = NULL;
 
 static void do_esp32_reset(const char * topic, bool value, void * context)
 {
@@ -100,7 +98,7 @@ static void do_datastore_dump(const char * topic, bool value, void * context)
 {
     if (value)
     {
-        datastore_dump(datastore);
+        datastore_dump(g_datastore);
     }
 }
 
@@ -159,27 +157,7 @@ static void _delay(void)
     vTaskDelay(100 / portTICK_RATE_MS);
 }
 
-static void load_datastore_defaults(datastore_t * datastore)
-{
-    if (datastore)
-    {
-        // TODO: load from NV
-        datastore_set_string(datastore, DATASTORE_ID_WIFI_SSID, 0, CONFIG_WIFI_SSID);
-        datastore_set_string(datastore, DATASTORE_ID_WIFI_PASSWORD, 0, CONFIG_WIFI_PASSWORD);
 
-        datastore_set_string(datastore, DATASTORE_ID_MQTT_BROKER_ADDRESS, 0, CONFIG_MQTT_BROKER_IP_ADDRESS);
-        datastore_set_uint32(datastore, DATASTORE_ID_MQTT_BROKER_PORT, 0, CONFIG_MQTT_BROKER_TCP_PORT);
-
-        datastore_set_uint8(datastore, DATASTORE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS);
-
-        // TODO
-        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 0, "LABEL1");
-        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 1, "LABEL2");
-        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 2, "LABEL3");
-        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 3, "LABEL4");
-        datastore_set_string(datastore, DATASTORE_ID_TEMP_LABEL, 4, "LABEL5");
-    }
-}
 
 static void avr_test_sequence(void)
 {
@@ -250,11 +228,9 @@ void app_main()
     ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
-    datastore = datastore_malloc();
-    datastore_init(datastore);
-    load_datastore_defaults(datastore);
-
-    datastore_dump(datastore);
+    g_datastore = resources_init();
+    resources_load(g_datastore);
+    datastore_dump(g_datastore);
 
     // Onboard LED
     led_init(CONFIG_ONBOARD_LED_GPIO);
@@ -397,7 +373,7 @@ void app_main()
     power_init(sensor_priority);
 
     _delay();
-    datastore_dump(datastore);
+    datastore_dump(g_datastore);
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
@@ -422,7 +398,7 @@ void app_main()
 
 //    sensor_temp_close(temp_sensors);
 //    i2c_master_close(i2c_master_info);
-//    datastore_free(&datastore);
+    datastore_free(&g_datastore);
 
     ESP_LOGE(TAG, "Restarting...");
     vTaskDelay(1000 / portTICK_RATE_MS);

@@ -32,6 +32,7 @@
  * One identified issue with the 256dpi/esp-mqtt component is that large messages
  * near the declared MQTT buffer size will cause a disconnect.
  */
+
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -43,14 +44,13 @@
 #include "esp_mqtt.h"
 
 #include "mqtt.h"
+#include "resources.h"
 #include "trie.h"
 #include "convert_string.h"
-#include "datastore.h"
 #include "utils.h"
+#include "datastore/datastore.h"
 
 #define TAG "mqtt"
-
-extern datastore_t * datastore;
 
 typedef struct
 {
@@ -92,9 +92,9 @@ static void _status_callback(esp_mqtt_status_t status)
     {
         case ESP_MQTT_STATUS_CONNECTED:
             ESP_LOGI(TAG, "MQTT connected");
-            datastore_set_uint32(datastore, DATASTORE_ID_MQTT_STATUS, 0, DATASTORE_MQTT_STATUS_CONNECTED);
-            datastore_set_uint32(datastore, DATASTORE_ID_MQTT_TIMESTAMP, 0, seconds_since_boot());
-            datastore_increment(datastore, DATASTORE_ID_MQTT_CONNECTION_COUNT, 0);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_CONNECTED);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_MQTT_TIMESTAMP, 0, seconds_since_boot());
+            datastore_increment(g_datastore, RESOURCE_ID_MQTT_CONNECTION_COUNT, 0);
 
             // send a device status update
             const char * value = "MQTT connected";
@@ -104,7 +104,7 @@ static void _status_callback(esp_mqtt_status_t status)
 
         case ESP_MQTT_STATUS_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT disconnected");
-            datastore_set_uint32(datastore, DATASTORE_ID_MQTT_STATUS, 0, DATASTORE_MQTT_STATUS_DISCONNECTED);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_DISCONNECTED);
             break;
         default:
             break;
@@ -118,7 +118,7 @@ static void _message_callback(const char * topic, uint8_t * payload, size_t len)
 
     const char * data = (const char *)payload;
 
-    datastore_increment(datastore, DATASTORE_ID_MQTT_MESSAGE_RX_COUNT, 0);
+    datastore_increment(g_datastore, RESOURCE_ID_MQTT_MESSAGE_RX_COUNT, 0);
 
     // TODO: use g_trie until we add a context pointer to the message callback
     topic_info_t * topic_info = trie_search(g_trie, topic);
@@ -339,7 +339,7 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
         {
             // sadly the esp_mqtt component only supports a single instance
             esp_mqtt_init(_status_callback, _message_callback, 256 /*buffer size*/, 2000 /*timeout*/);
-            datastore_set_uint32(datastore, DATASTORE_ID_MQTT_STATUS, 0, DATASTORE_MQTT_STATUS_CONNECTING);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_CONNECTING);
             private->trie = trie_create();
 
             if (private->trie)
@@ -374,7 +374,7 @@ bool mqtt_publish(const char * topic, uint8_t * payload, size_t len, int qos, bo
     bool result = false;
     if ((result = esp_mqtt_publish(topic, payload, len, qos, retained)) != false)
     {
-        datastore_increment(datastore, DATASTORE_ID_MQTT_MESSAGE_TX_COUNT, 0);
+        datastore_increment(g_datastore, RESOURCE_ID_MQTT_MESSAGE_TX_COUNT, 0);
     }
     return result;
 }

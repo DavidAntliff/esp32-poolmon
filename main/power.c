@@ -28,15 +28,14 @@
 
 #include "power.h"
 #include "constants.h"
-#include "datastore.h"
+#include "resources.h"
 #include "utils.h"
+#include "datastore/datastore.h"
 
 #define TAG "power"
 
 // ignore any temperature measurements that have expired
 #define MEASUREMENT_EXPIRY 15 // seconds
-
-extern datastore_t * datastore;
 
 #define SHC_WATER (4184.0)               // J/kg/K
 #define MASS_PER_VOLUME_WATER (1000.0)   // kg/m^3
@@ -64,8 +63,8 @@ static void power_calculation_task(void * pvParameter)
 
         uint32_t timestamp_in = 0;
         uint32_t timestamp_out = 0;
-        datastore_get_uint32(datastore, DATASTORE_ID_TEMP_TIMESTAMP, in, &timestamp_in);
-        datastore_get_uint32(datastore, DATASTORE_ID_TEMP_TIMESTAMP, out, &timestamp_out);
+        datastore_get_uint32(g_datastore, RESOURCE_ID_TEMP_TIMESTAMP, in, &timestamp_in);
+        datastore_get_uint32(g_datastore, RESOURCE_ID_TEMP_TIMESTAMP, out, &timestamp_out);
 
         uint32_t now = seconds_since_boot();
 
@@ -75,18 +74,18 @@ static void power_calculation_task(void * pvParameter)
             {
                 float temp_in = 0.0f;
                 float temp_out = 0.0f;
-                datastore_get_float(datastore, DATASTORE_ID_TEMP_VALUE, in, &temp_in);
-                datastore_get_float(datastore, DATASTORE_ID_TEMP_VALUE, out, &temp_out);
+                datastore_get_float(g_datastore, RESOURCE_ID_TEMP_VALUE, in, &temp_in);
+                datastore_get_float(g_datastore, RESOURCE_ID_TEMP_VALUE, out, &temp_out);
                 float delta = temp_out - temp_in;
 
                 float lpm = 0.0f;
-                datastore_get_float(datastore, DATASTORE_ID_FLOW_RATE, 0, &lpm);
+                datastore_get_float(g_datastore, RESOURCE_ID_FLOW_RATE, 0, &lpm);
 
                 float power = _calculate_transfer_power_watts(lpm, delta);
                 ESP_LOGI(TAG, "flow %f lpm, temp delta %f K, power %f W", lpm, delta, power);
 
-                datastore_set_float(datastore, DATASTORE_ID_POWER_VALUE, 0, power);
-                datastore_set_uint32(datastore, DATASTORE_ID_POWER_TIMESTAMP, 0, now);
+                datastore_set_float(g_datastore, RESOURCE_ID_POWER_VALUE, 0, power);
+                datastore_set_uint32(g_datastore, RESOURCE_ID_POWER_TIMESTAMP, 0, now);
             }
             else
             {

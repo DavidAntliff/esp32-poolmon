@@ -34,18 +34,17 @@
 #include "avr_support.h"
 #include "constants.h"
 #include "utils.h"
-#include "datastore.h"
 #include "i2c_master.h"
 #include "smbus.h"
 #include "publish.h"
+#include "resources.h"
 #include "../avr/avr-poolmon/registers.h"
+#include "datastore/datastore.h"
 
 #define TAG "avr_support"
 
 #define SMBUS_TIMEOUT     1000   // milliseconds
 #define TICKS_PER_UPDATE  (1000 / portTICK_RATE_MS)
-
-extern datastore_t * datastore;
 
 // use as bitwise OR combinations
 typedef enum
@@ -110,11 +109,11 @@ static void _publish_switch_states(uint8_t switch_states, QueueHandle_t publish_
     publish_value(PUBLISH_VALUE_SWITCH_3, switch_states & 0b0100 ? 1.0 : 0.0, publish_queue);
     publish_value(PUBLISH_VALUE_SWITCH_4, switch_states & 0b1000 ? 1.0 : 0.0, publish_queue);
 
-    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_CP_MODE_VALUE, 0, switch_states & 0b0001 ? 1.0 : 0.0);
-    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_CP_MAN_VALUE,  0, switch_states & 0b0010 ? 1.0 : 0.0);
-    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_PP_MODE_VALUE, 0, switch_states & 0b0100 ? 1.0 : 0.0);
-    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_PP_MAN_VALUE,  0, switch_states & 0b1000 ? 1.0 : 0.0);
-    datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
+    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, switch_states & 0b0001 ? 1.0 : 0.0);
+    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, switch_states & 0b0010 ? 1.0 : 0.0);
+    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, switch_states & 0b0100 ? 1.0 : 0.0);
+    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, switch_states & 0b1000 ? 1.0 : 0.0);
+    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
 }
 
 static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_switch_states, QueueHandle_t publish_queue)
@@ -127,30 +126,30 @@ static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_swit
     if (changed & 0b0001)
     {
         publish_value(PUBLISH_VALUE_SWITCH_1, new_switch_states & 0b0001 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_CP_MODE_VALUE, 0, new_switch_states & 0b0001 ? 1.0 : 0.0);
+        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, new_switch_states & 0b0001 ? 1.0 : 0.0);
     }
 
     if (changed & 0b0010)
     {
         publish_value(PUBLISH_VALUE_SWITCH_2, new_switch_states & 0b0010 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_CP_MAN_VALUE,  0, new_switch_states & 0b0010 ? 1.0 : 0.0);
+        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, new_switch_states & 0b0010 ? 1.0 : 0.0);
     }
 
     if (changed & 0b0100)
     {
         publish_value(PUBLISH_VALUE_SWITCH_3, new_switch_states & 0b0100 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_PP_MODE_VALUE, 0, new_switch_states & 0b0100 ? 1.0 : 0.0);
+        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, new_switch_states & 0b0100 ? 1.0 : 0.0);
     }
 
     if (changed & 0b1000)
     {
         publish_value(PUBLISH_VALUE_SWITCH_4, new_switch_states & 0b1000 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_PP_MAN_VALUE,  0, new_switch_states & 0b1000 ? 1.0 : 0.0);
+        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, new_switch_states & 0b1000 ? 1.0 : 0.0);
     }
 
     if (changed & 0b1111)
     {
-        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
+        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
     }
 }
 
@@ -168,9 +167,9 @@ static void _publish_pump_states(uint8_t pump_states, QueueHandle_t publish_queu
     publish_value(PUBLISH_VALUE_SSR_1, pump_states & 0b0001 ? 1.0 : 0.0, publish_queue);
     publish_value(PUBLISH_VALUE_SSR_2, pump_states & 0b0010 ? 1.0 : 0.0, publish_queue);
 
-    datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_CP_STATE, 0, pump_states & 0b0001 ? 1.0 : 0.0);
-    datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_PP_STATE, 0, pump_states & 0b0010 ? 1.0 : 0.0);
-//    datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_TIMESTAMP, 0, seconds_since_boot());
+    datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, pump_states & 0b0001 ? 1.0 : 0.0);
+    datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_PP_STATE, 0, pump_states & 0b0010 ? 1.0 : 0.0);
+//    datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_TIMESTAMP, 0, seconds_since_boot());
 }
 
 static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_states, QueueHandle_t publish_queue)
@@ -182,18 +181,18 @@ static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_sta
     if (changed & 0b0001)
     {
         publish_value(PUBLISH_VALUE_SSR_1, new_pump_states & 0b0001 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_CP_STATE, 0, new_pump_states & 0b0001 ? 1.0 : 0.0);
+        datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, new_pump_states & 0b0001 ? 1.0 : 0.0);
     }
 
     if (changed & 0b0010)
     {
         publish_value(PUBLISH_VALUE_SSR_2, new_pump_states & 0b0010 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(datastore, DATASTORE_ID_PUMPS_PP_STATE,  0, new_pump_states & 0b0010 ? 1.0 : 0.0);
+        datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_PP_STATE,  0, new_pump_states & 0b0010 ? 1.0 : 0.0);
     }
 
 //    if (changed & 0b1111)
 //    {
-//        datastore_set_uint32(datastore, DATASTORE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
+//        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
 //    }
 }
 

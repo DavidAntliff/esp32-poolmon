@@ -37,6 +37,15 @@ typedef enum
     MQTT_ERROR_LAST,
 } mqtt_error_t;
 
+typedef enum
+{
+    MQTT_STATUS_DISCONNECTED = 0,
+    MQTT_STATUS_CONNECTING,
+    MQTT_STATUS_CONNECTED,
+} mqtt_status_t;
+
+#define MQTT_LEN_BROKER_ADDRESS 64
+
 typedef struct
 {
     void * private;

@@ -26,6 +26,17 @@
 #define WIFI_SUPPORT_H
 
 #include "freertos/FreeRTOS.h"
+#include "esp_wifi.h"
+
+typedef enum
+{
+    WIFI_STATUS_DISCONNECTED = 0,
+    WIFI_STATUS_CONNECTED,
+    WIFI_STATUS_GOT_ADDRESS,
+} wifi_status_t;
+
+#define WIFI_LEN_SSID        (sizeof(((wifi_sta_config_t *)0)->ssid))
+#define WIFI_LEN_PASSWORD    (sizeof(((wifi_sta_config_t *)0)->password))
 
 void wifi_support_init(UBaseType_t priority);
 

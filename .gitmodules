@@ -25,3 +25,6 @@
 [submodule "components/trie"]
 	path = components/trie
 	url = https://github.com/DavidAntliff/trie.git
+[submodule "components/datastore/datastore"]
+	path = components/datastore/datastore
+	url = https://github.com/DavidAntliff/datastore.git

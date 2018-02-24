@@ -29,6 +29,9 @@
 
 #define VERSION "0.1"
 
+#define SYSTEM_LEN_VERSION          4
+#define SYSTEM_LEN_BUILD_DATE_TIME 16
+
 #define PUBLISH_QUEUE_DEPTH      16
 
 // RMT channel allocations

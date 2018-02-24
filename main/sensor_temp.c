@@ -32,21 +32,20 @@
 
 #include "sensor_temp.h"
 #include "constants.h"
+#include "resources.h"
 #include "utils.h"
-#include "datastore.h"
 #include "led.h"
 #include "publish.h"
 #include "owb.h"
 #include "owb_rmt.h"
 #include "ds18b20.h"
+#include "datastore/datastore.h"
 
 #define MAX_DEVICES          (8)
 #define DS18B20_RESOLUTION   (DS18B20_RESOLUTION_10_BIT)
 #define SAMPLE_PERIOD        (5000)  // sensor sampling period in milliseconds
 
 #define TAG "sensor_temp"
-
-extern datastore_t * datastore;
 
 struct _temp_sensors_t
 {
@@ -229,8 +228,8 @@ static void sensor_temp_task(void * pvParameter)
                 if (errors[i] == DS18B20_OK)
                 {
                     publish_value(PUBLISH_VALUE_TEMP_1 + i, readings[i], task_inputs->publish_queue);
-                    datastore_set_float(datastore, DATASTORE_ID_TEMP_VALUE, i, readings[i]);
-                    datastore_set_uint32(datastore, DATASTORE_ID_TEMP_TIMESTAMP, i, now);
+                    datastore_set_float(g_datastore, RESOURCE_ID_TEMP_VALUE, i, readings[i]);
+                    datastore_set_uint32(g_datastore, RESOURCE_ID_TEMP_TIMESTAMP, i, now);
                 }
                 else
                 {

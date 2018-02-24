@@ -31,12 +31,11 @@
 #include "esp_event_loop.h"
 
 #include "wifi_support.h"
+#include "resources.h"
 #include "esp_mqtt.h"
-#include "datastore.h"
+#include "datastore/datastore.h"
 
 #define TAG "wifi_support"
-
-extern datastore_t * datastore;
 
 static EventGroupHandle_t wifi_event_group;
 const static int CONNECTED_BIT = BIT0;
@@ -51,20 +50,20 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             break;
         case SYSTEM_EVENT_STA_CONNECTED:
             ESP_LOGI(TAG, "WiFi connected");
-            datastore_set_uint32(datastore, DATASTORE_ID_WIFI_STATUS, 0, DATASTORE_WIFI_STATUS_CONNECTED);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_CONNECTED);
             break;
         case SYSTEM_EVENT_STA_GOT_IP:
             ESP_LOGI(TAG, "WiFi got IP");
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
-            datastore_set_uint32(datastore, DATASTORE_ID_WIFI_STATUS, 0, DATASTORE_WIFI_STATUS_GOT_ADDRESS);
-            datastore_set_uint32(datastore, DATASTORE_ID_WIFI_ADDRESS, 0, event->event_info.got_ip.ip_info.ip.addr);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_GOT_ADDRESS);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_ADDRESS, 0, event->event_info.got_ip.ip_info.ip.addr);
             esp_mqtt_start(CONFIG_MQTT_BROKER_IP_ADDRESS, CONFIG_MQTT_BROKER_TCP_PORT, "esp-mqtt", "username", "password");
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             // This is a workaround as ESP32 WiFi libs don't currently auto-reassociate.
             ESP_LOGI(TAG, "WiFi disconnected");
-            datastore_set_uint32(datastore, DATASTORE_ID_WIFI_STATUS, 0, DATASTORE_WIFI_STATUS_DISCONNECTED);
-            datastore_set_uint32(datastore, DATASTORE_ID_WIFI_ADDRESS, 0, 0);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_DISCONNECTED);
+            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_ADDRESS, 0, 0);
             esp_mqtt_stop();
             esp_wifi_connect();
             xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
@@ -85,8 +84,8 @@ static void wifi_conn_init(void)
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
 
     wifi_config_t wifi_config = { 0 };
-    datastore_get_string(datastore, DATASTORE_ID_WIFI_SSID, 0, (char *)wifi_config.sta.ssid);
-    datastore_get_string(datastore, DATASTORE_ID_WIFI_PASSWORD, 0, (char *)wifi_config.sta.password);
+    datastore_get_string(g_datastore, RESOURCE_ID_WIFI_SSID, 0, (char *)wifi_config.sta.ssid);
+    datastore_get_string(g_datastore, RESOURCE_ID_WIFI_PASSWORD, 0, (char *)wifi_config.sta.password);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
@@ -120,12 +119,12 @@ static void wifi_monitor_task(void * pvParameter)
                 ESP_LOGD(TAG, "RSSI %d", ap_info.rssi);
             }
 
-            datastore_set_int8(datastore, DATASTORE_ID_WIFI_RSSI, 0, ap_info.rssi);
+            datastore_set_int8(g_datastore, RESOURCE_ID_WIFI_RSSI, 0, ap_info.rssi);
         }
         else
         {
             new_info = true;
-            datastore_set_int8(datastore, DATASTORE_ID_WIFI_RSSI, 0, 0);
+            datastore_set_int8(g_datastore, RESOURCE_ID_WIFI_RSSI, 0, 0);
         }
         vTaskDelay(1000 / portTICK_RATE_MS);
     }

@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-VERBOSE := 1
+#VERBOSE := 1
 
 PROJECT_NAME := esp32-poolmon
 

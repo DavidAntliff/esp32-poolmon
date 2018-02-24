@@ -32,17 +32,16 @@
 
 #include "sensor_light.h"
 #include "constants.h"
+#include "resources.h"
 #include "utils.h"
-#include "datastore.h"
 #include "smbus.h"
 #include "tsl2561.h"
 #include "publish.h"
+#include "datastore/datastore.h"
 
 #define TAG "sensor_light"
 
 #define SAMPLE_PERIOD (5000)  // sensor sampling period in milliseconds
-
-extern datastore_t * datastore;
 
 typedef struct
 {
@@ -60,7 +59,7 @@ static void sensor_light_task(void * pvParameter)
     i2c_port_t i2c_port = i2c_master_info->port;
 
     uint8_t i2c_address = 0;
-    datastore_get_uint8(datastore, DATASTORE_ID_LIGHT_I2C_ADDRESS, 0, &i2c_address);
+    datastore_get_uint8(g_datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, &i2c_address);
 
     // before accessing I2C, use a lock to gain exclusive use of the bus
     i2c_master_lock(i2c_master_info, portMAX_DELAY);
@@ -78,7 +77,7 @@ static void sensor_light_task(void * pvParameter)
         tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_1X);
         //tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_16X);
 
-        datastore_set_bool(datastore, DATASTORE_ID_LIGHT_DETECTED, 0, true);
+        datastore_set_bool(g_datastore, RESOURCE_ID_LIGHT_DETECTED, 0, true);
         i2c_master_unlock(i2c_master_info);
 
         TickType_t last_wake_time = xTaskGetTickCount();
@@ -109,11 +108,11 @@ static void sensor_light_task(void * pvParameter)
                 ESP_LOGI(TAG, "  Visible:       %d", visible);
                 ESP_LOGI(TAG, "  Illuminance:   %d lux", lux);
 
-                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_FULL, 0, visible + infrared);
-                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_INFRARED, 0, infrared);
-                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_VISIBLE, 0, visible);
-                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_ILLUMINANCE, 0, lux);
-                datastore_set_uint32(datastore, DATASTORE_ID_LIGHT_TIMESTAMP, 0, seconds_since_boot());
+                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_FULL, 0, visible + infrared);
+                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_INFRARED, 0, infrared);
+                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_VISIBLE, 0, visible);
+                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_ILLUMINANCE, 0, lux);
+                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_TIMESTAMP, 0, seconds_since_boot());
             }
             else
             {
@@ -125,7 +124,7 @@ static void sensor_light_task(void * pvParameter)
     }
     else
     {
-        datastore_set_bool(datastore, DATASTORE_ID_LIGHT_DETECTED, 0, false);
+        datastore_set_bool(g_datastore, RESOURCE_ID_LIGHT_DETECTED, 0, false);
         i2c_master_unlock(i2c_master_info);
     }
 
