@@ -26,7 +26,8 @@
 #define POWER_H
 
 #include "freertos/FreeRTOS.h"
+#include "datastore/datastore.h"
 
-void power_init(UBaseType_t priority);
+void power_init(UBaseType_t priority, const datastore_t * datastore);
 
 #endif // POWER_H

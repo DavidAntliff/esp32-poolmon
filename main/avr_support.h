@@ -30,6 +30,7 @@
 #include "freertos/queue.h"
 
 #include "i2c_master.h"
+#include "datastore/datastore.h"
 
 // switch states
 typedef enum
@@ -56,7 +57,7 @@ typedef enum
     AVR_ALARM_STATE_ON = 1,
 } avr_alarm_state_t;
 
-void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue);
+void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore);
 
 // reset the AVR
 void avr_support_reset(void);

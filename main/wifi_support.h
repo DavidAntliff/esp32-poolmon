@@ -27,6 +27,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "esp_wifi.h"
+#include "datastore/datastore.h"
 
 typedef enum
 {
@@ -38,6 +39,6 @@ typedef enum
 #define WIFI_LEN_SSID        (sizeof(((wifi_sta_config_t *)0)->ssid))
 #define WIFI_LEN_PASSWORD    (sizeof(((wifi_sta_config_t *)0)->password))
 
-void wifi_support_init(UBaseType_t priority);
+void wifi_support_init(UBaseType_t priority, const datastore_t * datastore);
 
 #endif // WIFI_SUPPORT_H

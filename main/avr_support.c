@@ -68,7 +68,7 @@ static QueueHandle_t command_queue;
 typedef struct
 {
     i2c_master_info_t * i2c_master_info;
-    QueueHandle_t publish_queue;
+    const datastore_t * datastore;
 } task_inputs_t;
 
 #define I2C_ERROR_CHECK(x) do {                                             \
@@ -101,22 +101,17 @@ static uint8_t _decode_switch_states(uint8_t status)
     return new_states;
 }
 
-static void _publish_switch_states(uint8_t switch_states, QueueHandle_t publish_queue)
+static void _publish_switch_states(uint8_t switch_states, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "Publishing all switch states");
-    publish_value(PUBLISH_VALUE_SWITCH_1, switch_states & 0b0001 ? 1.0 : 0.0, publish_queue);
-    publish_value(PUBLISH_VALUE_SWITCH_2, switch_states & 0b0010 ? 1.0 : 0.0, publish_queue);
-    publish_value(PUBLISH_VALUE_SWITCH_3, switch_states & 0b0100 ? 1.0 : 0.0, publish_queue);
-    publish_value(PUBLISH_VALUE_SWITCH_4, switch_states & 0b1000 ? 1.0 : 0.0, publish_queue);
-
-    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, switch_states & 0b0001 ? 1.0 : 0.0);
-    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, switch_states & 0b0010 ? 1.0 : 0.0);
-    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, switch_states & 0b0100 ? 1.0 : 0.0);
-    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, switch_states & 0b1000 ? 1.0 : 0.0);
-    datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
+    datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, switch_states & 0b0001 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, switch_states & 0b0010 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, switch_states & 0b0100 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, switch_states & 0b1000 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
 }
 
-static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_switch_states, QueueHandle_t publish_queue)
+static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_switch_states, const datastore_t * datastore)
 {
     uint8_t changed = last_switch_states ^ new_switch_states;
     ESP_LOGD(TAG, "last_switch_states 0x%02x, new_switch_states 0x%02x, changed 0x%02x", last_switch_states, new_switch_states, changed);
@@ -125,31 +120,27 @@ static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_swit
     // Switches 2 and 4 report "0" when in Off position, and "1" in On position.
     if (changed & 0b0001)
     {
-        publish_value(PUBLISH_VALUE_SWITCH_1, new_switch_states & 0b0001 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, new_switch_states & 0b0001 ? 1.0 : 0.0);
+        datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, new_switch_states & 0b0001 ? 1.0 : 0.0);
     }
 
     if (changed & 0b0010)
     {
-        publish_value(PUBLISH_VALUE_SWITCH_2, new_switch_states & 0b0010 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, new_switch_states & 0b0010 ? 1.0 : 0.0);
+        datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, new_switch_states & 0b0010 ? 1.0 : 0.0);
     }
 
     if (changed & 0b0100)
     {
-        publish_value(PUBLISH_VALUE_SWITCH_3, new_switch_states & 0b0100 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, new_switch_states & 0b0100 ? 1.0 : 0.0);
+        datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, new_switch_states & 0b0100 ? 1.0 : 0.0);
     }
 
     if (changed & 0b1000)
     {
-        publish_value(PUBLISH_VALUE_SWITCH_4, new_switch_states & 0b1000 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, new_switch_states & 0b1000 ? 1.0 : 0.0);
+        datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, new_switch_states & 0b1000 ? 1.0 : 0.0);
     }
 
     if (changed & 0b1111)
     {
-        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
+        datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
     }
 }
 
@@ -161,18 +152,15 @@ static uint8_t _decode_pump_states(uint8_t status)
     return new_states;
 }
 
-static void _publish_pump_states(uint8_t pump_states, QueueHandle_t publish_queue)
+static void _publish_pump_states(uint8_t pump_states, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "Publishing all pump states");
-    publish_value(PUBLISH_VALUE_SSR_1, pump_states & 0b0001 ? 1.0 : 0.0, publish_queue);
-    publish_value(PUBLISH_VALUE_SSR_2, pump_states & 0b0010 ? 1.0 : 0.0, publish_queue);
-
-    datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, pump_states & 0b0001 ? 1.0 : 0.0);
-    datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_PP_STATE, 0, pump_states & 0b0010 ? 1.0 : 0.0);
-//    datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_TIMESTAMP, 0, seconds_since_boot());
+    datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, pump_states & 0b0001 ? 1.0 : 0.0);
+    datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_PP_STATE, 0, pump_states & 0b0010 ? 1.0 : 0.0);
+//    datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_TIMESTAMP, 0, seconds_since_boot());
 }
 
-static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_states, QueueHandle_t publish_queue)
+static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_states, const datastore_t * datastore)
 {
     uint8_t changed = last_pump_states ^ new_pump_states;
     ESP_LOGD(TAG, "last_pump_states 0x%02x, new_pump_states 0x%02x, changed 0x%02x", last_pump_states, new_pump_states, changed);
@@ -180,19 +168,17 @@ static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_sta
     // Pumps report "0" when in Off position, and "1" in On position.
     if (changed & 0b0001)
     {
-        publish_value(PUBLISH_VALUE_SSR_1, new_pump_states & 0b0001 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, new_pump_states & 0b0001 ? 1.0 : 0.0);
+        datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, new_pump_states & 0b0001 ? 1.0 : 0.0);
     }
 
     if (changed & 0b0010)
     {
-        publish_value(PUBLISH_VALUE_SSR_2, new_pump_states & 0b0010 ? 1.0 : 0.0, publish_queue);
-        datastore_set_uint32(g_datastore, RESOURCE_ID_PUMPS_PP_STATE,  0, new_pump_states & 0b0010 ? 1.0 : 0.0);
+        datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_PP_STATE,  0, new_pump_states & 0b0010 ? 1.0 : 0.0);
     }
 
 //    if (changed & 0b1111)
 //    {
-//        datastore_set_uint32(g_datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
+//        datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
 //    }
 }
 
@@ -222,10 +208,10 @@ static void avr_support_task(void * pvParameter)
     uint8_t status = _read_register(smbus_info, REGISTER_STATUS);
     ESP_LOGD(TAG, "I2C %d, REG 0x01: 0x%02x", i2c_port, status);
     uint8_t switch_states = _decode_switch_states(status);
-    _publish_switch_states(switch_states, task_inputs->publish_queue);
+    _publish_switch_states(switch_states, task_inputs->datastore);
 
     uint8_t pump_states = _decode_pump_states(status);
-    _publish_pump_states(pump_states, task_inputs->publish_queue);
+    _publish_pump_states(pump_states, task_inputs->datastore);
 
     i2c_master_unlock(i2c_master_info);
 
@@ -313,12 +299,12 @@ static void avr_support_task(void * pvParameter)
 
         // if any switches have changed state, publish them
         uint8_t new_switch_states = _decode_switch_states(status);
-        _publish_switch_changes(switch_states, new_switch_states, task_inputs->publish_queue);
+        _publish_switch_changes(switch_states, new_switch_states, task_inputs->datastore);
         switch_states = new_switch_states;
 
         // if any pumps have changed state, publish them
         uint8_t new_pump_states = _decode_pump_states(status);
-        _publish_pump_changes(pump_states, new_pump_states, task_inputs->publish_queue);
+        _publish_pump_changes(pump_states, new_pump_states, task_inputs->datastore);
         pump_states = new_pump_states;
 
         vTaskDelayUntil(&last_wake_time, TICKS_PER_UPDATE);
@@ -328,7 +314,7 @@ static void avr_support_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
-void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue)
+void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
@@ -340,7 +326,7 @@ void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority,
     {
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->i2c_master_info = i2c_master_info;
-        task_inputs->publish_queue = publish_queue;
+        task_inputs->datastore = datastore;
         xTaskCreate(&avr_support_task, "avr_support_task", 4096, task_inputs, priority, NULL);
     }
 

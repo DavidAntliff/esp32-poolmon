@@ -27,6 +27,7 @@
 
 #include "driver/rmt.h"
 #include "driver/pcnt.h"
+#include "datastore/datastore.h"
 
 /* @brief Initialise Flow Meter sensor task.
  * @param[in] pcnt_gpio The GPIO from which to count events.
@@ -41,6 +42,6 @@
  */
 void sensor_flow_init(uint8_t pcnt_gpio, pcnt_unit_t pcnt_unit, pcnt_channel_t pcnt_channel,
                       uint8_t rmt_gpio, rmt_channel_t rmt_channel, uint8_t rmt_clk_div,
-                      float sampling_period, float sampling_window, uint16_t filter_length, UBaseType_t priority, QueueHandle_t publish_queue);
+                      float sampling_period, float sampling_window, uint16_t filter_length, UBaseType_t priority, const datastore_t * datastore);
 
 #endif // SENSOR_FLOW_H

@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2017 David Antliff
+ * Copyright (c) 2018 David Antliff
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+#include <string.h>
 #include <stdio.h>
 
 #include "freertos/FreeRTOS.h"
@@ -33,8 +34,11 @@
 
 #define TAG "publish"
 
-//extern mqtt_client * g_client;
-void * g_client;   // temporary hack
+typedef struct
+{
+    mqtt_info_t * mqtt_info;
+    QueueHandle_t publish_queue;
+} task_inputs_t;
 
 #define ROOT_TOPIC "poolmon"
 
@@ -77,43 +81,41 @@ static void publish_task(void * pvParameter)
 {
     assert(pvParameter);
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
-    QueueHandle_t publish_queue = (QueueHandle_t)pvParameter;
+    task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
+    QueueHandle_t publish_queue = task_inputs->publish_queue;
+    mqtt_info_t * mqtt_info = task_inputs->mqtt_info;
 
     while (1)
     {
-        // Not necessarily true when using multiple cores:
-        //if (uxQueueMessagesWaiting(publish_queue) != 0)
-        //{
-        //    ESP_LOGE(TAG":mqtt", "Queue should be empty!\n");
-        //}
-
         published_value_t published_value = {0};
         BaseType_t sensor_queue_status = xQueueReceive(publish_queue, &published_value, portMAX_DELAY);
         if (sensor_queue_status == pdPASS)
         {
-            // TODO: we need a more reliable way to know that the client is valid,
-            // as attempting to publish when the client has died causes a crash.
-            if (g_client != NULL)
-            {
-                ESP_LOGD(TAG, "Received %d:%f", published_value.id, published_value.value);
-                if (published_value.id >= 0 && published_value.id < PUBLISH_VALUE_LAST)
-                {
-                    char topic[64] = {0};
-                    char value[8] = {0};
-                    snprintf(topic, 64-1, "%s/%s", ROOT_TOPIC, values_info[published_value.id].topic);
-                    snprintf(value, 8-1, "%.3f", published_value.value);
-                    ESP_LOGI(TAG, "Publish %s %s", topic, value);
-                    //mqtt_publish(g_client, topic, value, strlen(value), 0, 0);
-                }
-                else
-                {
-                    ESP_LOGE(TAG, "Invalid value ID %d", published_value.id);
-                }
-            }
-            else
-            {
-                ESP_LOGW(TAG":publish_task", "MQTT not ready - throw away");
-            }
+            mqtt_publish("test", (uint8_t *)"payload", 8, 0, false);
+
+//            // TODO: we need a more reliable way to know that the client is valid,
+//            // as attempting to publish when the client has died causes a crash.
+//            if (g_client != NULL)
+//            {
+//                ESP_LOGD(TAG, "Received %d:%f", published_value.id, published_value.value);
+//                if (published_value.id >= 0 && published_value.id < PUBLISH_VALUE_LAST)
+//                {
+//                    char topic[64] = {0};
+//                    char value[8] = {0};
+//                    snprintf(topic, 64-1, "%s/%s", ROOT_TOPIC, values_info[published_value.id].topic);
+//                    snprintf(value, 8-1, "%.3f", published_value.value);
+//                    ESP_LOGI(TAG, "Publish %s %s", topic, value);
+//                    //mqtt_publish(g_client, topic, value, strlen(value), 0, 0);
+//                }
+//                else
+//                {
+//                    ESP_LOGE(TAG, "Invalid value ID %d", published_value.id);
+//                }
+//            }
+//            else
+//            {
+//                ESP_LOGW(TAG":publish_task", "MQTT not ready - throw away");
+//            }
         }
         else
         {
@@ -146,7 +148,7 @@ void publish_value(publish_value_id_t value_id, float value, QueueHandle_t publi
     }
 }
 
-QueueHandle_t publish_init(unsigned int queue_depth, UBaseType_t priority)
+QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
@@ -155,7 +157,17 @@ QueueHandle_t publish_init(unsigned int queue_depth, UBaseType_t priority)
     // Create a queue for the sensor task to publish sensor readings
     // (Priority of sending task should be lower than receiving task)
     QueueHandle_t publish_queue = xQueueCreate(queue_depth, sizeof(published_value_t));
-    xTaskCreate(&publish_task, "publish_task", 4096, publish_queue, priority, NULL);
+
+    // task will take ownership of this struct
+    task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
+    if (task_inputs)
+    {
+        memset(task_inputs, 0, sizeof(*task_inputs));
+        task_inputs->mqtt_info = mqtt_info;
+        task_inputs->publish_queue = publish_queue;
+        xTaskCreate(&publish_task, "publish_task", 4096, task_inputs, priority, NULL);
+    }
+
     return publish_queue;
 }
 

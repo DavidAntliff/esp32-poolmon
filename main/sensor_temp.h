@@ -27,7 +27,8 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
+
+#include "datastore/datastore.h"
 
 typedef struct _temp_sensors_t temp_sensors_t;
 
@@ -43,7 +44,7 @@ typedef enum
     SENSOR_TEMP_ASSIGNMENT_T5,
 } datastore_temp_assignment_t;
 
-temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandle_t publish_queue);
+temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const datastore_t * datastore);
 void sensor_temp_close(temp_sensors_t * sensors);
 
 #endif // SENSOR_TEMP_H

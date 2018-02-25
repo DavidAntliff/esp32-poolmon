@@ -46,7 +46,7 @@
 typedef struct
 {
     i2c_master_info_t * i2c_master_info;
-    QueueHandle_t publish_queue;
+    const datastore_t * datastore;
 } task_inputs_t;
 
 static void sensor_light_task(void * pvParameter)
@@ -57,9 +57,10 @@ static void sensor_light_task(void * pvParameter)
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
     i2c_port_t i2c_port = i2c_master_info->port;
+    const datastore_t * datastore = task_inputs->datastore;
 
     uint8_t i2c_address = 0;
-    datastore_get_uint8(g_datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, &i2c_address);
+    datastore_get_uint8(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, &i2c_address);
 
     // before accessing I2C, use a lock to gain exclusive use of the bus
     i2c_master_lock(i2c_master_info, portMAX_DELAY);
@@ -77,7 +78,7 @@ static void sensor_light_task(void * pvParameter)
         tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_1X);
         //tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_16X);
 
-        datastore_set_bool(g_datastore, RESOURCE_ID_LIGHT_DETECTED, 0, true);
+        datastore_set_bool(datastore, RESOURCE_ID_LIGHT_DETECTED, 0, true);
         i2c_master_unlock(i2c_master_info);
 
         TickType_t last_wake_time = xTaskGetTickCount();
@@ -97,22 +98,17 @@ static void sensor_light_task(void * pvParameter)
             {
                 uint32_t lux = tsl2561_compute_lux(tsl2561_info, visible, infrared);
 
-                publish_value(PUBLISH_VALUE_LIGHT_FULL_SPECTRUM, visible + infrared, task_inputs->publish_queue);
-                publish_value(PUBLISH_VALUE_LIGHT_VISIBLE, visible, task_inputs->publish_queue);
-                publish_value(PUBLISH_VALUE_LIGHT_INFRARED, infrared, task_inputs->publish_queue);
-                publish_value(PUBLISH_VALUE_LIGHT_LUX, lux, task_inputs->publish_queue);
-
                 ESP_LOGI(TAG, "Light Sensor Readings:")
                 ESP_LOGI(TAG, "  Full spectrum: %d", visible + infrared);
                 ESP_LOGI(TAG, "  Infrared:      %d", infrared);
                 ESP_LOGI(TAG, "  Visible:       %d", visible);
                 ESP_LOGI(TAG, "  Illuminance:   %d lux", lux);
 
-                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_FULL, 0, visible + infrared);
-                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_INFRARED, 0, infrared);
-                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_VISIBLE, 0, visible);
-                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_ILLUMINANCE, 0, lux);
-                datastore_set_uint32(g_datastore, RESOURCE_ID_LIGHT_TIMESTAMP, 0, seconds_since_boot());
+                datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_FULL, 0, visible + infrared);
+                datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_INFRARED, 0, infrared);
+                datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_VISIBLE, 0, visible);
+                datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_ILLUMINANCE, 0, lux);
+                datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_TIMESTAMP, 0, seconds_since_boot());
             }
             else
             {
@@ -124,7 +120,7 @@ static void sensor_light_task(void * pvParameter)
     }
     else
     {
-        datastore_set_bool(g_datastore, RESOURCE_ID_LIGHT_DETECTED, 0, false);
+        datastore_set_bool(datastore, RESOURCE_ID_LIGHT_DETECTED, 0, false);
         i2c_master_unlock(i2c_master_info);
     }
 
@@ -134,7 +130,7 @@ static void sensor_light_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
-void sensor_light_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue)
+void sensor_light_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
@@ -144,7 +140,7 @@ void sensor_light_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority
     {
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->i2c_master_info = i2c_master_info;
-        task_inputs->publish_queue = publish_queue;
+        task_inputs->datastore = datastore;
         xTaskCreate(&sensor_light_task, "sensor_light_task", 4096, task_inputs, priority, NULL);
     }
 }

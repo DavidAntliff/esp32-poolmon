@@ -27,10 +27,10 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
 
 #include "i2c_master.h"
+#include "datastore/datastore.h"
 
-void sensor_light_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, QueueHandle_t publish_queue);
+void sensor_light_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore);
 
 #endif // SENSOR_LIGHT_H

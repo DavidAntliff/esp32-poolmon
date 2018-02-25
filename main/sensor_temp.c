@@ -58,7 +58,7 @@ struct _temp_sensors_t
 typedef struct
 {
     temp_sensors_t * sensors;
-    QueueHandle_t publish_queue;
+    const datastore_t * datastore;
 } task_inputs_t;
 
 static void read_temperatures(DS18B20_Info ** device_infos, float * readings, DS18B20_ERROR * errors, int num_devices)
@@ -195,6 +195,8 @@ static void sensor_temp_task(void * pvParameter)
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
+    const datastore_t * datastore = task_inputs->datastore;
+
     int sample_count = 0;
 
     int errors_count[MAX_DEVICES] = {0};
@@ -227,9 +229,8 @@ static void sensor_temp_task(void * pvParameter)
                 // filter out errored readings
                 if (errors[i] == DS18B20_OK)
                 {
-                    publish_value(PUBLISH_VALUE_TEMP_1 + i, readings[i], task_inputs->publish_queue);
-                    datastore_set_float(g_datastore, RESOURCE_ID_TEMP_VALUE, i, readings[i]);
-                    datastore_set_uint32(g_datastore, RESOURCE_ID_TEMP_TIMESTAMP, i, now);
+                    datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, readings[i]);
+                    datastore_set_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, i, now);
                 }
                 else
                 {
@@ -250,7 +251,7 @@ static void sensor_temp_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
-temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandle_t publish_queue)
+temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
@@ -266,7 +267,7 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, QueueHandl
     {
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->sensors = sensors;
-        task_inputs->publish_queue = publish_queue;
+        task_inputs->datastore = datastore;
         xTaskCreate(&sensor_temp_task, "sensor_temp_task", 4096, task_inputs, priority, NULL);
     }
     return sensors;

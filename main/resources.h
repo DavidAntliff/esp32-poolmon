@@ -90,6 +90,4 @@ typedef enum
 datastore_t * resources_init(void);
 void resources_load(const datastore_t * datastore);
 
-extern datastore_t * g_datastore;
-
 #endif // RESOURCES_H

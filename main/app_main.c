@@ -98,7 +98,11 @@ static void do_datastore_dump(const char * topic, bool value, void * context)
 {
     if (value)
     {
-        datastore_dump(g_datastore);
+        if (context != NULL)
+        {
+            const datastore_t * datastore = (const datastore_t *)context;
+            datastore_dump(datastore);
+        }
     }
 }
 
@@ -228,9 +232,9 @@ void app_main()
     ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
-    g_datastore = resources_init();
-    resources_load(g_datastore);
-    datastore_dump(g_datastore);
+    datastore_t * datastore = resources_init();
+    resources_load(datastore);
+    datastore_dump(datastore);
 
     // Onboard LED
     led_init(CONFIG_ONBOARD_LED_GPIO);
@@ -248,37 +252,35 @@ void app_main()
 
     // bring up the display ASAP in case of error
     _delay();
-    display_init(i2c_master_info, display_priority);
+    display_init(i2c_master_info, display_priority, datastore);
 
-
-    QueueHandle_t publish_queue = publish_init(PUBLISH_QUEUE_DEPTH, publish_priority);
 
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
 
     // Temp sensors
     _delay();
-    temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, publish_queue);
+    temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, datastore);
 
     // I2C devices - AVR, Light Sensor, LCD
     _delay();
-    avr_support_init(i2c_master_info, avr_priority, publish_queue);
+    avr_support_init(i2c_master_info, avr_priority, datastore);
     avr_support_reset();
 
     _delay();
-    sensor_light_init(i2c_master_info, sensor_priority, publish_queue);
+    sensor_light_init(i2c_master_info, sensor_priority, datastore);
 
 
     // Flow Meter
     _delay();
     sensor_flow_init(CONFIG_FLOW_METER_PULSE_GPIO, FLOW_METER_PCNT_UNIT, FLOW_METER_PCNT_CHANNEL,
                      CONFIG_FLOW_METER_RMT_GPIO, FLOW_METER_RMT_CHANNEL, FLOW_METER_RMT_CLK_DIV,
-                     FLOW_METER_SAMPLING_PERIOD, FLOW_METER_SAMPLING_WINDOW, FLOW_METER_FILTER_LENGTH, sensor_priority, publish_queue);
+                     FLOW_METER_SAMPLING_PERIOD, FLOW_METER_SAMPLING_WINDOW, FLOW_METER_FILTER_LENGTH, sensor_priority, datastore);
 
     bool running = true;
 
     mqtt_info_t * mqtt_info = mqtt_malloc();
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
-    if ((mqtt_error = mqtt_init(mqtt_info)) == MQTT_OK)
+    if ((mqtt_error = mqtt_init(mqtt_info, datastore)) == MQTT_OK)
     {
         // careful, stack variables!
         int context_echo_bool = 1;
@@ -355,7 +357,7 @@ void app_main()
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
 
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/datastore/dump", &do_datastore_dump, NULL)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/datastore/dump", &do_datastore_dump, (void *)datastore)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
@@ -367,13 +369,16 @@ void app_main()
 
     _delay();
     nvs_flash_init();
-    wifi_support_init(wifi_monitor_priority);
+    wifi_support_init(wifi_monitor_priority, datastore);
 
     _delay();
-    power_init(sensor_priority);
+    QueueHandle_t publish_queue = publish_init(mqtt_info, PUBLISH_QUEUE_DEPTH, publish_priority);
 
     _delay();
-    datastore_dump(g_datastore);
+    power_init(sensor_priority, datastore);
+
+    _delay();
+    datastore_dump(datastore);
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
@@ -398,7 +403,7 @@ void app_main()
 
 //    sensor_temp_close(temp_sensors);
 //    i2c_master_close(i2c_master_info);
-    datastore_free(&g_datastore);
+    datastore_free(&datastore);
 
     ESP_LOGE(TAG, "Restarting...");
     vTaskDelay(1000 / portTICK_RATE_MS);

@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -37,12 +39,18 @@
 
 #define TAG "wifi_support"
 
+typedef struct
+{
+    const datastore_t * datastore;
+} task_inputs_t;
+
 static EventGroupHandle_t wifi_event_group;
 const static int CONNECTED_BIT = BIT0;
 
 static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
+    const datastore_t * datastore = (const datastore_t *)ctx;
 
     switch(event->event_id) {
         case SYSTEM_EVENT_STA_START:
@@ -50,20 +58,20 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             break;
         case SYSTEM_EVENT_STA_CONNECTED:
             ESP_LOGI(TAG, "WiFi connected");
-            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_CONNECTED);
+            datastore_set_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_CONNECTED);
             break;
         case SYSTEM_EVENT_STA_GOT_IP:
             ESP_LOGI(TAG, "WiFi got IP");
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
-            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_GOT_ADDRESS);
-            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_ADDRESS, 0, event->event_info.got_ip.ip_info.ip.addr);
+            datastore_set_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_GOT_ADDRESS);
+            datastore_set_uint32(datastore, RESOURCE_ID_WIFI_ADDRESS, 0, event->event_info.got_ip.ip_info.ip.addr);
             esp_mqtt_start(CONFIG_MQTT_BROKER_IP_ADDRESS, CONFIG_MQTT_BROKER_TCP_PORT, "esp-mqtt", "username", "password");
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             // This is a workaround as ESP32 WiFi libs don't currently auto-reassociate.
             ESP_LOGI(TAG, "WiFi disconnected");
-            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_DISCONNECTED);
-            datastore_set_uint32(g_datastore, RESOURCE_ID_WIFI_ADDRESS, 0, 0);
+            datastore_set_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_DISCONNECTED);
+            datastore_set_uint32(datastore, RESOURCE_ID_WIFI_ADDRESS, 0, 0);
             esp_mqtt_stop();
             esp_wifi_connect();
             xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
@@ -74,18 +82,18 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
     return ESP_OK;
 }
 
-static void wifi_conn_init(void)
+static void wifi_conn_init(const datastore_t * datastore)
 {
     tcpip_adapter_init();
     wifi_event_group = xEventGroupCreate();
-    ESP_ERROR_CHECK(esp_event_loop_init(wifi_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_loop_init(wifi_event_handler, datastore));
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
 
     wifi_config_t wifi_config = { 0 };
-    datastore_get_string(g_datastore, RESOURCE_ID_WIFI_SSID, 0, (char *)wifi_config.sta.ssid);
-    datastore_get_string(g_datastore, RESOURCE_ID_WIFI_PASSWORD, 0, (char *)wifi_config.sta.password);
+    datastore_get_string(datastore, RESOURCE_ID_WIFI_SSID, 0, (char *)wifi_config.sta.ssid);
+    datastore_get_string(datastore, RESOURCE_ID_WIFI_PASSWORD, 0, (char *)wifi_config.sta.password);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
@@ -97,6 +105,8 @@ static void wifi_monitor_task(void * pvParameter)
 {
     //assert(pvParameter);
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
+    task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
+    const datastore_t * datastore = task_inputs->datastore;
 
     bool new_info = true;
 
@@ -119,12 +129,12 @@ static void wifi_monitor_task(void * pvParameter)
                 ESP_LOGD(TAG, "RSSI %d", ap_info.rssi);
             }
 
-            datastore_set_int8(g_datastore, RESOURCE_ID_WIFI_RSSI, 0, ap_info.rssi);
+            datastore_set_int8(datastore, RESOURCE_ID_WIFI_RSSI, 0, ap_info.rssi);
         }
         else
         {
             new_info = true;
-            datastore_set_int8(g_datastore, RESOURCE_ID_WIFI_RSSI, 0, 0);
+            datastore_set_int8(datastore, RESOURCE_ID_WIFI_RSSI, 0, 0);
         }
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
@@ -132,11 +142,18 @@ static void wifi_monitor_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
-void wifi_support_init(UBaseType_t priority)
+void wifi_support_init(UBaseType_t priority, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
-    wifi_conn_init();
+    wifi_conn_init(datastore);
 
-    xTaskCreate(&wifi_monitor_task, "wifi_monitor_task", 4096, NULL, priority, NULL);
+    // task will take ownership of this struct
+    task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
+    if (task_inputs)
+    {
+        memset(task_inputs, 0, sizeof(*task_inputs));
+        task_inputs->datastore = datastore;
+        xTaskCreate(&wifi_monitor_task, "wifi_monitor_task", 4096, task_inputs, priority, NULL);
+    }
 }

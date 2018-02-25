@@ -57,8 +57,9 @@ typedef struct
     trie * trie;
 } private_t;
 
-// TODO: Singleton for now
+// TODO: Singletons for now
 static trie * g_trie = NULL;
+static datastore_t * g_datastore = NULL;
 
 typedef enum
 {
@@ -327,9 +328,12 @@ static mqtt_error_t _is_init(const mqtt_info_t * mqtt_info)
     return err;
 }
 
-mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
+mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
+
+    // TODO: add void * context to callbacks
+    g_datastore = datastore;
 
     mqtt_error_t err = MQTT_ERROR_UNKNOWN;
     if (mqtt_info != NULL)
@@ -339,7 +343,7 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info)
         {
             // sadly the esp_mqtt component only supports a single instance
             esp_mqtt_init(_status_callback, _message_callback, 256 /*buffer size*/, 2000 /*timeout*/);
-            datastore_set_uint32(g_datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_CONNECTING);
+            datastore_set_uint32(datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_CONNECTING);
             private->trie = trie_create();
 
             if (private->trie)

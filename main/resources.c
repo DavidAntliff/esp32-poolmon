@@ -32,8 +32,6 @@
 
 #define TAG "resources"
 
-datastore_t * g_datastore = NULL;
-
 #define ERROR_CHECK(x) do {                                                       \
         esp_err_t rc = (x);                                                       \
         if (rc != DATASTORE_STATUS_OK) {                                          \

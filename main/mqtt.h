@@ -26,6 +26,7 @@
 #define MQTT_H
 
 #include "esp_mqtt.h"
+#include "datastore/datastore.h"
 
 typedef enum
 {
@@ -53,7 +54,7 @@ typedef struct
 
 mqtt_info_t * mqtt_malloc(void);
 void mqtt_free(mqtt_info_t ** mqtt_info);
-mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info);
+mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info, const datastore_t * datastore);
 
 bool mqtt_publish(const char * topic, uint8_t * payload, size_t len, int qos, bool retained);
 

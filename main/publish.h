@@ -25,6 +25,8 @@
 #ifndef PUBLISH_H
 #define PUBLISH_H
 
+#include "mqtt.h"
+
 typedef enum
 {
     PUBLISH_VALUE_TEMP_1 = 0,           // Temperature sensor 1 - measurement in degrees Celsius
@@ -60,7 +62,7 @@ typedef struct
     float value;
 } published_value_t;
 
-QueueHandle_t publish_init(unsigned int queue_depth, UBaseType_t priority);
+QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority);
 
 void publish_value(publish_value_id_t value_id, float value, QueueHandle_t publish_queue);
 

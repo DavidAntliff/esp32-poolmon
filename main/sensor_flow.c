@@ -51,7 +51,7 @@ typedef struct
     float sampling_period;     // time (in seconds) between subsequent samples
     float sampling_window;     // sample window length (in seconds)
     uint16_t filter_length;    // counter filter length in APB cycles
-    QueueHandle_t publish_queue;
+    const datastore_t * datastore;
 } task_inputs_t;
 
 static void init_rmt(uint8_t tx_gpio, rmt_channel_t channel, uint8_t clk_div)
@@ -175,6 +175,7 @@ static void sensor_flow_task(void * pvParameter)
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
+    const datastore_t * datastore = task_inputs->datastore;
 
     init_rmt(task_inputs->rmt_gpio, task_inputs->rmt_channel, task_inputs->rmt_clk_div);
     init_pcnt(task_inputs->pcnt_gpio, task_inputs->rmt_gpio, task_inputs->pcnt_unit, task_inputs->pcnt_channel, task_inputs->filter_length);
@@ -210,11 +211,8 @@ static void sensor_flow_task(void * pvParameter)
         double frequency_hz = count / 2.0 / task_inputs->sampling_window;
         double rate_lpm = calc_flow_rate_lpm(frequency_hz);
 
-        publish_value(PUBLISH_VALUE_FLOW_FREQ, frequency_hz, task_inputs->publish_queue);
-        publish_value(PUBLISH_VALUE_FLOW_RATE, rate_lpm, task_inputs->publish_queue);
-
-        datastore_set_float(g_datastore, RESOURCE_ID_FLOW_FREQUENCY, 0, frequency_hz);
-        datastore_set_float(g_datastore, RESOURCE_ID_FLOW_RATE, 0, rate_lpm);
+        datastore_set_float(datastore, RESOURCE_ID_FLOW_FREQUENCY, 0, frequency_hz);
+        datastore_set_float(datastore, RESOURCE_ID_FLOW_RATE, 0, rate_lpm);
 
         ESP_LOGI(TAG, "counter %d, frequency %f Hz, rate %f LPM", count, frequency_hz, rate_lpm);
 
@@ -227,7 +225,7 @@ static void sensor_flow_task(void * pvParameter)
 
 void sensor_flow_init(uint8_t pcnt_gpio, pcnt_unit_t pcnt_unit, pcnt_channel_t pcnt_channel,
                       uint8_t rmt_gpio, rmt_channel_t rmt_channel, uint8_t rmt_clk_div,
-                      float sampling_period, float sampling_window, uint16_t filter_length, UBaseType_t priority, QueueHandle_t publish_queue)
+                      float sampling_period, float sampling_window, uint16_t filter_length, UBaseType_t priority, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
@@ -245,7 +243,7 @@ void sensor_flow_init(uint8_t pcnt_gpio, pcnt_unit_t pcnt_unit, pcnt_channel_t p
         task_inputs->sampling_period = sampling_period;
         task_inputs->sampling_window = sampling_window;
         task_inputs->filter_length = filter_length;
-        task_inputs->publish_queue = publish_queue;
+        task_inputs->datastore = datastore;
         xTaskCreate(&sensor_flow_task, "sensor_flow_task", 4096, task_inputs, priority, NULL);
     }
 }
