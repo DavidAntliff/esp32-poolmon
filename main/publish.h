@@ -32,7 +32,7 @@ typedef struct
     QueueHandle_t queue;
 } publish_context_t;
 
-QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority);
+QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority, const char * root_topic);
 
 // Called by datastore whenever a subscribed value is set
 void publish_callback(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context);

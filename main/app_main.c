@@ -53,6 +53,8 @@
 
 #define TAG "app_main"
 
+#define ROOT_TOPIC "poolmon"
+
 //TODO: LED task, to blink LED when required
 // - count number of connected devices
 // - indicate when sampling
@@ -239,6 +241,62 @@ void init_publish_subscriptions(const datastore_t * datastore, QueueHandle_t pub
     }
 }
 
+void init_mqtt_echo_subscriptions(mqtt_info_t * mqtt_info, const datastore_t * datastore)
+{
+    int * context_echo_bool = malloc(sizeof(*context_echo_bool)); *context_echo_bool = 1;
+    int * context_echo_uint8 = malloc(sizeof(*context_echo_uint8)); *context_echo_uint8 = 2;
+    int * context_echo_uint32 = malloc(sizeof(*context_echo_uint32)); *context_echo_uint32 = 3;
+    int * context_echo_int8 = malloc(sizeof(*context_echo_int8)); *context_echo_int8 = 4;
+    int * context_echo_int32 = malloc(sizeof(*context_echo_int32)); *context_echo_int32 = 5;
+    int * context_echo_float = malloc(sizeof(*context_echo_float)); *context_echo_float = 6;
+    int * context_echo_double = malloc(sizeof(*context_echo_double)); *context_echo_double = 7;
+    int * context_echo_string = malloc(sizeof(*context_echo_string)); *context_echo_string = 8;
+
+    // These will leak!
+
+    mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
+
+    if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/echo/bool", &echo_bool, &context_echo_bool)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_uint8(mqtt_info, ROOT_TOPIC"/echo/uint8", &echo_uint8, &context_echo_uint8)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_uint8 failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_uint32(mqtt_info, ROOT_TOPIC"/echo/uint32", &echo_uint32, &context_echo_uint32)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_uint32 failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_int8(mqtt_info, ROOT_TOPIC"/echo/int8", &echo_int8, &context_echo_int8)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_int8 failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_int32(mqtt_info, ROOT_TOPIC"/echo/int32", &echo_int32, &context_echo_int32)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_int32 failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_float(mqtt_info, ROOT_TOPIC"/echo/float", &echo_float, &context_echo_float)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_double(mqtt_info, ROOT_TOPIC"/echo/double", &echo_double, &context_echo_double)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_double failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_string(mqtt_info, ROOT_TOPIC"/echo/string", &echo_string, &context_echo_string)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
+    }
+}
+
 void app_main()
 {
     init_boot_time_reference();
@@ -271,11 +329,9 @@ void app_main()
 
     datastore_t * datastore = resources_init();
     resources_load(datastore);
-    datastore_dump(datastore);
 
     // Onboard LED
     led_init(CONFIG_ONBOARD_LED_GPIO);
-
 
     // I2C bus
     ESP_LOGW(TAG, "about to run i2c_master_init");
@@ -291,7 +347,6 @@ void app_main()
     _delay();
     display_init(i2c_master_info, display_priority, datastore);
 
-
     // It works best to find all connected devices before starting WiFi, otherwise it can be unreliable.
 
     // Temp sensors
@@ -306,7 +361,6 @@ void app_main()
     _delay();
     sensor_light_init(i2c_master_info, sensor_priority, datastore);
 
-
     // Flow Meter
     _delay();
     sensor_flow_init(CONFIG_FLOW_METER_PULSE_GPIO, FLOW_METER_PCNT_UNIT, FLOW_METER_PCNT_CHANNEL,
@@ -319,82 +373,34 @@ void app_main()
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
     if ((mqtt_error = mqtt_init(mqtt_info, datastore)) == MQTT_OK)
     {
-        // careful, stack variables!
-        int context_echo_bool = 1;
-        int context_echo_uint8 = 2;
-        int context_echo_uint32 = 3;
-        int context_echo_int8 = 4;
-        int context_echo_int32 = 5;
-        int context_echo_float = 6;
-        int context_echo_double = 7;
-        int context_echo_string = 8;
+        init_mqtt_echo_subscriptions(mqtt_info, datastore);
 
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/echo/bool", &echo_bool, &context_echo_bool)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/esp32/reset", &do_esp32_reset, &running)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
 
-        if ((mqtt_error = mqtt_register_topic_as_uint8(mqtt_info, "poolmon/echo/uint8", &echo_uint8, &context_echo_uint8)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_uint8 failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_uint32(mqtt_info, "poolmon/echo/uint32", &echo_uint32, &context_echo_uint32)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_uint32 failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_int8(mqtt_info, "poolmon/echo/int8", &echo_int8, &context_echo_int8)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_int8 failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_int32(mqtt_info, "poolmon/echo/int32", &echo_int32, &context_echo_int32)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_int32 failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_float(mqtt_info, "poolmon/echo/float", &echo_float, &context_echo_float)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_double(mqtt_info, "poolmon/echo/double", &echo_double, &context_echo_double)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_double failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_string(mqtt_info, "poolmon/echo/string", &echo_string, &context_echo_string)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/esp32/reset", &do_esp32_reset, &running)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/avr/reset", &do_avr_reset, NULL)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
 
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/avr/reset", &do_avr_reset, NULL)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/avr/cp", &do_avr_cp, NULL)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
 
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/avr/cp", &do_avr_cp, NULL)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/avr/pp", &do_avr_pp, NULL)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
 
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/avr/pp", &do_avr_pp, NULL)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/avr/alarm", &do_avr_alarm, NULL)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
 
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/avr/alarm", &do_avr_alarm, NULL)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, "poolmon/datastore/dump", &do_datastore_dump, (void *)datastore)) != MQTT_OK)
+        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/datastore/dump", &do_datastore_dump, (void *)datastore)) != MQTT_OK)
         {
             ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
         }
@@ -409,7 +415,7 @@ void app_main()
     wifi_support_init(wifi_monitor_priority, datastore);
 
     _delay();
-    QueueHandle_t publish_queue = publish_init(mqtt_info, PUBLISH_QUEUE_DEPTH, publish_priority);
+    QueueHandle_t publish_queue = publish_init(mqtt_info, PUBLISH_QUEUE_DEPTH, publish_priority, ROOT_TOPIC);
     init_publish_subscriptions(datastore, publish_queue);
 
     _delay();

@@ -39,9 +39,8 @@ typedef struct
 {
     mqtt_info_t * mqtt_info;
     QueueHandle_t publish_queue;
+    const char * root_topic;
 } task_inputs_t;
-
-#define ROOT_TOPIC "poolmon"
 
 typedef struct
 {
@@ -86,34 +85,44 @@ typedef struct
     datastore_instance_id_t instance_id;
 } publish_request_t;
 
-static void process_request(publish_request_t request)
+static void process_request(publish_request_t request, const char * root_topic)
 {
     ESP_LOGD(TAG, "Received request: id %d, name %s, instance %d", request.resource_id, datastore_get_name(request.datastore, request.resource_id), request.instance_id);
 
-    // TODO: check if MQTT is ready before attempting to send
-
-    // find the topic
-    bool found = false;
-    for (size_t i = 0; found == false && i < sizeof(values_info) / sizeof(values_info[0]); ++i)
+    // check if MQTT is ready before attempting to send
+    mqtt_status_t mqtt_status = MQTT_STATUS_DISCONNECTED;
+    if (datastore_get_uint32(request.datastore, RESOURCE_ID_MQTT_STATUS, 0, &mqtt_status) == DATASTORE_STATUS_OK)
     {
-        if (values_info[i].resource_id == request.resource_id \
-            && values_info[i].instance_id == request.instance_id)
+        if (mqtt_status == MQTT_STATUS_CONNECTED)
         {
-            // retrieve value as string
-            found = true;
-            char topic[64] = "";
-            char value_string[256] = "";
-            snprintf(topic, sizeof(topic) - 1, "%s/%s", ROOT_TOPIC, values_info[i].topic);
-            datastore_get_as_string(request.datastore, request.resource_id, request.instance_id, value_string, sizeof(value_string));
-            size_t value_size = strlen(value_string);
-            ESP_LOGD(TAG, "Topic %s, value \"%s\" [%d bytes]", topic, value_string, value_size);
-            mqtt_publish(topic, (uint8_t *)value_string, strlen(value_string) + 1, 0, false);
-        }
-    }
+            // find the topic
+            bool found = false;
+            for (size_t i = 0; found == false && i < sizeof(values_info) / sizeof(values_info[0]); ++i)
+            {
+                if (values_info[i].resource_id == request.resource_id \
+                    && values_info[i].instance_id == request.instance_id)
+                {
+                    // retrieve value as string
+                    found = true;
+                    char topic[64] = "";
+                    char value_string[256] = "";
+                    snprintf(topic, sizeof(topic) - 1, "%s/%s", root_topic, values_info[i].topic);
+                    datastore_get_as_string(request.datastore, request.resource_id, request.instance_id, value_string, sizeof(value_string));
+                    size_t value_size = strlen(value_string);
+                    ESP_LOGD(TAG, "Topic %s, value \"%s\" [%d bytes]", topic, value_string, value_size);
+                    mqtt_publish(topic, (uint8_t *)value_string, strlen(value_string) + 1, 0, false);
+                }
+            }
 
-    if (found == false)
-    {
-        ESP_LOGW(TAG, "Request id %d, name %s, instance %d not published", request.resource_id, datastore_get_name(request.datastore, request.resource_id), request.instance_id);
+            if (found == false)
+            {
+                ESP_LOGW(TAG, "Request id %d, name %s, instance %d not published", request.resource_id, datastore_get_name(request.datastore, request.resource_id), request.instance_id);
+            }
+        }
+        else
+        {
+            ESP_LOGW(TAG, "MQTT not connected - discarding request");
+        }
     }
 }
 
@@ -125,6 +134,7 @@ static void publish_task(void * pvParameter)
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     QueueHandle_t publish_queue = task_inputs->publish_queue;
     //mqtt_info_t * mqtt_info = task_inputs->mqtt_info;
+    const char * root_topic = task_inputs->root_topic;
 
     while (1)
     {
@@ -132,7 +142,7 @@ static void publish_task(void * pvParameter)
         BaseType_t sensor_queue_status = xQueueReceive(publish_queue, &request, portMAX_DELAY);
         if (sensor_queue_status == pdPASS)
         {
-            process_request(request);
+            process_request(request, root_topic);
         }
         else
         {
@@ -165,7 +175,7 @@ void publish_callback(const datastore_t * datastore, datastore_resource_id_t id,
     }
 }
 
-QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority)
+QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority, const char * root_topic)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
@@ -180,6 +190,7 @@ QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UB
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->mqtt_info = mqtt_info;
         task_inputs->publish_queue = publish_queue;
+        task_inputs->root_topic = root_topic;
         xTaskCreate(&publish_task, "publish_task", 4096, task_inputs, priority, NULL);
     }
 
