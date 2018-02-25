@@ -203,6 +203,42 @@ static void avr_test_sequence(void)
     state = (state + 1) % 7;
 }
 
+void init_publish_subscriptions(const datastore_t * datastore, QueueHandle_t publish_queue)
+{
+    if (datastore)
+    {
+        publish_context_t * publish_context = malloc(sizeof(*publish_context));
+        memset(publish_context, 0, sizeof(*publish_context));
+        publish_context->queue = publish_queue;
+        // TODO: Who will free this later?
+
+        resource_id_t resources[] = {
+            RESOURCE_ID_TEMP_VALUE,
+            RESOURCE_ID_LIGHT_FULL,
+            RESOURCE_ID_LIGHT_VISIBLE,
+            RESOURCE_ID_LIGHT_INFRARED,
+            RESOURCE_ID_LIGHT_ILLUMINANCE,
+            RESOURCE_ID_FLOW_FREQUENCY,
+            RESOURCE_ID_FLOW_RATE,
+            RESOURCE_ID_SWITCHES_CP_MODE_VALUE,
+            RESOURCE_ID_SWITCHES_CP_MAN_VALUE,
+            RESOURCE_ID_SWITCHES_PP_MODE_VALUE,
+            RESOURCE_ID_SWITCHES_PP_MAN_VALUE,
+            RESOURCE_ID_PUMPS_CP_STATE,
+            RESOURCE_ID_PUMPS_PP_STATE,
+        };
+
+        for (size_t i = 0; i < sizeof(resources) / sizeof(resources[0]); ++i)
+        {
+            datastore_status_t status;
+            if ((status = datastore_add_set_callback(datastore, resources[i], publish_callback, publish_context)) != DATASTORE_STATUS_OK)
+            {
+                ESP_LOGE(TAG, "datastore_add_set_callback for resource %d failed: %d", resources[i], status);
+            }
+        }
+    }
+}
+
 void app_main()
 {
     init_boot_time_reference();
@@ -215,6 +251,7 @@ void app_main()
     esp_log_level_set("wifi_support", ESP_LOG_INFO);
     esp_log_level_set("datastore", ESP_LOG_INFO);
     esp_log_level_set("mqtt", ESP_LOG_INFO);
+    esp_log_level_set("publish", ESP_LOG_DEBUG);
 //    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
 
@@ -373,6 +410,7 @@ void app_main()
 
     _delay();
     QueueHandle_t publish_queue = publish_init(mqtt_info, PUBLISH_QUEUE_DEPTH, publish_priority);
+    init_publish_subscriptions(datastore, publish_queue);
 
     _delay();
     power_init(sensor_priority, datastore);

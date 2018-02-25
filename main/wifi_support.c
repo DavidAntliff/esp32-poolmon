@@ -86,14 +86,14 @@ static void wifi_conn_init(const datastore_t * datastore)
 {
     tcpip_adapter_init();
     wifi_event_group = xEventGroupCreate();
-    ESP_ERROR_CHECK(esp_event_loop_init(wifi_event_handler, datastore));
+    ESP_ERROR_CHECK(esp_event_loop_init(wifi_event_handler, (void *)datastore));
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
 
     wifi_config_t wifi_config = { 0 };
-    datastore_get_string(datastore, RESOURCE_ID_WIFI_SSID, 0, (char *)wifi_config.sta.ssid);
-    datastore_get_string(datastore, RESOURCE_ID_WIFI_PASSWORD, 0, (char *)wifi_config.sta.password);
+    datastore_get_string(datastore, RESOURCE_ID_WIFI_SSID, 0, (char *)wifi_config.sta.ssid, sizeof(wifi_config.sta.ssid));
+    datastore_get_string(datastore, RESOURCE_ID_WIFI_PASSWORD, 0, (char *)wifi_config.sta.password, sizeof(wifi_config.sta.password));
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));

@@ -267,8 +267,8 @@ static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * stat
 
     char version[SYSTEM_LEN_VERSION] = "";
     char build_date_time[SYSTEM_LEN_BUILD_DATE_TIME] = "";
-    datastore_get_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, version);
-    datastore_get_string(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, 0, build_date_time);
+    datastore_get_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, version, sizeof(version));
+    datastore_get_string(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, 0, build_date_time, sizeof(build_date_time));
 
     char line[ROW_STRING_WIDTH] = "";
     snprintf(line, ROW_STRING_WIDTH, "PoolControl v%s", version);
@@ -282,7 +282,7 @@ static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * stat
     *activity = !(*activity);
 }
 
-static void _get_temp_sensor(const datastore_t * store, datastore_instance_id_t instance, float * value, char * label, uint32_t * timestamp, const datastore_t * datastore)
+static void _get_temp_sensor(const datastore_t * store, datastore_instance_id_t instance, float * value, char * label, size_t label_size, uint32_t * timestamp, const datastore_t * datastore)
 {
     assert(value);
     assert(label);
@@ -291,7 +291,7 @@ static void _get_temp_sensor(const datastore_t * store, datastore_instance_id_t 
     label[0] = '\0';
     *timestamp = 0;
     datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, instance, value);
-    datastore_get_string(datastore, RESOURCE_ID_TEMP_LABEL, instance, label);
+    datastore_get_string(datastore, RESOURCE_ID_TEMP_LABEL, instance, label, label_size);
     datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, instance, timestamp);
 }
 
@@ -301,7 +301,7 @@ static void _render_temp_line(char * line, unsigned int len, datastore_instance_
     char label[SENSOR_TEMP_LEN_LABEL] = "";
     uint32_t timestamp = 0;
 
-    _get_temp_sensor(datastore, instance, &value, label, &timestamp, datastore);
+    _get_temp_sensor(datastore, instance, &value, label, sizeof(label), &timestamp, datastore);
     if (now - timestamp < MEASUREMENT_EXPIRY)
     {
         snprintf(line, ROW_STRING_WIDTH, "T%d %-7s %4.1f"DEGREES_C, instance + 1, label, value);
@@ -524,7 +524,7 @@ static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void *
     char ssid[WIFI_LEN_SSID] = "";
     int8_t rssi = 0;
 
-    datastore_get_string(datastore, RESOURCE_ID_WIFI_SSID, 0, ssid);
+    datastore_get_string(datastore, RESOURCE_ID_WIFI_SSID, 0, ssid, sizeof(ssid));
     datastore_get_int8(datastore, RESOURCE_ID_WIFI_RSSI, 0, &rssi);
 
     // truncate ssid at 7 characters
@@ -617,7 +617,7 @@ static void _handle_page_mqtt_status_2(const i2c_lcd1602_info_t * lcd_info, void
 {
     char broker_address[MQTT_LEN_BROKER_ADDRESS] = "";
     uint32_t broker_port = 0;
-    datastore_get_string(datastore, RESOURCE_ID_MQTT_BROKER_ADDRESS, 0, broker_address);
+    datastore_get_string(datastore, RESOURCE_ID_MQTT_BROKER_ADDRESS, 0, broker_address, sizeof(broker_address));
     datastore_get_uint32(datastore, RESOURCE_ID_MQTT_BROKER_PORT, 0, &broker_port);
 
     char line[ROW_STRING_WIDTH] = "";
@@ -695,7 +695,7 @@ static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void 
     if (*page_state < 8)
     {
         char version[SYSTEM_LEN_VERSION] = "";
-        datastore_get_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, version);
+        datastore_get_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, version, SYSTEM_LEN_VERSION);
 
         snprintf(line, ROW_STRING_WIDTH, "ESP32 v%3s      ", version);
         I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));

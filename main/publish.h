@@ -27,43 +27,14 @@
 
 #include "mqtt.h"
 
-typedef enum
-{
-    PUBLISH_VALUE_TEMP_1 = 0,           // Temperature sensor 1 - measurement in degrees Celsius
-    PUBLISH_VALUE_TEMP_2,               // Temperature sensor 2 - measurement in degrees Celsius
-    PUBLISH_VALUE_TEMP_3,               // Temperature sensor 3 - measurement in degrees Celsius
-    PUBLISH_VALUE_TEMP_4,               // Temperature sensor 4 - measurement in degrees Celsius
-    PUBLISH_VALUE_TEMP_5,               // Temperature sensor 5 - measurement in degrees Celsius
-
-    PUBLISH_VALUE_LIGHT_FULL_SPECTRUM,  // Ambient Light sensor - full spectrum measurement
-    PUBLISH_VALUE_LIGHT_VISIBLE,        // Ambient Light sensor - visible light measurement
-    PUBLISH_VALUE_LIGHT_INFRARED,       // Ambient Light sensor - infrared light measurement
-    PUBLISH_VALUE_LIGHT_LUX,            // Ambient Light sensor - lux calculation
-
-    PUBLISH_VALUE_FLOW_FREQ,            // Flow meter frequency measurement - Hz
-    PUBLISH_VALUE_FLOW_RATE,            // Flow meter flow rate calculation (litres per minute)
-
-    PUBLISH_VALUE_SWITCH_1,             // Control panel switch 1 (CP Mode) state
-    PUBLISH_VALUE_SWITCH_2,             // Control panel switch 2 (CP Manual) state
-    PUBLISH_VALUE_SWITCH_3,             // Control panel switch 3 (PP Mode) state
-    PUBLISH_VALUE_SWITCH_4,             // Control panel switch 4 (PP Manual) state
-
-    PUBLISH_VALUE_SSR_1,                // Solid State Relay 1 state
-    PUBLISH_VALUE_SSR_2,                // Solid State Relay 2 state
-
-    PUBLISH_VALUE_ALARM,                // Alarm (buzzer) state
-
-    PUBLISH_VALUE_LAST,
-} publish_value_id_t;
-
 typedef struct
 {
-    publish_value_id_t id;
-    float value;
-} published_value_t;
+    QueueHandle_t queue;
+} publish_context_t;
 
 QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority);
 
-void publish_value(publish_value_id_t value_id, float value, QueueHandle_t publish_queue);
+// Called by datastore whenever a subscribed value is set
+void publish_callback(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context);
 
 #endif // PUBLISH_H
