@@ -91,7 +91,6 @@ static void read_temperatures(DS18B20_Info ** device_infos, float * readings, DS
 static int find_owb_rom_codes(const OneWireBus * owb, OneWireBus_ROMCode * rom_codes, int max_codes)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
-
     int num_devices = 0;
     OneWireBus_SearchState search_state = {0};
     bool found = false;
@@ -116,7 +115,6 @@ static void associate_ds18b20_devices(const OneWireBus * owb,
                                       int num_devices)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
-
     for (int i = 0; i < num_devices; ++i)
     {
         DS18B20_Info * ds18b20_info = ds18b20_malloc();
@@ -139,7 +137,6 @@ static void associate_ds18b20_devices(const OneWireBus * owb,
 static temp_sensors_t * detect_sensors(uint8_t gpio)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
-
     // set up the One Wire Bus
     OneWireBus * owb = NULL;
     temp_sensors_t * sensors = NULL;
@@ -191,6 +188,7 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
 
 static void sensor_temp_task(void * pvParameter)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
     assert(pvParameter);
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
@@ -254,9 +252,25 @@ static void sensor_temp_task(void * pvParameter)
 temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
-
     // Assume that new devices are not connected during operation.
     temp_sensors_t * sensors = detect_sensors(gpio);
+
+    // TODO: separate "Detected Sensor ROM Codes" from "Assignments" - instead, assignments
+    // should be made by the user (via a list of detected devices) and stored in NV.
+
+    // set ROM code assignments
+    for (size_t i = 0; i < sensors->num_ds18b20s; ++i)
+    {
+        // render device ID (LSB first) as sixteen hex digits
+        char rom_code[2 * sizeof(OneWireBus_ROMCode) + 1] = "";
+        for (size_t j = 0; j < sizeof(OneWireBus_ROMCode); ++j)
+        {
+            char byte[3] = "";
+            snprintf(byte, 3, "%02x", sensors->ds18b20_infos[i]->rom_code.bytes[sizeof(OneWireBus_ROMCode) - j - 1]);
+            strcat(rom_code, byte);
+        }
+        datastore_set_string(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i, rom_code);
+    }
 
     // Blink the LED to indicate the number of temperature devices detected:
     led_flash(100, 200, sensors->num_ds18b20s);
@@ -276,7 +290,6 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const data
 void sensor_temp_close(temp_sensors_t * sensors)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
-
     if (sensors != NULL)
     {
         // clean up dynamically allocated data

@@ -32,17 +32,9 @@
 
 typedef struct _temp_sensors_t temp_sensors_t;
 
-#define SENSOR_TEMP_INSTANCES 5
-#define SENSOR_TEMP_LEN_LABEL 8
-
-typedef enum
-{
-    SENSOR_TEMP_ASSIGNMENT_T1 = 0,
-    SENSOR_TEMP_ASSIGNMENT_T2,
-    SENSOR_TEMP_ASSIGNMENT_T3,
-    SENSOR_TEMP_ASSIGNMENT_T4,
-    SENSOR_TEMP_ASSIGNMENT_T5,
-} datastore_temp_assignment_t;
+#define SENSOR_TEMP_INSTANCES      5
+#define SENSOR_TEMP_LEN_LABEL      (7 + 1)
+#define SENSOR_TEMP_LEN_ASSIGNMENT (16+1)
 
 temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const datastore_t * datastore);
 void sensor_temp_close(temp_sensors_t * sensors);

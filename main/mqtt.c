@@ -59,7 +59,7 @@ typedef struct
 
 // TODO: Singletons for now
 static trie * g_trie = NULL;
-static datastore_t * g_datastore = NULL;
+static const datastore_t * g_datastore = NULL;
 
 typedef enum
 {
@@ -357,6 +357,31 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info, const datastore_t * datastore)
                 ESP_LOGE(TAG, "unable to create trie");
                 err = MQTT_ERROR_NULL_POINTER;
             }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "mqtt_info->private is NULL");
+            err = MQTT_ERROR_NULL_POINTER;
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "mqtt_info is NULL");
+        err = MQTT_ERROR_NULL_POINTER;
+    }
+    return err;
+}
+
+mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info)
+{
+    mqtt_error_t err = MQTT_ERROR_UNKNOWN;
+    if (mqtt_info != NULL)
+    {
+        private_t * private = (private_t *)mqtt_info->private;
+        if (private != NULL)
+        {
+            esp_mqtt_init(_status_callback, _message_callback, 256 /*buffer size*/, 2000 /*timeout*/);
+            err = MQTT_OK;
         }
         else
         {

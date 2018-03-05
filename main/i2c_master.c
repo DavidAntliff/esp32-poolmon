@@ -51,12 +51,7 @@ i2c_master_info_t * i2c_master_init(i2c_port_t i2c_port, gpio_num_t sda_io_num, 
         info->config.scl_pullup_en = GPIO_PULLUP_DISABLE;  // use external pullups
         info->config.master.clk_speed = clk_speed;         // Hz
 
-        ESP_LOGW(TAG, "about to run i2c_param_config");
-
         ESP_ERROR_CHECK(i2c_param_config(i2c_port, &info->config));
-
-        ESP_LOGW(TAG, "about to run i2c_driver_install");
-
         ESP_ERROR_CHECK(i2c_driver_install(i2c_port, info->config.mode,
                                            I2C_MASTER_RX_BUF_LEN,
                                            I2C_MASTER_TX_BUF_LEN, 0));
@@ -99,13 +94,13 @@ int i2c_master_scan(const i2c_master_info_t * info)
 
 void i2c_master_close(i2c_master_info_t * info)
 {
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
     free(info);
 }
 
 bool i2c_master_lock(const i2c_master_info_t * info, TickType_t ticks_to_wait)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
-
     bool result = false;
     if (info)
     {
@@ -120,7 +115,6 @@ bool i2c_master_lock(const i2c_master_info_t * info, TickType_t ticks_to_wait)
 void i2c_master_unlock(const i2c_master_info_t * info)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
-
     if (info)
     {
         xSemaphoreGive(info->semaphore);

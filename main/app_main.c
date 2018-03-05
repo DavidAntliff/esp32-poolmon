@@ -108,6 +108,18 @@ static void do_datastore_dump(const char * topic, bool value, void * context)
     }
 }
 
+static void do_sensors_temp_label(const char * topic, const char * value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    uint32_t instance = 0;
+    sscanf(topic, ROOT_TOPIC"/sensors/temp/%u/label", &instance);
+    ESP_LOGD(TAG, "instance %u, value %s", instance, value);
+    if (instance > 0 && instance <= SENSOR_TEMP_INSTANCES)
+    {
+        datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, instance - 1, value);
+    }
+}
+
 static void echo_bool(const char * topic, bool value, void * context)
 {
     int ctxt_val = *(int *)context;
@@ -205,15 +217,10 @@ static void avr_test_sequence(void)
     state = (state + 1) % 7;
 }
 
-void init_publish_subscriptions(const datastore_t * datastore, QueueHandle_t publish_queue)
+void init_publish_subscriptions(const datastore_t * datastore, publish_context_t * publish_context)
 {
     if (datastore)
     {
-        publish_context_t * publish_context = malloc(sizeof(*publish_context));
-        memset(publish_context, 0, sizeof(*publish_context));
-        publish_context->queue = publish_queue;
-        // TODO: Who will free this later?
-
         resource_id_t resources[] = {
             RESOURCE_ID_TEMP_VALUE,
             RESOURCE_ID_LIGHT_FULL,
@@ -301,46 +308,76 @@ typedef struct
     mqtt_info_t * mqtt_info;
     bool * running;
     datastore_t * datastore;
+    publish_context_t * publish_context;
 } globals_t;
 
 void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context)
 {
-    ESP_LOGE(TAG, "mqtt_status_callback");
+    ESP_LOGD(TAG, "mqtt_status_callback");
     globals_t * globals = (globals_t *)context;
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
 
-    init_mqtt_echo_subscriptions(globals->mqtt_info, datastore);
-
-    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/esp32/reset", &do_esp32_reset, (void *)globals->running)) != MQTT_OK)
+    mqtt_status_t mqtt_status = 0;
+    if (datastore_get_uint32(globals->datastore, RESOURCE_ID_MQTT_STATUS, 0, &mqtt_status) != DATASTORE_STATUS_OK)
     {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+        ESP_LOGE(TAG, "datastore get error");
     }
-
-    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/reset", &do_avr_reset, NULL)) != MQTT_OK)
+    else
     {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-    }
+        if (mqtt_status == MQTT_STATUS_CONNECTED)
+        {
+            // send some useful data
+            publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_WIFI_ADDRESS, 0);
+            for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
+            {
+                publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i);
+            }
 
-    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/cp", &do_avr_cp, NULL)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-    }
+            // subscribe to some topics
+            init_mqtt_echo_subscriptions(globals->mqtt_info, datastore);
 
-    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/pp", &do_avr_pp, NULL)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-    }
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/esp32/reset", &do_esp32_reset, (void *)globals->running)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
 
-    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/alarm", &do_avr_alarm, NULL)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-    }
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/reset", &do_avr_reset, NULL)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
 
-    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/datastore/dump", &do_datastore_dump, (void *)globals->datastore)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-    }
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/cp", &do_avr_cp, NULL)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
 
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/pp", &do_avr_pp, NULL)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/alarm", &do_avr_alarm, NULL)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/datastore/dump", &do_datastore_dump, (void *)globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
+
+            // temp sensor labels and device assignments
+            for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
+            {
+                char topic[64] = "";
+                snprintf(topic, 64, ROOT_TOPIC"/sensors/temp/%d/label", i + 1);
+                if ((mqtt_error = mqtt_register_topic_as_string(globals->mqtt_info, topic, &do_sensors_temp_label, globals->datastore)) != MQTT_OK)
+                {
+                    ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+                }
+            }
+        }
+    }
 }
 
 
@@ -418,23 +455,8 @@ void app_main()
 
     mqtt_info_t * mqtt_info = mqtt_malloc();
 
-    // be careful of the scope on this
-    globals_t globals = {
-        .mqtt_info = mqtt_info,
-        .running = &running,
-        .datastore = datastore,
-    };
-
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
-    if ((mqtt_error = mqtt_init(mqtt_info, datastore)) == MQTT_OK)
-    {
-        datastore_status_t status = datastore_add_set_callback(datastore, RESOURCE_ID_MQTT_STATUS, mqtt_status_callback, &globals);
-        if (status != DATASTORE_STATUS_OK)
-        {
-            ESP_LOGE(TAG, "datastore_add_set_callback for resource %d failed: %d", RESOURCE_ID_MQTT_STATUS, status);
-        }
-    }
-    else
+    if ((mqtt_error = mqtt_init(mqtt_info, datastore)) != MQTT_OK)
     {
         ESP_LOGE(TAG, "mqtt_init failed: %d", mqtt_error);
     }
@@ -444,8 +466,8 @@ void app_main()
     wifi_support_init(wifi_monitor_priority, datastore);
 
     _delay();
-    QueueHandle_t publish_queue = publish_init(mqtt_info, PUBLISH_QUEUE_DEPTH, publish_priority, ROOT_TOPIC);
-    init_publish_subscriptions(datastore, publish_queue);
+    publish_context_t * publish_context = publish_init(mqtt_info, PUBLISH_QUEUE_DEPTH, publish_priority, ROOT_TOPIC);
+    init_publish_subscriptions(datastore, publish_context);
 
     _delay();
     power_init(sensor_priority, datastore);
@@ -454,6 +476,22 @@ void app_main()
     datastore_dump(datastore);
 
     TickType_t last_wake_time = xTaskGetTickCount();
+
+    // be careful of the scope on this
+    globals_t globals = {
+        .mqtt_info = mqtt_info,
+        .running = &running,
+        .datastore = datastore,
+        .publish_context = publish_context,
+    };
+
+    datastore_status_t status = datastore_add_set_callback(datastore, RESOURCE_ID_MQTT_STATUS, mqtt_status_callback, &globals);
+    if (status != DATASTORE_STATUS_OK)
+    {
+        ESP_LOGE(TAG, "datastore_add_set_callback for resource %d failed: %d", RESOURCE_ID_MQTT_STATUS, status);
+    }
+
+    mqtt_start(mqtt_info);
 
     while (running)
     {
@@ -477,6 +515,7 @@ void app_main()
 //    sensor_temp_close(temp_sensors);
 //    i2c_master_close(i2c_master_info);
     datastore_free(&datastore);
+    publish_free(&publish_context);
 
     ESP_LOGE(TAG, "Restarting...");
     vTaskDelay(1000 / portTICK_RATE_MS);

@@ -42,38 +42,63 @@ typedef struct
     const char * root_topic;
 } task_inputs_t;
 
+typedef void (*value_renderer)(const datastore_t * datastore, datastore_resource_id_t resource_id, datastore_instance_id_t instance_id, char * buffer, size_t buffer_size);
+
 typedef struct
 {
     datastore_resource_id_t resource_id;
     datastore_instance_id_t instance_id;
     const char * topic;
+    value_renderer renderer;
 } value_info_t;
+
+static void _as_string(const datastore_t * datastore, datastore_resource_id_t resource_id, datastore_instance_id_t instance_id, char * buffer, size_t buffer_size)
+{
+    datastore_get_as_string(datastore, resource_id, instance_id, buffer, buffer_size);
+}
+
+static void _as_ipv4_address(const datastore_t * datastore, datastore_resource_id_t resource_id, datastore_instance_id_t instance_id, char * buffer, size_t buffer_size)
+{
+    uint32_t ipv4_address = 0;
+    datastore_get_uint32(datastore, resource_id, instance_id, &ipv4_address);
+    snprintf(buffer, buffer_size, "%d.%d.%d.%d",
+             (ipv4_address & 0xff),
+             (ipv4_address & 0xff00) >> 8,
+             (ipv4_address & 0xff0000) >> 16,
+             (ipv4_address & 0xff000000) >> 24);
+}
 
 static const value_info_t values_info[] =
 {
-    { RESOURCE_ID_TEMP_VALUE, 0, "sensors/temp/1/value", },
-    { RESOURCE_ID_TEMP_VALUE, 1, "sensors/temp/2/value", },
-    { RESOURCE_ID_TEMP_VALUE, 2, "sensors/temp/3/value", },
-    { RESOURCE_ID_TEMP_VALUE, 3, "sensors/temp/4/value", },
-    { RESOURCE_ID_TEMP_VALUE, 4, "sensors/temp/5/value", },
+    { RESOURCE_ID_TEMP_VALUE, 0, "sensors/temp/1/value", _as_string },
+    { RESOURCE_ID_TEMP_VALUE, 1, "sensors/temp/2/value", _as_string },
+    { RESOURCE_ID_TEMP_VALUE, 2, "sensors/temp/3/value", _as_string },
+    { RESOURCE_ID_TEMP_VALUE, 3, "sensors/temp/4/value", _as_string },
+    { RESOURCE_ID_TEMP_VALUE, 4, "sensors/temp/5/value", _as_string },
 
-    { RESOURCE_ID_LIGHT_FULL,        0, "sensors/light/1/full_spectrum", },
-    { RESOURCE_ID_LIGHT_VISIBLE,     0, "sensors/light/1/visible", },
-    { RESOURCE_ID_LIGHT_INFRARED,    0, "sensors/light/1/infrared", },
-    { RESOURCE_ID_LIGHT_ILLUMINANCE, 0, "sensors/light/1/lux", },
+    { RESOURCE_ID_TEMP_ASSIGNMENT, 0, "sensors/temp/1/assignment", _as_string },
+    { RESOURCE_ID_TEMP_ASSIGNMENT, 1, "sensors/temp/2/assignment", _as_string },
+    { RESOURCE_ID_TEMP_ASSIGNMENT, 2, "sensors/temp/3/assignment", _as_string },
+    { RESOURCE_ID_TEMP_ASSIGNMENT, 3, "sensors/temp/4/assignment", _as_string },
+    { RESOURCE_ID_TEMP_ASSIGNMENT, 4, "sensors/temp/5/assignment", _as_string },
 
-    { RESOURCE_ID_FLOW_FREQUENCY, 0, "sensors/flow/1/freq", },
-    { RESOURCE_ID_FLOW_RATE,      0, "sensors/flow/1/rate", },
+    { RESOURCE_ID_LIGHT_FULL,        0, "sensors/light/1/full_spectrum", _as_string },
+    { RESOURCE_ID_LIGHT_VISIBLE,     0, "sensors/light/1/visible",       _as_string },
+    { RESOURCE_ID_LIGHT_INFRARED,    0, "sensors/light/1/infrared",      _as_string },
+    { RESOURCE_ID_LIGHT_ILLUMINANCE, 0, "sensors/light/1/lux",           _as_string },
 
-    { RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, "switches/cp/mode", },
-    { RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, "switches/cp/manual", },
-    { RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, "switches/pp/mode", },
-    { RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, "switches/pp/manual", },
+    { RESOURCE_ID_FLOW_FREQUENCY, 0, "sensors/flow/1/freq", _as_string },
+    { RESOURCE_ID_FLOW_RATE,      0, "sensors/flow/1/rate", _as_string },
 
-    { RESOURCE_ID_PUMPS_CP_STATE, 0, "pumps/cp/state", },
-    { RESOURCE_ID_PUMPS_PP_STATE, 0, "pumps/pp/state", },
+    { RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, "switches/cp/mode",   _as_string },
+    { RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, "switches/cp/manual", _as_string },
+    { RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, "switches/pp/mode",   _as_string },
+    { RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, "switches/pp/manual", _as_string },
 
-//    { RESOURCE_ID_WIFI_ADDRESS, 0, "wifi/address", },   // set before MQTT is ready
+    { RESOURCE_ID_PUMPS_CP_STATE, 0, "pumps/cp/state", _as_string },
+    { RESOURCE_ID_PUMPS_PP_STATE, 0, "pumps/pp/state", _as_string },
+
+    { RESOURCE_ID_WIFI_ADDRESS, 0, "wifi/address", _as_ipv4_address },
 
 //    { RESOURCE_ID_ALARM_STATE, 0, "alarms/1/state", },
 };
@@ -99,7 +124,7 @@ static void process_request(publish_request_t request, const char * root_topic)
             bool found = false;
             for (size_t i = 0; found == false && i < sizeof(values_info) / sizeof(values_info[0]); ++i)
             {
-                if (values_info[i].resource_id == request.resource_id \
+                if (values_info[i].resource_id == request.resource_id
                     && values_info[i].instance_id == request.instance_id)
                 {
                     // retrieve value as string
@@ -107,10 +132,18 @@ static void process_request(publish_request_t request, const char * root_topic)
                     char topic[64] = "";
                     char value_string[256] = "";
                     snprintf(topic, sizeof(topic) - 1, "%s/%s", root_topic, values_info[i].topic);
-                    datastore_get_as_string(request.datastore, request.resource_id, request.instance_id, value_string, sizeof(value_string));
-                    size_t value_size = strlen(value_string);
-                    ESP_LOGD(TAG, "Topic %s, value \"%s\" [%d bytes]", topic, value_string, value_size);
-                    mqtt_publish(topic, (uint8_t *)value_string, strlen(value_string) + 1, 0, false);
+                    if (values_info[i].renderer != NULL)
+                    {
+                        values_info[i].renderer(request.datastore, request.resource_id, request.instance_id, value_string, sizeof(value_string));
+                        //datastore_get_as_string(request.datastore, request.resource_id, request.instance_id, value_string, sizeof(value_string));
+                        size_t value_size = strlen(value_string);
+                        ESP_LOGD(TAG, "Topic %s, value \"%s\" [%d bytes]", topic, value_string, value_size);
+                        mqtt_publish(topic, (uint8_t *)value_string, strlen(value_string) + 1, 0, false);
+                    }
+                    else
+                    {
+                        ESP_LOGE(TAG, "No value renderer for ID %d\n", request.resource_id);
+                    }
                 }
             }
 
@@ -153,29 +186,41 @@ static void publish_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
-void publish_callback(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context)
+void publish_resource(publish_context_t * publish_context, const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance)
 {
     // push the datastore ID and instance to the queue so that the task can send an MQTT update
-    ESP_LOGD(TAG, "publish_callback: datastore %p, resource id %d, instance id %d, context %p", datastore, id, instance, context);
-    publish_context_t * publish_context = (publish_context_t *)context;
-    QueueHandle_t publish_queue = publish_context->queue;
-
-    if (datastore != NULL)
+    ESP_LOGD(TAG, "publish_resource: context %p, datastore %p, resource id %d, instance id %d", publish_context, datastore, id, instance);
+    if (publish_context != NULL)
     {
-        publish_request_t request = {
-            .datastore = datastore,
-            .resource_id = id,
-            .instance_id = instance,
-        };
-        BaseType_t status = xQueueSendToBack(publish_queue, &request, 0);
-        if (status != pdPASS)
+        QueueHandle_t publish_queue = publish_context->queue;
+        if (datastore != NULL)
         {
-            ESP_LOGE(TAG, "Could not send to queue");
+            publish_request_t request = {
+                .datastore = datastore,
+                .resource_id = id,
+                .instance_id = instance,
+            };
+            BaseType_t status = xQueueSendToBack(publish_queue, &request, 0);
+            if (status != pdPASS)
+            {
+                ESP_LOGE(TAG, "Could not send to queue");
+            }
         }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "publish_context is NULL");
     }
 }
 
-QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority, const char * root_topic)
+void publish_callback(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context)
+{
+    ESP_LOGD(TAG, "publish_callback: datastore %p, resource id %d, instance id %d, context %p", datastore, id, instance, context);
+    publish_context_t * publish_context = (publish_context_t *)context;
+    publish_resource(publish_context, datastore, id, instance);
+}
+
+publish_context_t * publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority, const char * root_topic)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
@@ -194,7 +239,22 @@ QueueHandle_t publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UB
         xTaskCreate(&publish_task, "publish_task", 4096, task_inputs, priority, NULL);
     }
 
-    return publish_queue;
+    publish_context_t * publish_context = malloc(sizeof(*publish_context));
+    if (publish_context != NULL)
+    {
+        memset(publish_context, 0, sizeof(*publish_context));
+        publish_context->queue = publish_queue;
+    }
+
+    return publish_context;
 }
 
+void publish_free(publish_context_t ** publish_context)
+{
+    if (publish_context != NULL && (*publish_context != NULL))
+    {
+        free(*publish_context);
+        *publish_context = NULL;
+    }
+}
 
