@@ -243,6 +243,7 @@ void init_publish_subscriptions(const datastore_t * datastore, QueueHandle_t pub
 
 void init_mqtt_echo_subscriptions(mqtt_info_t * mqtt_info, const datastore_t * datastore)
 {
+    // These will leak!
     int * context_echo_bool = malloc(sizeof(*context_echo_bool)); *context_echo_bool = 1;
     int * context_echo_uint8 = malloc(sizeof(*context_echo_uint8)); *context_echo_uint8 = 2;
     int * context_echo_uint32 = malloc(sizeof(*context_echo_uint32)); *context_echo_uint32 = 3;
@@ -251,8 +252,6 @@ void init_mqtt_echo_subscriptions(mqtt_info_t * mqtt_info, const datastore_t * d
     int * context_echo_float = malloc(sizeof(*context_echo_float)); *context_echo_float = 6;
     int * context_echo_double = malloc(sizeof(*context_echo_double)); *context_echo_double = 7;
     int * context_echo_string = malloc(sizeof(*context_echo_string)); *context_echo_string = 8;
-
-    // These will leak!
 
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
 
@@ -297,6 +296,54 @@ void init_mqtt_echo_subscriptions(mqtt_info_t * mqtt_info, const datastore_t * d
     }
 }
 
+typedef struct
+{
+    mqtt_info_t * mqtt_info;
+    bool * running;
+    datastore_t * datastore;
+} globals_t;
+
+void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context)
+{
+    ESP_LOGE(TAG, "mqtt_status_callback");
+    globals_t * globals = (globals_t *)context;
+    mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
+
+    init_mqtt_echo_subscriptions(globals->mqtt_info, datastore);
+
+    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/esp32/reset", &do_esp32_reset, (void *)globals->running)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/reset", &do_avr_reset, NULL)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/cp", &do_avr_cp, NULL)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/pp", &do_avr_pp, NULL)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/avr/alarm", &do_avr_alarm, NULL)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+    }
+
+    if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/datastore/dump", &do_datastore_dump, (void *)globals->datastore)) != MQTT_OK)
+    {
+        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+    }
+
+}
+
+
 void app_main()
 {
     init_boot_time_reference();
@@ -309,7 +356,7 @@ void app_main()
     esp_log_level_set("wifi_support", ESP_LOG_INFO);
     esp_log_level_set("datastore", ESP_LOG_INFO);
     esp_log_level_set("mqtt", ESP_LOG_INFO);
-    esp_log_level_set("publish", ESP_LOG_DEBUG);
+    esp_log_level_set("publish", ESP_LOG_INFO);
 //    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
 
@@ -370,39 +417,21 @@ void app_main()
     bool running = true;
 
     mqtt_info_t * mqtt_info = mqtt_malloc();
+
+    // be careful of the scope on this
+    globals_t globals = {
+        .mqtt_info = mqtt_info,
+        .running = &running,
+        .datastore = datastore,
+    };
+
     mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
     if ((mqtt_error = mqtt_init(mqtt_info, datastore)) == MQTT_OK)
     {
-        init_mqtt_echo_subscriptions(mqtt_info, datastore);
-
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/esp32/reset", &do_esp32_reset, &running)) != MQTT_OK)
+        datastore_status_t status = datastore_add_set_callback(datastore, RESOURCE_ID_MQTT_STATUS, mqtt_status_callback, &globals);
+        if (status != DATASTORE_STATUS_OK)
         {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/avr/reset", &do_avr_reset, NULL)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/avr/cp", &do_avr_cp, NULL)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/avr/pp", &do_avr_pp, NULL)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/avr/alarm", &do_avr_alarm, NULL)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-        }
-
-        if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/datastore/dump", &do_datastore_dump, (void *)datastore)) != MQTT_OK)
-        {
-            ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            ESP_LOGE(TAG, "datastore_add_set_callback for resource %d failed: %d", RESOURCE_ID_MQTT_STATUS, status);
         }
     }
     else

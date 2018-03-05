@@ -100,7 +100,6 @@ static void _status_callback(esp_mqtt_status_t status)
             // send a device status update
             const char * value = "MQTT connected";
             mqtt_publish("poolmon/device/status", (uint8_t*)value, strlen(value), 0, false);
-            esp_mqtt_subscribe("poolmon/#", 0);
             break;
 
         case ESP_MQTT_STATUS_DISCONNECTED:
@@ -400,6 +399,9 @@ static mqtt_error_t _register_topic(mqtt_info_t * mqtt_info, const char * topic,
                 topic_info->rcb = rcb;
                 topic_info->context = context;
                 trie_insert(private->trie, topic, topic_info);
+
+                // subscribe to this topic
+                esp_mqtt_subscribe(topic, 0);
             }
             else
             {
