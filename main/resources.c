@@ -101,6 +101,9 @@ datastore_t * resources_init(void)
 
         _add_resource(datastore, RESOURCE_ID_PUMPS_CP_STATE,         "PUMPS_CP_STATE",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_PUMPS_PP_STATE,         "PUMPS_PP_STATE",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+
+        _add_resource(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA,    "CONTROL_CP_ON_DELTA",    datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
+        _add_resource(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA,   "CONTROL_CP_OFF_DELTA",   datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
     }
 
     return datastore;
@@ -128,5 +131,8 @@ void resources_load(const datastore_t * datastore)
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 2, "Temp 3"));
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 3, "Temp 4"));
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 4, "Temp 5"));
+
+        ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, 4.0f));
+        ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, 2.0f));
     }
 }

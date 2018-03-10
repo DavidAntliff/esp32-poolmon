@@ -59,7 +59,7 @@ static float _calculate_transfer_power_watts(float lpm, float temp_delta)
 
 static void power_calculation_task(void * pvParameter)
 {
-    //assert(pvParameter);
+    assert(pvParameter);
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     const datastore_t * datastore = task_inputs->datastore;

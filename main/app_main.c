@@ -49,6 +49,7 @@
 #include "avr_support.h"
 #include "display.h"
 #include "power.h"
+#include "control.h"
 #include "datastore/datastore.h"
 
 #define TAG "app_main"
@@ -130,6 +131,18 @@ static void do_sensors_temp_assignment(const char * topic, const char * value, v
     {
         datastore_set_string(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, instance - 1, value);
     }
+}
+
+static void do_control_cp_delta_on(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_float(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, value);
+}
+
+static void do_control_cp_delta_off(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, value);
 }
 
 static void echo_bool(const char * topic, bool value, void * context)
@@ -396,6 +409,16 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
                     ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
                 }
             }
+
+            if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, ROOT_TOPIC"/control/cp/delta_on", &do_control_cp_delta_on, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, ROOT_TOPIC"/control/cp/delta_off", &do_control_cp_delta_off, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
+            }
         }
     }
 }
@@ -416,6 +439,7 @@ void app_main()
     esp_log_level_set("publish", ESP_LOG_INFO);
     esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
+    esp_log_level_set("control", ESP_LOG_DEBUG);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_ESP_MQTT_TASK_STACK_PRIORITY;
@@ -423,6 +447,7 @@ void app_main()
     UBaseType_t sensor_priority = publish_priority - 1;
     UBaseType_t avr_priority = sensor_priority;
     UBaseType_t wifi_monitor_priority = sensor_priority;
+    UBaseType_t control_priority = sensor_priority;
 
     ESP_LOGI(TAG, "Start");
 
@@ -521,6 +546,9 @@ void app_main()
     }
 
     mqtt_start(mqtt_info);
+    _delay();
+
+    control_init(control_priority, datastore);
 
     while (running)
     {
@@ -533,7 +561,7 @@ void app_main()
             ESP_LOGI(TAG, "uptime %d seconds", seconds_since_boot());
         }
 
-        avr_test_sequence();
+        //avr_test_sequence();
 
         vTaskDelayUntil(&last_wake_time, 1000 / portTICK_RATE_MS);
     }
