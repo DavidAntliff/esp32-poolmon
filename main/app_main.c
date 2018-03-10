@@ -455,6 +455,17 @@ void app_main()
     _delay();
     temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, datastore);
 
+    // TODO: restore assignments from NV
+    // For now, assign them in the same order they are detected:
+    _delay();   // make sure sensor_temp's task's callbacks are installed
+    for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
+    {
+        // TODO: store assignment of detected sensors to instances in NV
+        char rom_code[SENSOR_TEMP_LEN_ROM_CODE] = "";
+        datastore_get_string(datastore, RESOURCE_ID_TEMP_DETECTED, i, rom_code, sizeof(rom_code));
+        datastore_set_string(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i, rom_code);
+    }
+
     // I2C devices - AVR, Light Sensor, LCD
     _delay();
     avr_support_init(i2c_master_info, avr_priority, datastore);

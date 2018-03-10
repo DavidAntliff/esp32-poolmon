@@ -82,8 +82,7 @@ typedef enum
     PAGE_LAST,
 } page_id_t;
 
-//#define INITIAL_PAGE PAGE_SPLASH
-#define INITIAL_PAGE PAGE_MQTT_STATUS
+#define INITIAL_PAGE PAGE_SPLASH
 
 typedef enum
 {
