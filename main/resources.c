@@ -70,10 +70,11 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_MQTT_MESSAGE_TX_COUNT,  "MQTT_MESSAGE_TX_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_MQTT_MESSAGE_RX_COUNT,  "MQTT_MESSAGE_RX_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
-        _add_resource(datastore, RESOURCE_ID_TEMP_VALUE,             "TEMP_VALUE",             datastore_create_resource(DATASTORE_TYPE_FLOAT,  SENSOR_TEMP_INSTANCES));
-        _add_resource(datastore, RESOURCE_ID_TEMP_TIMESTAMP,         "TEMP_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32, SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_VALUE,             "TEMP_VALUE",             datastore_create_resource(DATASTORE_TYPE_FLOAT,              SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_TIMESTAMP,         "TEMP_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32,             SENSOR_TEMP_INSTANCES));
         _add_resource(datastore, RESOURCE_ID_TEMP_LABEL,             "TEMP_LABEL",             datastore_create_string_resource(SENSOR_TEMP_LEN_LABEL,      SENSOR_TEMP_INSTANCES));
-        _add_resource(datastore, RESOURCE_ID_TEMP_ASSIGNMENT,        "TEMP_ASSIGNMENT",        datastore_create_string_resource(SENSOR_TEMP_LEN_ASSIGNMENT, SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_DETECTED,          "TEMP_DETECTED",          datastore_create_string_resource(SENSOR_TEMP_LEN_ROM_CODE,   SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_ASSIGNMENT,        "TEMP_ASSIGNMENT",        datastore_create_string_resource(SENSOR_TEMP_LEN_ROM_CODE,   SENSOR_TEMP_INSTANCES));
 
         _add_resource(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS,      "LIGHT_I2C_ADDRESS",      datastore_create_resource(DATASTORE_TYPE_UINT8,  1));
         _add_resource(datastore, RESOURCE_ID_LIGHT_DETECTED,         "LIGHT_DETECTED",         datastore_create_resource(DATASTORE_TYPE_BOOL,   1));

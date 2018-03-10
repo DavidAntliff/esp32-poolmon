@@ -146,14 +146,12 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
 
     if (rmt_driver_info)
     {
-        ESP_LOGW(TAG, "about to run owb_rmt_initialize");
         owb = owb_rmt_initialize(rmt_driver_info, gpio, OWB_RMT_CHANNEL_TX, OWB_RMT_CHANNEL_RX);
         owb_use_crc(owb, true);       // enable CRC check for ROM code and measurement readings
 
         // locate attached devices
         OneWireBus_ROMCode * device_rom_codes = calloc(MAX_DEVICES, sizeof(*device_rom_codes));
 
-        ESP_LOGW(TAG, "about to run find_owb_rom_codes");
         int num_devices = find_owb_rom_codes(owb, device_rom_codes, MAX_DEVICES);
 
         // free up unused space
@@ -162,7 +160,6 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
         // associate devices on bus with DS18B20 device driver
         DS18B20_Info ** device_infos = calloc(num_devices, sizeof(*device_infos));
 
-        ESP_LOGW(TAG, "about to run associate_ds18b20_devices");
         associate_ds18b20_devices(owb, device_rom_codes, device_infos, num_devices);
 
         sensors = malloc(sizeof(*sensors));
@@ -186,6 +183,46 @@ static temp_sensors_t * detect_sensors(uint8_t gpio)
     return sensors;
 }
 
+typedef struct
+{
+    int * map;
+    OneWireBus_ROMCode * rom_codes;
+} context_t;
+
+void _recalc_assignments(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * ctxt)
+{
+    ESP_LOGD(TAG, "_recalc_assignments: datastore %p, resource id %d, instance id %d, ctxt %p", datastore, id, instance, ctxt);
+    context_t * context = (context_t *)ctxt;
+
+    // search for match between assignment rom code and detected rom codes
+    char rom_code_str[SENSOR_TEMP_LEN_ROM_CODE] = "";
+    datastore_get_as_string(datastore, id, instance, rom_code_str, SENSOR_TEMP_LEN_ROM_CODE);
+    ESP_LOGD(TAG, "rom_code_str [%s]", rom_code_str);
+
+    // convert ROM code as string into OneWireBus_ROMCode - note that rom code is LSB-first
+    OneWireBus_ROMCode rom_code = { 0 };
+    for (size_t i = 0; i < sizeof(OneWireBus_ROMCode); ++i)
+    {
+        char * in = &rom_code_str[2 * (sizeof(OneWireBus_ROMCode) - i - 1)];  // reverse order because LSB is first
+        uint8_t hn = in[0] > '9' ? (in[0] | 0x20) - 'a' + 10 : in[0] - '0';
+        uint8_t ln = in[1] > '9' ? (in[1] | 0x20) - 'a' + 10 : in[1] - '0';
+        rom_code.bytes[i] = (hn << 4) | ln;
+    }
+    ESP_LOG_BUFFER_HEXDUMP(TAG, &rom_code, sizeof(rom_code), ESP_LOG_DEBUG);
+
+    for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
+    {
+        ESP_LOG_BUFFER_HEXDUMP(TAG, &context->rom_codes[i], sizeof(rom_code), ESP_LOG_DEBUG);
+
+        if (memcmp(&rom_code, &context->rom_codes[i], sizeof(OneWireBus_ROMCode)) == 0)
+        {
+            context->map[instance] = i;
+            ESP_LOGI(TAG, "Assigned rom code [%s] (detected instance %d) to T%d", rom_code_str, i, instance + 1);
+            break;
+        }
+    }
+}
+
 static void sensor_temp_task(void * pvParameter)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
@@ -196,6 +233,15 @@ static void sensor_temp_task(void * pvParameter)
     const datastore_t * datastore = task_inputs->datastore;
 
     int sample_count = 0;
+
+    // Map sensor instances (enumerated in ROM code order as detected) with T1, ..., T5 instances
+    int map[SENSOR_TEMP_INSTANCES] = { -1, -1, -1, -1, -1 };
+    context_t context = {
+        .map = &map[0],
+        .rom_codes = &task_inputs->sensors->rom_codes[0],
+    };
+    // Callback if any assignments change
+    datastore_add_set_callback(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, _recalc_assignments, &context);
 
     int errors_count[MAX_DEVICES] = {0};
     if (task_inputs->sensors->num_ds18b20s > 0)
@@ -224,17 +270,25 @@ static void sensor_temp_task(void * pvParameter)
             ESP_LOGI(TAG, "Temperature readings (degrees C): sample %d", sample_count);
             for (int i = 0; i < task_inputs->sensors->num_ds18b20s; ++i)
             {
-                // filter out errored readings
-                if (errors[i] == DS18B20_OK)
+                // map actual sensors to T1, ..., T4 assignments
+                float reading = map[i] >= 0 ? readings[map[i]] : -2048.0;
+                int num_errors = map[i] >= 0 ? errors_count[map[i]] : 0;
+                DS18B20_ERROR error = map[i] >= 0 ? errors[map[i]] : DS18B20_OK;
+
+                // filter out unmapped and errored readings
+                if (map[i] >= 0)
                 {
-                    datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, readings[i]);
-                    datastore_set_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, i, now);
+                    if (error == DS18B20_OK)
+                    {
+                        datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, reading);
+                        datastore_set_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, i, now);
+                        ESP_LOGI(TAG, "  T%d: %.1f    %d errors", i + 1, reading, num_errors);
+                    }
+                    else
+                    {
+                        ++errors_count[map[i]];
+                    }
                 }
-                else
-                {
-                    ++errors_count[i];
-                }
-                ESP_LOGI(TAG, "  %d: %.1f    %d errors", i, readings[i], errors_count[i]);
             }
 
             vTaskDelayUntil(&last_wake_time, SAMPLE_PERIOD / portTICK_PERIOD_MS);
@@ -258,7 +312,7 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const data
     // TODO: separate "Detected Sensor ROM Codes" from "Assignments" - instead, assignments
     // should be made by the user (via a list of detected devices) and stored in NV.
 
-    // set ROM code assignments
+    // publish detected ROM codes
     for (size_t i = 0; i < sensors->num_ds18b20s; ++i)
     {
         // render device ID (LSB first) as sixteen hex digits
@@ -269,7 +323,7 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const data
             snprintf(byte, 3, "%02x", sensors->ds18b20_infos[i]->rom_code.bytes[sizeof(OneWireBus_ROMCode) - j - 1]);
             strcat(rom_code, byte);
         }
-        datastore_set_string(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i, rom_code);
+        datastore_set_string(datastore, RESOURCE_ID_TEMP_DETECTED, i, rom_code);
     }
 
     // Blink the LED to indicate the number of temperature devices detected:

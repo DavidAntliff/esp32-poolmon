@@ -120,6 +120,18 @@ static void do_sensors_temp_label(const char * topic, const char * value, void *
     }
 }
 
+static void do_sensors_temp_assignment(const char * topic, const char * value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    uint32_t instance = 0;
+    sscanf(topic, ROOT_TOPIC"/sensors/temp/%u/assignment", &instance);
+    ESP_LOGD(TAG, "instance %u, value %s", instance, value);
+    if (instance > 0 && instance <= SENSOR_TEMP_INSTANCES)
+    {
+        datastore_set_string(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, instance - 1, value);
+    }
+}
+
 static void echo_bool(const char * topic, bool value, void * context)
 {
     int ctxt_val = *(int *)context;
@@ -330,7 +342,9 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
             publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_WIFI_ADDRESS, 0);
             for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
             {
+                // TODO: store assignment of detected sensors to instances in NV
                 publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i);
+                publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_TEMP_DETECTED, i);
             }
 
             // subscribe to some topics
@@ -373,7 +387,13 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
                 snprintf(topic, 64, ROOT_TOPIC"/sensors/temp/%d/label", i + 1);
                 if ((mqtt_error = mqtt_register_topic_as_string(globals->mqtt_info, topic, &do_sensors_temp_label, globals->datastore)) != MQTT_OK)
                 {
-                    ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+                    ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
+                }
+
+                snprintf(topic, 64, ROOT_TOPIC"/sensors/temp/%d/assignment", i + 1);
+                if ((mqtt_error = mqtt_register_topic_as_string(globals->mqtt_info, topic, &do_sensors_temp_assignment, globals->datastore)) != MQTT_OK)
+                {
+                    ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
                 }
             }
         }
@@ -394,7 +414,7 @@ void app_main()
     esp_log_level_set("datastore", ESP_LOG_INFO);
     esp_log_level_set("mqtt", ESP_LOG_INFO);
     esp_log_level_set("publish", ESP_LOG_INFO);
-//    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
+    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
 
     // Priority of queue consumer should be higher than producers
@@ -418,11 +438,9 @@ void app_main()
     led_init(CONFIG_ONBOARD_LED_GPIO);
 
     // I2C bus
-    ESP_LOGW(TAG, "about to run i2c_master_init");
     _delay();
     i2c_master_info_t * i2c_master_info = i2c_master_init(I2C_MASTER_NUM, CONFIG_I2C_MASTER_SDA_GPIO, CONFIG_I2C_MASTER_SCL_GPIO, I2C_MASTER_FREQ_HZ);
 
-    ESP_LOGW(TAG, "about to run i2c_master_scan");
     _delay();
     int num_i2c_devices = i2c_master_scan(i2c_master_info);
     ESP_LOGI(TAG, "%d I2C devices detected", num_i2c_devices);
