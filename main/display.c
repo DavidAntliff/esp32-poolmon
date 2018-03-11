@@ -416,14 +416,28 @@ static void _handle_page_sensors_flow(const i2c_lcd1602_info_t * lcd_info, void 
     datastore_get_float(datastore, RESOURCE_ID_FLOW_FREQUENCY, 0, &frequency);
     datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &rate);
 
-    char line[ROW_STRING_WIDTH] = "";
-    snprintf(line, ROW_STRING_WIDTH, "Flow   %5.1f Hz ", frequency);
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    uint32_t timestamp = 0;
+    datastore_get_uint32(datastore, RESOURCE_ID_FLOW_TIMESTAMP, 0, &timestamp);
 
-    snprintf(line, ROW_STRING_WIDTH, "       %5.1f LPM", rate);
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    if (seconds_since_boot() - timestamp < MEASUREMENT_EXPIRY)
+    {
+        char line[ROW_STRING_WIDTH] = "";
+        snprintf(line, ROW_STRING_WIDTH, "Flow   %5.1f Hz ", frequency);
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+        snprintf(line, ROW_STRING_WIDTH, "       %5.1f LPM", rate);
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    }
+    else
+    {
+        // measurement timed out
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "Flow   ---.- Hz "));
+        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "       ---.- LPM"));
+    }
 }
 
 static void _build_switch_string(char * string, uint8_t len, datastore_resource_id_t mode, datastore_resource_id_t man, const datastore_t * datastore)

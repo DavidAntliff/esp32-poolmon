@@ -31,9 +31,11 @@
 #include "control.h"
 #include "resources.h"
 #include "avr_support.h"
+#include "utils.h"
 #include "datastore/datastore.h"
 
-#define POLL_PERIOD (1000)  // control loop period in milliseconds
+#define POLL_PERIOD        (1000)  // control loop period in milliseconds
+#define MEASUREMENT_EXPIRY (15)    // seconds
 
 #define TAG "control"
 
@@ -54,8 +56,27 @@ static void control_cp_task(void * pvParameter)
     avr_pump_state_t state = AVR_PUMP_STATE_OFF;
     avr_support_set_cp_pump(AVR_PUMP_STATE_OFF);
 
-    // wait 10 seconds for stable sensor readings
-    vTaskDelay(10 * 1000 / portTICK_RATE_MS);
+    // wait for stable sensor readings
+    bool stable = false;
+    while(!stable)
+    {
+        last_wake_time = xTaskGetTickCount();
+        ESP_LOGD(TAG, "CP control loop: wait for stable sensors");
+
+        uint32_t t1_ts = 0;
+        uint32_t t2_ts = 0;
+        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, 0, &t1_ts);
+        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, 1, &t2_ts);
+
+        uint32_t now = seconds_since_boot();
+        if ((now - t1_ts < MEASUREMENT_EXPIRY) && (now - t2_ts < MEASUREMENT_EXPIRY))
+        {
+            stable = true;
+            ESP_LOGI(TAG, "CP control loop: sensors stable");
+        }
+
+        vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
+    }
 
     while (1)
     {
@@ -63,44 +84,61 @@ static void control_cp_task(void * pvParameter)
         ESP_LOGD(TAG, "CP control loop: state %d", state);
 
         float t1 = 0.0f;
+        uint32_t t1_ts = 0;
         float t2 = 0.0f;
+        uint32_t t2_ts = 0;
         bool transition = false;
 
-        // TODO: confirm pump state matches
-        //datastore_get_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &state);
-        datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, 0, &t1);
-        datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, 1, &t2);
+        uint32_t now = seconds_since_boot();
+        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, 0, &t1_ts);
+        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, 1, &t2_ts);
 
-        ESP_LOGD(TAG, "T1 %f, T2 %f", t1, t2);
-
-        // transitions
-        if (state == AVR_PUMP_STATE_OFF)
+        if (now - t1_ts < MEASUREMENT_EXPIRY)
         {
-            float delta = 0.0f;
-            datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, &delta);
-//            ESP_LOGD(TAG, "delta on %f", delta);
-            if (t1 - t2 >= delta)
+            if (now - t2_ts < MEASUREMENT_EXPIRY)
             {
-                state = AVR_PUMP_STATE_ON;
-                transition = true;
+                datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, 0, &t1);
+                datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, 1, &t2);
+                ESP_LOGD(TAG, "T1 %f, T2 %f", t1, t2);
+
+                // transitions
+                if (state == AVR_PUMP_STATE_OFF)
+                {
+                    float delta = 0.0f;
+                    datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, &delta);
+        //            ESP_LOGD(TAG, "delta on %f", delta);
+                    if (t1 - t2 >= delta)
+                    {
+                        state = AVR_PUMP_STATE_ON;
+                        transition = true;
+                    }
+                }
+                else
+                {
+                    float delta = 0.0f;
+                    datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, &delta);
+        //            ESP_LOGD(TAG, "delta off %f", delta);
+                    if (t1 - t2 <= delta)
+                    {
+                        state = AVR_PUMP_STATE_OFF;
+                        transition = true;
+                    }
+                }
+
+                // output
+                if (transition)
+                {
+                    avr_support_set_cp_pump(state);
+                }
+            }
+            else
+            {
+                ESP_LOGW(TAG, "T2 measurement timeout");
             }
         }
         else
         {
-            float delta = 0.0f;
-            datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, &delta);
-//            ESP_LOGD(TAG, "delta off %f", delta);
-            if (t1 - t2 <= delta)
-            {
-                state = AVR_PUMP_STATE_OFF;
-                transition = true;
-            }
-        }
-
-        // output
-        if (transition)
-        {
-            avr_support_set_cp_pump(state);
+            ESP_LOGW(TAG, "T1 measurement timeout");
         }
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
@@ -118,6 +156,26 @@ static void control_pp_task(void * pvParameter)
 
     avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
 
+    // wait for stable sensor readings
+    bool stable = false;
+    while(!stable)
+    {
+        last_wake_time = xTaskGetTickCount();
+        ESP_LOGD(TAG, "PP control loop: wait for stable sensors");
+
+        uint32_t timestamp = 0;
+        datastore_get_uint32(datastore, RESOURCE_ID_FLOW_TIMESTAMP, 0, &timestamp);
+
+        uint32_t now = seconds_since_boot();
+        if (now - timestamp < MEASUREMENT_EXPIRY)
+        {
+            stable = true;
+            ESP_LOGI(TAG, "PP control loop: sensors stable");
+        }
+
+        vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
+    }
+
     typedef enum
     {
         STATE_PP_OFF = 0,
@@ -126,15 +184,14 @@ static void control_pp_task(void * pvParameter)
     } state_t;
 
     state_t state = STATE_PP_OFF;
-    TickType_t cycle_start_time = 0;
+    uint32_t cycle_start_time = 0;
     uint32_t n = 0;
-
-    // wait 10 seconds for stable sensor readings
-    vTaskDelay(10 * 1000 / portTICK_RATE_MS);
 
     while (1)
     {
         last_wake_time = xTaskGetTickCount();
+        uint32_t now = seconds_since_boot();
+
         ESP_LOGD(TAG, "PP control loop: state %d, n %d", state, n);
 
         // TODO: daily time
@@ -151,36 +208,45 @@ static void control_pp_task(void * pvParameter)
         {
         case STATE_PP_OFF:
         {
-            float flow_rate = 0.0f;
-            datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);
-            avr_pump_state_t cp_state = AVR_PUMP_STATE_OFF;
-            datastore_get_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_state);
-            float flow_threshold = 0.0f;
-            datastore_get_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, &flow_threshold);
-
-            ESP_LOGD(TAG, "flow rate %f, cp state %d, threshold %f", flow_rate, cp_state, flow_threshold);
-
-            if ((cp_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold))
+            uint32_t timestamp = 0;
+            datastore_get_uint32(datastore, RESOURCE_ID_FLOW_TIMESTAMP, 0, &timestamp);
+            if (now - timestamp < MEASUREMENT_EXPIRY)
             {
-                state = STATE_PP_ON;
-                avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
-                cycle_start_time = last_wake_time;
-                datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, &n);
-                --n;
+                float flow_rate = 0.0f;
+                datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);
+                avr_pump_state_t cp_state = AVR_PUMP_STATE_OFF;
+                datastore_get_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_state);
+                float flow_threshold = 0.0f;
+                datastore_get_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, &flow_threshold);
+
+                ESP_LOGD(TAG, "flow rate %f, cp state %d, threshold %f", flow_rate, cp_state, flow_threshold);
+
+                if ((cp_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold))
+                {
+                    state = STATE_PP_ON;
+                    avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
+                    cycle_start_time = now;
+                    datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, &n);
+                    --n;
+                }
+            }
+            else
+            {
+                ESP_LOGW(TAG, "Flow measurement expired");
             }
             break;
         }
 
         case STATE_PP_ON:
         {
-            float duration = 0.0f;
-            datastore_get_float(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, &duration);
-            TickType_t cycle_end_time = cycle_start_time + (TickType_t)(duration * configTICK_RATE_HZ);
+            uint32_t duration = 0;
+            datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, &duration);
+            uint32_t cycle_end_time = cycle_start_time + duration;
 
-            if (last_wake_time >= cycle_end_time)
+            if (now >= cycle_end_time)
             {
                 state = STATE_PP_PAUSE;
-                cycle_start_time = last_wake_time;
+                cycle_start_time = now;
                 avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
             }
             break;
@@ -188,23 +254,23 @@ static void control_pp_task(void * pvParameter)
 
         case STATE_PP_PAUSE:
         {
-            float duration = 0.0f;
-            datastore_get_float(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, &duration);
-            TickType_t cycle_end_time = cycle_start_time + (TickType_t)(duration * configTICK_RATE_HZ);
+            uint32_t duration = 0;
+            datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, &duration);
+            TickType_t cycle_end_time = cycle_start_time + duration;
 
             if (n > 0)
             {
-                if (last_wake_time >= cycle_end_time)
+                if (now >= cycle_end_time)
                 {
                     state = STATE_PP_ON;
                     avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
-                    cycle_start_time = last_wake_time;
+                    cycle_start_time = now;
                     --n;
                 }
             }
             else
             {
-                if (last_wake_time >= cycle_end_time)
+                if (now >= cycle_end_time)
                 {
                     state = STATE_PP_OFF;
                     avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
