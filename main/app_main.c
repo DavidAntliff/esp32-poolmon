@@ -145,6 +145,30 @@ static void do_control_cp_delta_off(const char * topic, float value, void * cont
     datastore_set_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, value);
 }
 
+static void do_control_flow_threshold(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, value);
+}
+
+static void do_control_pp_cycle_count(const char * topic, uint32_t value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, value);
+}
+
+static void do_control_pp_cycle_on_duration(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_float(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, value);
+}
+
+static void do_control_pp_cycle_pause_duration(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_float(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, value);
+}
+
 static void echo_bool(const char * topic, bool value, void * context)
 {
     int ctxt_val = *(int *)context;
@@ -416,6 +440,26 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
             }
 
             if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, ROOT_TOPIC"/control/cp/delta_off", &do_control_cp_delta_off, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, ROOT_TOPIC"/control/flow/threshold", &do_control_flow_threshold, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_uint32(globals->mqtt_info, ROOT_TOPIC"/control/pp/cycle/count", &do_control_pp_cycle_count, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_uint32 failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, ROOT_TOPIC"/control/pp/cycle/on_duration", &do_control_pp_cycle_on_duration, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, ROOT_TOPIC"/control/pp/cycle/pause_duration", &do_control_pp_cycle_pause_duration, globals->datastore)) != MQTT_OK)
             {
                 ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
             }

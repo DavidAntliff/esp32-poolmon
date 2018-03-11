@@ -104,6 +104,11 @@ datastore_t * resources_init(void)
 
         _add_resource(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA,    "CONTROL_CP_ON_DELTA",    datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
         _add_resource(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA,   "CONTROL_CP_OFF_DELTA",   datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
+        _add_resource(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, "CONTROL_FLOW_THRESHOLD", datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
+
+        _add_resource(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT,          "CONTROL_PP_CYCLE_COUNT",          datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION,    "CONTROL_PP_CYCLE_ON_DURATION",    datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
+        _add_resource(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, "CONTROL_PP_CYCLE_PAUSE_DURATION", datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
     }
 
     return datastore;
@@ -134,5 +139,10 @@ void resources_load(const datastore_t * datastore)
 
         ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, 4.0f));
         ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, 2.0f));
+        ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, 5.0f));
+
+        ERROR_CHECK(datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, 5));
+        ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, 5.0f /*60.0f*/));
+        ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, 5.0f /*30.0f*/));
     }
 }
