@@ -50,6 +50,7 @@
 #include "display.h"
 #include "power.h"
 #include "control.h"
+#include "sntp_rtc.h"
 #include "datastore/datastore.h"
 
 #define TAG "app_main"
@@ -484,6 +485,7 @@ void app_main()
     esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
     esp_log_level_set("control", ESP_LOG_DEBUG);
+    esp_log_level_set("sntp_rtc", ESP_LOG_DEBUG);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_ESP_MQTT_TASK_STACK_PRIORITY;
@@ -592,7 +594,11 @@ void app_main()
     mqtt_start(mqtt_info);
     _delay();
 
+    sntp_rtc_init();
+    _delay();
+
     control_init(control_priority, datastore);
+    _delay();
 
     while (running)
     {
