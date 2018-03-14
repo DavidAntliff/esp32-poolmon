@@ -264,7 +264,6 @@ static void sensor_temp_task(void * pvParameter)
             ++sample_count;
 
             led_off();
-            uint32_t now = seconds_since_boot();
 
             // print results in a separate loop, after all have been read
             ESP_LOGI(TAG, "Temperature readings (degrees C): sample %d", sample_count);
@@ -281,7 +280,6 @@ static void sensor_temp_task(void * pvParameter)
                     if (error == DS18B20_OK)
                     {
                         datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, reading);
-                        datastore_set_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, i, now);
                         ESP_LOGI(TAG, "  T%d: %.1f    %d errors", i + 1, reading, num_errors);
                     }
                     else

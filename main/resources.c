@@ -71,7 +71,6 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_MQTT_MESSAGE_RX_COUNT,  "MQTT_MESSAGE_RX_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_TEMP_VALUE,             "TEMP_VALUE",             datastore_create_resource(DATASTORE_TYPE_FLOAT,              SENSOR_TEMP_INSTANCES));
-        _add_resource(datastore, RESOURCE_ID_TEMP_TIMESTAMP,         "TEMP_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32,             SENSOR_TEMP_INSTANCES));
         _add_resource(datastore, RESOURCE_ID_TEMP_LABEL,             "TEMP_LABEL",             datastore_create_string_resource(SENSOR_TEMP_LEN_LABEL,      SENSOR_TEMP_INSTANCES));
         _add_resource(datastore, RESOURCE_ID_TEMP_DETECTED,          "TEMP_DETECTED",          datastore_create_string_resource(SENSOR_TEMP_LEN_ROM_CODE,   SENSOR_TEMP_INSTANCES));
         _add_resource(datastore, RESOURCE_ID_TEMP_ASSIGNMENT,        "TEMP_ASSIGNMENT",        datastore_create_string_resource(SENSOR_TEMP_LEN_ROM_CODE,   SENSOR_TEMP_INSTANCES));
@@ -82,14 +81,11 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_LIGHT_VISIBLE,          "LIGHT_VISIBLE",          datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_LIGHT_INFRARED,         "LIGHT_INFRARED",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_LIGHT_ILLUMINANCE,      "LIGHT_ILLUMINANCE",      datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        _add_resource(datastore, RESOURCE_ID_LIGHT_TIMESTAMP,        "LIGHT_TIMESTAMP",        datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_FLOW_FREQUENCY,         "FLOW_FREQUENCY",         datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
         _add_resource(datastore, RESOURCE_ID_FLOW_RATE,              "FLOW_RATE",              datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
-        _add_resource(datastore, RESOURCE_ID_FLOW_TIMESTAMP,         "FLOW_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_POWER_VALUE,            "POWER_VALUE",            datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
-        _add_resource(datastore, RESOURCE_ID_POWER_TIMESTAMP,        "POWER_TIMESTAMP",        datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, "SWITCHES_CP_MODE_VALUE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         //_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_COUNT, "SWITCHES_CP_MODE_COUNT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
@@ -99,7 +95,6 @@ datastore_t * resources_init(void)
         //_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MODE_COUNT, "SWITCHES_PP_MODE_COUNT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  "SWITCHES_PP_MAN_VALUE",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         //_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MAN_COUNT, "SWITCHES_PP_MAN_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        _add_resource(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP,     "SWITCHES_TIMESTAMP",     datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_PUMPS_CP_STATE,         "PUMPS_CP_STATE",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_PUMPS_PP_STATE,         "PUMPS_PP_STATE",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
@@ -132,7 +127,6 @@ void resources_load(const datastore_t * datastore)
 
         ERROR_CHECK(datastore_set_uint8(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS));
 
-        // TODO
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 0, "Temp 1"));
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 1, "Temp 2"));
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_TEMP_LABEL, 2, "Temp 3"));

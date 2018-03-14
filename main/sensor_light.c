@@ -108,7 +108,6 @@ static void sensor_light_task(void * pvParameter)
                 datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_INFRARED, 0, infrared);
                 datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_VISIBLE, 0, visible);
                 datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_ILLUMINANCE, 0, lux);
-                datastore_set_uint32(datastore, RESOURCE_ID_LIGHT_TIMESTAMP, 0, seconds_since_boot());
             }
             else
             {

@@ -37,7 +37,7 @@
 #define TAG "power"
 
 // ignore any temperature measurements that have expired
-#define MEASUREMENT_EXPIRY 15 // seconds
+#define MEASUREMENT_EXPIRY (15 * 1000000) // microseconds
 
 #define SHC_WATER (4184.0)               // J/kg/K
 #define MASS_PER_VOLUME_WATER (1000.0)   // kg/m^3
@@ -70,16 +70,14 @@ static void power_calculation_task(void * pvParameter)
         const uint8_t in = 0;
         const uint8_t out = 1;
 
-        uint32_t timestamp_in = 0;
-        uint32_t timestamp_out = 0;
-        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, in, &timestamp_in);
-        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, out, &timestamp_out);
+        datastore_age_t age_in = DATASTORE_INVALID_AGE;
+        datastore_age_t age_out = DATASTORE_INVALID_AGE;
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, in, &age_in);
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, out, &age_out);
 
-        uint32_t now = seconds_since_boot();
-
-        if (now - timestamp_in < MEASUREMENT_EXPIRY)
+        if (age_in < MEASUREMENT_EXPIRY)
         {
-            if (now - timestamp_out < MEASUREMENT_EXPIRY)
+            if (age_out < MEASUREMENT_EXPIRY)
             {
                 float temp_in = 0.0f;
                 float temp_out = 0.0f;
@@ -94,7 +92,6 @@ static void power_calculation_task(void * pvParameter)
                 ESP_LOGI(TAG, "flow %f lpm, temp delta %f K, power %f W", lpm, delta, power);
 
                 datastore_set_float(datastore, RESOURCE_ID_POWER_VALUE, 0, power);
-                datastore_set_uint32(datastore, RESOURCE_ID_POWER_TIMESTAMP, 0, now);
             }
             else
             {

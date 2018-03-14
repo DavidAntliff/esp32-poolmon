@@ -35,7 +35,7 @@
 #include "datastore/datastore.h"
 
 #define POLL_PERIOD        (1000)  // control loop period in milliseconds
-#define MEASUREMENT_EXPIRY (15)    // seconds
+#define MEASUREMENT_EXPIRY (15 * 1000000)    // microseconds
 
 #define TAG "control"
 
@@ -56,6 +56,9 @@ static void control_cp_task(void * pvParameter)
     avr_pump_state_t state = AVR_PUMP_STATE_OFF;
     avr_support_set_cp_pump(AVR_PUMP_STATE_OFF);
 
+    datastore_age_t t1_age = DATASTORE_INVALID_AGE;
+    datastore_age_t t2_age = DATASTORE_INVALID_AGE;
+
     // wait for stable sensor readings
     bool stable = false;
     while(!stable)
@@ -63,13 +66,10 @@ static void control_cp_task(void * pvParameter)
         last_wake_time = xTaskGetTickCount();
         ESP_LOGD(TAG, "CP control loop: wait for stable sensors");
 
-        uint32_t t1_ts = 0;
-        uint32_t t2_ts = 0;
-        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, 0, &t1_ts);
-        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, 1, &t2_ts);
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, 0, &t1_age);
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, 1, &t2_age);
 
-        uint32_t now = seconds_since_boot();
-        if ((now - t1_ts < MEASUREMENT_EXPIRY) && (now - t2_ts < MEASUREMENT_EXPIRY))
+        if ((t1_age < MEASUREMENT_EXPIRY) && (t2_age < MEASUREMENT_EXPIRY))
         {
             stable = true;
             ESP_LOGI(TAG, "CP control loop: sensors stable");
@@ -84,18 +84,17 @@ static void control_cp_task(void * pvParameter)
         ESP_LOGD(TAG, "CP control loop: state %d", state);
 
         float t1 = 0.0f;
-        uint32_t t1_ts = 0;
         float t2 = 0.0f;
-        uint32_t t2_ts = 0;
         bool transition = false;
 
-        uint32_t now = seconds_since_boot();
-        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, 0, &t1_ts);
-        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_TIMESTAMP, 1, &t2_ts);
+        t1_age = DATASTORE_INVALID_AGE;
+        t2_age = DATASTORE_INVALID_AGE;
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, 0, &t1_age);
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, 1, &t2_age);
 
-        if (now - t1_ts < MEASUREMENT_EXPIRY)
+        if (t1_age < MEASUREMENT_EXPIRY)
         {
-            if (now - t2_ts < MEASUREMENT_EXPIRY)
+            if (t2_age < MEASUREMENT_EXPIRY)
             {
                 datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, 0, &t1);
                 datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, 1, &t2);
@@ -157,17 +156,16 @@ static void control_pp_task(void * pvParameter)
     avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
 
     // wait for stable sensor readings
+    datastore_age_t age = DATASTORE_INVALID_AGE;
     bool stable = false;
     while(!stable)
     {
         last_wake_time = xTaskGetTickCount();
         ESP_LOGD(TAG, "PP control loop: wait for stable sensors");
 
-        uint32_t timestamp = 0;
-        datastore_get_uint32(datastore, RESOURCE_ID_FLOW_TIMESTAMP, 0, &timestamp);
+        datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &age);
 
-        uint32_t now = seconds_since_boot();
-        if (now - timestamp < MEASUREMENT_EXPIRY)
+        if (age < MEASUREMENT_EXPIRY)
         {
             stable = true;
             ESP_LOGI(TAG, "PP control loop: sensors stable");
@@ -208,9 +206,8 @@ static void control_pp_task(void * pvParameter)
         {
         case STATE_PP_OFF:
         {
-            uint32_t timestamp = 0;
-            datastore_get_uint32(datastore, RESOURCE_ID_FLOW_TIMESTAMP, 0, &timestamp);
-            if (now - timestamp < MEASUREMENT_EXPIRY)
+            datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &age);
+            if (age < MEASUREMENT_EXPIRY)
             {
                 float flow_rate = 0.0f;
                 datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);

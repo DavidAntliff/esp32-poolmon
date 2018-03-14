@@ -214,7 +214,6 @@ static void sensor_flow_task(void * pvParameter)
 
         datastore_set_float(datastore, RESOURCE_ID_FLOW_FREQUENCY, 0, frequency_hz);
         datastore_set_float(datastore, RESOURCE_ID_FLOW_RATE, 0, rate_lpm);
-        datastore_set_uint32(datastore, RESOURCE_ID_FLOW_TIMESTAMP, 0, seconds_since_boot());
 
         ESP_LOGI(TAG, "counter %d, frequency %f Hz, rate %f LPM", count, frequency_hz, rate_lpm);
 

@@ -108,7 +108,6 @@ static void _publish_switch_states(uint8_t switch_states, const datastore_t * da
     datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, switch_states & 0b0010 ? 1.0 : 0.0);
     datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, switch_states & 0b0100 ? 1.0 : 0.0);
     datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, switch_states & 0b1000 ? 1.0 : 0.0);
-    datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
 }
 
 static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_switch_states, const datastore_t * datastore)
@@ -137,11 +136,6 @@ static void _publish_switch_changes(uint8_t last_switch_states, uint8_t new_swit
     {
         datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  0, new_switch_states & 0b1000 ? 1.0 : 0.0);
     }
-
-    if (changed & 0b1111)
-    {
-        datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
-    }
 }
 
 static uint8_t _decode_pump_states(uint8_t status)
@@ -157,7 +151,6 @@ static void _publish_pump_states(uint8_t pump_states, const datastore_t * datast
     ESP_LOGD(TAG, "Publishing all pump states");
     datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, pump_states & 0b0001 ? 1.0 : 0.0);
     datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_PP_STATE, 0, pump_states & 0b0010 ? 1.0 : 0.0);
-//    datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_TIMESTAMP, 0, seconds_since_boot());
 }
 
 static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_states, const datastore_t * datastore)
@@ -175,11 +168,6 @@ static void _publish_pump_changes(uint8_t last_pump_states, uint8_t new_pump_sta
     {
         datastore_set_uint32(datastore, RESOURCE_ID_PUMPS_PP_STATE,  0, new_pump_states & 0b0010 ? 1.0 : 0.0);
     }
-
-//    if (changed & 0b1111)
-//    {
-//        datastore_set_uint32(datastore, RESOURCE_ID_SWITCHES_TIMESTAMP, 0, seconds_since_boot());
-//    }
 }
 
 static bool _test_command(command_t command, command_t flag)
