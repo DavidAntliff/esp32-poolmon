@@ -61,6 +61,7 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_WIFI_TIMESTAMP,         "WIFI_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_WIFI_RSSI,              "WIFI_RSSI",              datastore_create_resource(DATASTORE_TYPE_INT8,   1));
         _add_resource(datastore, RESOURCE_ID_WIFI_ADDRESS,           "WIFI_ADDRESS",           datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_WIFI_CONNECTION_COUNT,  "WIFI_CONNECTION_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_MQTT_STATUS,            "MQTT_STATUS",            datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_MQTT_TIMESTAMP,         "MQTT_TIMESTAMP",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));

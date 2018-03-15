@@ -34,8 +34,10 @@
 
 #include "wifi_support.h"
 #include "resources.h"
-#include "esp_mqtt.h"
+#include "utils.h"
 #include "datastore/datastore.h"
+
+#include "esp_mqtt.h"
 
 #define TAG "wifi_support"
 
@@ -59,11 +61,13 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
         case SYSTEM_EVENT_STA_CONNECTED:
             ESP_LOGI(TAG, "WiFi connected");
             datastore_set_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_CONNECTED);
+            datastore_increment(datastore, RESOURCE_ID_WIFI_CONNECTION_COUNT, 0);
             break;
         case SYSTEM_EVENT_STA_GOT_IP:
             ESP_LOGI(TAG, "WiFi got IP");
             xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
             datastore_set_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_GOT_ADDRESS);
+            datastore_set_uint32(datastore, RESOURCE_ID_WIFI_TIMESTAMP, 0, seconds_since_boot());
             datastore_set_uint32(datastore, RESOURCE_ID_WIFI_ADDRESS, 0, event->event_info.got_ip.ip_info.ip.addr);
             esp_mqtt_start(CONFIG_MQTT_BROKER_IP_ADDRESS, CONFIG_MQTT_BROKER_TCP_PORT, "esp-mqtt", "username", "password");
             break;
