@@ -471,8 +471,6 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
 
 void app_main()
 {
-    init_boot_time_reference();
-
     esp_log_level_set("*", ESP_LOG_WARN);
 //    esp_log_level_set("*", ESP_LOG_INFO);
 //    esp_log_level_set("*", ESP_LOG_DEBUG);
@@ -486,6 +484,7 @@ void app_main()
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
     esp_log_level_set("control", ESP_LOG_DEBUG);
     esp_log_level_set("sntp_rtc", ESP_LOG_DEBUG);
+    esp_log_level_set("power", ESP_LOG_DEBUG);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_ESP_MQTT_TASK_STACK_PRIORITY;
@@ -594,7 +593,7 @@ void app_main()
     mqtt_start(mqtt_info);
     _delay();
 
-    sntp_rtc_init();
+    sntp_rtc_init(wifi_monitor_priority, datastore);
     _delay();
 
     control_init(control_priority, datastore);

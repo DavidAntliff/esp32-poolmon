@@ -38,7 +38,6 @@
 
 // ignore any temperature measurements that have expired
 #define MEASUREMENT_EXPIRY (15 * 1000000) // microseconds
-
 #define SHC_WATER (4184.0)               // J/kg/K
 #define MASS_PER_VOLUME_WATER (1000.0)   // kg/m^3
 
@@ -64,8 +63,13 @@ static void power_calculation_task(void * pvParameter)
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     const datastore_t * datastore = task_inputs->datastore;
 
+    TickType_t last_wake_time = xTaskGetTickCount();
+
     while (1)
     {
+        ESP_LOGD(TAG, "power calculation loop");
+        last_wake_time = xTaskGetTickCount();
+
         // for now, use T1 and T2
         const uint8_t in = 0;
         const uint8_t out = 1;
@@ -103,7 +107,7 @@ static void power_calculation_task(void * pvParameter)
             ESP_LOGW(TAG, "T1 measurement has expired");
         }
 
-        vTaskDelay(POWER_CALCULATION_RATE * 1000 / portTICK_RATE_MS);
+        vTaskDelayUntil(&last_wake_time, POWER_CALCULATION_PERIOD * 1000 / portTICK_PERIOD_MS);
     }
 
     vTaskDelete(NULL);

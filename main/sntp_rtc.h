@@ -25,6 +25,11 @@
 #ifndef SNTP_RTC_H
 #define SNTP_RTC_H
 
-void sntp_rtc_init(void);
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#include "datastore/datastore.h"
+
+void sntp_rtc_init(UBaseType_t priority, const datastore_t * datastore);
 
 #endif // SNTP_RTC_H

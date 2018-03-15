@@ -26,23 +26,18 @@
 #include <sys/time.h>
 #include <stdlib.h>
 
+#include "esp_timer.h"
+
 #include "utils.h"
 
-static struct timeval _boot_tv = { 0 };
-
-void init_boot_time_reference(void)
+uint64_t microseconds_since_boot(void)
 {
-    gettimeofday(&_boot_tv, NULL);
+    return esp_timer_get_time();
 }
 
 uint32_t seconds_since_boot(void)
 {
-    // ignore sub-seconds
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec - _boot_tv.tv_sec;
-//    printf("%ld\n", (((tv.tv_sec * 1000000 + tv.tv_usec)
-//            - (tv_start.tv_sec * 1000000 + tv_start.tv_usec))));
+    return esp_timer_get_time() / 1000000;
 }
 
 // Based on https://stackoverflow.com/a/3974138/143397

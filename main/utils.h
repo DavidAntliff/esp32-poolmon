@@ -27,10 +27,13 @@
 
 #include <stdint.h>
 
-void init_boot_time_reference(void);
+/**
+ * @brief Obtain time since boot in microseconds.
+ */
+uint64_t microseconds_since_boot(void);
 
 /**
- * @brief Obtain current timestamp in seconds.
+ * @brief Obtain time since boot in seconds.
  */
 uint32_t seconds_since_boot(void);
 

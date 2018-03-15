@@ -34,6 +34,9 @@
 
 #define PUBLISH_QUEUE_DEPTH      16
 
+#define LOCAL_TIMEZONE_CODE      "NZST-12NZDT,M9.5.0,M4.1.0/3"
+#define UTC_TIMEZONE_CODE        "UTC0"
+
 // RMT channel allocations
 #define OWB_RMT_CHANNEL_RX       RMT_CHANNEL_0
 #define OWB_RMT_CHANNEL_TX       RMT_CHANNEL_1
@@ -54,6 +57,6 @@
 
 // TODO: light and temp sensor sampling periods etc.
 
-#define POWER_CALCULATION_RATE      (10.0)   // seconds
+#define POWER_CALCULATION_PERIOD    (10.0)   // seconds
 
 #endif // CONSTANTS
