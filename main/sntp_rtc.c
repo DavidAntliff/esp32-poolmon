@@ -80,6 +80,11 @@ static void sntp_rtc_task(void * pvParameter)
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
+    // Set timezone to New Zealand Daylight Savings Time
+    // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+    setenv("TZ", LOCAL_TIMEZONE_CODE, 1);
+    tzset();
+
     while (1)
     {
         last_wake_time = xTaskGetTickCount();
@@ -99,23 +104,18 @@ static void sntp_rtc_task(void * pvParameter)
             if (timeinfo.tm_year < (2016 - 1900)) {
                 ESP_LOGI(TAG, "Time is not set yet. Connecting to WiFi and getting time over NTP.");
                 _obtain_time();
-                // update 'now' variable with current time
                 time(&now);
             }
+
             char strftime_buf[64];
 
-            // Set timezone to New Zealand Daylight Savings Time and print local time
-            // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
-            setenv("TZ", LOCAL_TIMEZONE_CODE, 1);
-            tzset();
+            // show local time
             localtime_r(&now, &timeinfo);
             strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
             ESP_LOGI(TAG, "The current date/time in New Zealand is: %s", strftime_buf);
 
-            // Set timezone to UTC and print time
-            setenv("TZ", UTC_TIMEZONE_CODE, 1);
-            tzset();
-            localtime_r(&now, &timeinfo);
+            // show UTC
+            gmtime_r(&now, &timeinfo);
             strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
             ESP_LOGI(TAG, "The current date/time in UTC is: %s", strftime_buf);
         }
