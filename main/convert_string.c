@@ -71,10 +71,10 @@ static bool _to_int(const char * in_str, int32_t * value, int64_t min_value, int
     }
     else
     {
-        ESP_LOGW(TAG, "min_value %"PRId64", full_value %"PRId64", max_value %"PRId64, min_value, full_value, max_value);
-        ESP_LOGW(TAG, "0 >= -128 = %d", 0LL >= -128LL);
-        ESP_LOGW(TAG, "full_value >= min_value = %d", full_value >= min_value);
-        ESP_LOGW(TAG, "full_value <= max_value = %d", full_value <= min_value);
+//        ESP_LOGW(TAG, "min_value %"PRId64", full_value %"PRId64", max_value %"PRId64, min_value, full_value, max_value);
+//        ESP_LOGW(TAG, "0 >= -128 = %d", 0LL >= -128LL);
+//        ESP_LOGW(TAG, "full_value >= min_value = %d", full_value >= min_value);
+//        ESP_LOGW(TAG, "full_value <= max_value = %d", full_value <= min_value);
         if ((full_value >= min_value) && (full_value <= max_value))
         {
             if (value)

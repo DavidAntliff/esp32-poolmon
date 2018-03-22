@@ -53,6 +53,7 @@ datastore_t * resources_init(void)
     {
         _add_resource(datastore, RESOURCE_ID_SYSTEM_VERSION,         "SYSTEM_VERSION",         datastore_create_string_resource(SYSTEM_LEN_VERSION, 1));
         _add_resource(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, "SYSTEM_BUILD_DATE_TIME", datastore_create_string_resource(SYSTEM_LEN_BUILD_DATE_TIME, 1));
+        _add_resource(datastore, RESOURCE_ID_SYSTEM_TIME_SET,        "SYSTEM_TIME_SET",        datastore_create_resource(DATASTORE_TYPE_BOOL, 1));
 
         _add_resource(datastore, RESOURCE_ID_WIFI_SSID,              "WIFI_SSID",              datastore_create_string_resource(WIFI_LEN_SSID, 1));
         _add_resource(datastore, RESOURCE_ID_WIFI_PASSWORD,          "WIFI_PASSWORD",          datastore_create_string_resource(WIFI_LEN_PASSWORD, 1));
@@ -106,6 +107,9 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT,          "CONTROL_PP_CYCLE_COUNT",          datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION,    "CONTROL_PP_CYCLE_ON_DURATION",    datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, "CONTROL_PP_CYCLE_PAUSE_DURATION", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+
+        _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR,           "CONTROL_PP_DAILY_HOUR",           datastore_create_resource(DATASTORE_TYPE_INT32, 1));
+        _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE,         "CONTROL_PP_DAILY_MINUTE",         datastore_create_resource(DATASTORE_TYPE_INT32, 1));
     }
 
     return datastore;
@@ -115,8 +119,10 @@ void resources_load(const datastore_t * datastore)
 {
     if (datastore)
     {
+        // Defaults
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, VERSION));
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, 0, BUILD_TIMESTAMP));
+        ERROR_CHECK(datastore_set_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, false));
 
         // TODO: load from NV
         ERROR_CHECK(datastore_set_string(datastore, RESOURCE_ID_WIFI_SSID, 0, CONFIG_WIFI_SSID));

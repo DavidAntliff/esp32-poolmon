@@ -23,6 +23,7 @@
  */
 
 #include <string.h>
+#include <time.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -144,6 +145,14 @@ static void control_cp_task(void * pvParameter)
     }
 }
 
+static void _get_local_time(time_t * now_time, struct tm * timeinfo)
+{
+    assert(now_time != NULL);
+    assert(timeinfo != NULL);
+    time(now_time);
+    localtime_r(now_time, timeinfo);
+}
+
 static void control_pp_task(void * pvParameter)
 {
     assert(pvParameter);
@@ -184,6 +193,7 @@ static void control_pp_task(void * pvParameter)
     state_t state = STATE_PP_OFF;
     uint32_t cycle_start_time = 0;
     uint32_t n = 0;
+    struct tm last_timeinfo = { 0 };
 
     while (1)
     {
@@ -192,7 +202,52 @@ static void control_pp_task(void * pvParameter)
 
         ESP_LOGD(TAG, "PP control loop: state %d, n %d", state, n);
 
-        // TODO: daily time
+        // run cycle daily at configured time
+        bool daily_trigger = false;
+        bool system_time_set = false;
+        datastore_get_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, &system_time_set);
+        if (system_time_set)
+        {
+            int32_t daily_hour = -1;
+            int32_t daily_minute = -1;
+            datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0, &daily_hour);
+            datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, &daily_minute);
+
+            if (daily_hour >= 0 && daily_minute >= 0)
+            {
+                time_t now;
+                struct tm timeinfo;
+                _get_local_time(&now, &timeinfo);
+                ESP_LOGD(TAG, "timeinfo.tm_hour %d, last_timeinfo.tm_hour %d", timeinfo.tm_hour, last_timeinfo.tm_hour);
+                ESP_LOGD(TAG, "timeinfo.tm_min %d, last_timeinfo.tm_min %d", timeinfo.tm_min, last_timeinfo.tm_min);
+                if ((timeinfo.tm_min != last_timeinfo.tm_min)
+                    && (timeinfo.tm_hour == daily_hour && timeinfo.tm_min == daily_minute))
+                {
+                    daily_trigger = true;
+                    char strftime_buf[64];
+                    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+                    ESP_LOGI(TAG, "Triggered Purge Pump at %s", strftime_buf);
+                }
+                else
+                {
+                    int now_minutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
+                    int set_minutes = daily_hour * 60 + daily_minute;
+                    int rem_minutes = now_minutes <= set_minutes ? set_minutes - now_minutes : 24 * 60 - now_minutes + set_minutes;
+                    int hours_remaining = rem_minutes / 60;  // floor
+                    int minutes_remaining = rem_minutes - (hours_remaining * 60);
+                    ESP_LOGD(TAG, "%dh%02dm until daily purge (now %d, set %d, rem %d)", hours_remaining, minutes_remaining, now_minutes, set_minutes, rem_minutes);
+                }
+                last_timeinfo = timeinfo;
+            }
+            else
+            {
+                ESP_LOGD(TAG, "Daily PP timer disabled");
+            }
+        }
+        else
+        {
+            ESP_LOGD(TAG, "Waiting for system time to be set");
+        }
 
         // TODO: handle tick count overflow
 
@@ -218,7 +273,7 @@ static void control_pp_task(void * pvParameter)
 
                 ESP_LOGD(TAG, "flow rate %f, cp state %d, threshold %f", flow_rate, cp_state, flow_threshold);
 
-                if ((cp_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold))
+                if (daily_trigger || ((cp_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold)))
                 {
                     state = STATE_PP_ON;
                     avr_support_set_pp_pump(AVR_PUMP_STATE_ON);

@@ -37,7 +37,8 @@
 
 #define TAG "sntp_rtc"
 
-#define CHECK_PERIOD (5000) // milliseconds
+#define OUTER_CHECK_PERIOD (10 * 1000)  // wait time between checking system time is set in milliseconds
+#define INNER_CHECK_PERIOD (5 * 1000)   // wait time between inner checks in milliseconds
 
 typedef struct
 {
@@ -47,12 +48,13 @@ typedef struct
 static void _initialise_sntp(void)
 {
     ESP_LOGI(TAG, "Initializing SNTP");
+    sntp_stop();
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, "pool.ntp.org");
     sntp_init();
 }
 
-static void _obtain_time(void)
+static bool _obtain_time(void)
 {
     _initialise_sntp();
 
@@ -61,12 +63,18 @@ static void _obtain_time(void)
     struct tm timeinfo = { 0 };
     int retry = 0;
     const int retry_count = 10;
-    while(timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count) {
+    while(timeinfo.tm_year < (2016 - 1900) && retry++ < retry_count) {
         ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(INNER_CHECK_PERIOD / portTICK_PERIOD_MS);
         time(&now);
         localtime_r(&now, &timeinfo);
     }
+
+    if (retry >= retry_count)
+    {
+        ESP_LOGE(TAG, "Unable to set system time");
+    }
+    return !(retry >= retry_count);
 }
 
 static void sntp_rtc_task(void * pvParameter)
@@ -103,28 +111,33 @@ static void sntp_rtc_task(void * pvParameter)
             // Is time set? If not, tm_year will be (1970 - 1900).
             if (timeinfo.tm_year < (2016 - 1900)) {
                 ESP_LOGI(TAG, "Time is not set yet. Connecting to WiFi and getting time over NTP.");
-                _obtain_time();
-                time(&now);
+                datastore_set_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, false);
+                if (_obtain_time())
+                {
+                    ESP_LOGI(TAG, "System time set");
+                    datastore_set_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, true);
+                    time(&now);
+
+                    char strftime_buf[64];
+
+                    // show local time
+                    localtime_r(&now, &timeinfo);
+                    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+                    ESP_LOGI(TAG, "The current date/time in New Zealand is: %s", strftime_buf);
+
+                    // show UTC
+                    gmtime_r(&now, &timeinfo);
+                    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+                    ESP_LOGI(TAG, "The current date/time in UTC is: %s", strftime_buf);
+                }
             }
-
-            char strftime_buf[64];
-
-            // show local time
-            localtime_r(&now, &timeinfo);
-            strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-            ESP_LOGI(TAG, "The current date/time in New Zealand is: %s", strftime_buf);
-
-            // show UTC
-            gmtime_r(&now, &timeinfo);
-            strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-            ESP_LOGI(TAG, "The current date/time in UTC is: %s", strftime_buf);
         }
         else
         {
             ESP_LOGD(TAG, "waiting for WiFi address");
         }
 
-        vTaskDelayUntil(&last_wake_time, CHECK_PERIOD / portTICK_PERIOD_MS);
+        vTaskDelayUntil(&last_wake_time, OUTER_CHECK_PERIOD / portTICK_PERIOD_MS);
     }
 }
 

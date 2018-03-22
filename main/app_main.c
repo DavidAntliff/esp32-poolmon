@@ -50,6 +50,7 @@
 #include "display.h"
 #include "power.h"
 #include "control.h"
+#include "system_monitor.h"
 #include "sntp_rtc.h"
 #include "datastore/datastore.h"
 
@@ -168,6 +169,18 @@ static void do_control_pp_cycle_pause_duration(const char * topic, uint32_t valu
 {
     datastore_t * datastore = (datastore_t *)context;
     datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, value);
+}
+
+static void do_control_pp_daily_hour(const char * topic, int32_t value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0, value);
+}
+
+static void do_control_pp_daily_minute(const char * topic, int32_t value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, value);
 }
 
 static void echo_bool(const char * topic, bool value, void * context)
@@ -464,6 +477,16 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
             {
                 ESP_LOGE(TAG, "mqtt_register_topic_as_uint32 failed: %d", mqtt_error);
             }
+
+            if ((mqtt_error = mqtt_register_topic_as_int32(globals->mqtt_info, ROOT_TOPIC"/control/pp/daily/hour", &do_control_pp_daily_hour, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_int32 failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_int32(globals->mqtt_info, ROOT_TOPIC"/control/pp/daily/minute", &do_control_pp_daily_minute, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_int32 failed: %d", mqtt_error);
+            }
         }
     }
 }
@@ -474,17 +497,18 @@ void app_main()
     esp_log_level_set("*", ESP_LOG_WARN);
 //    esp_log_level_set("*", ESP_LOG_INFO);
 //    esp_log_level_set("*", ESP_LOG_DEBUG);
-//   esp_log_level_set("display", ESP_LOG_DEBUG);
+    esp_log_level_set("i2c", ESP_LOG_INFO);
+//    esp_log_level_set("display", ESP_LOG_DEBUG);
 //    esp_log_level_set("avr_support", ESP_LOG_DEBUG);
     esp_log_level_set("wifi_support", ESP_LOG_INFO);
     esp_log_level_set("datastore", ESP_LOG_INFO);
     esp_log_level_set("mqtt", ESP_LOG_INFO);
     esp_log_level_set("publish", ESP_LOG_INFO);
-    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
+//    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
     esp_log_level_set("control", ESP_LOG_DEBUG);
     esp_log_level_set("sntp_rtc", ESP_LOG_DEBUG);
-    esp_log_level_set("power", ESP_LOG_DEBUG);
+//    esp_log_level_set("power", ESP_LOG_DEBUG);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_ESP_MQTT_TASK_STACK_PRIORITY;
@@ -493,6 +517,7 @@ void app_main()
     UBaseType_t avr_priority = sensor_priority;
     UBaseType_t wifi_monitor_priority = sensor_priority;
     UBaseType_t control_priority = sensor_priority;
+    UBaseType_t system_priority = publish_priority;
 
     ESP_LOGI(TAG, "Start");
 
@@ -597,6 +622,9 @@ void app_main()
     _delay();
 
     control_init(control_priority, datastore);
+    _delay();
+
+    system_monitor_init(system_priority, datastore);
     _delay();
 
     while (running)
