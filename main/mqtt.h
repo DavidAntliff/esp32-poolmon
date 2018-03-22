@@ -57,7 +57,7 @@ void mqtt_free(mqtt_info_t ** mqtt_info);
 mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info, const datastore_t * datastore);
 mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info);
 
-bool mqtt_publish(const char * topic, uint8_t * payload, size_t len, int qos, bool retained);
+bool mqtt_publish(const char * topic, const uint8_t * payload, size_t len, int qos, bool retained);
 
 typedef void (*mqtt_receive_callback_bool)(const char * topic, bool value, void * context);
 typedef void (*mqtt_receive_callback_uint8)(const char * topic, uint8_t value, void * context);

@@ -33,6 +33,7 @@
 #include "resources.h"
 #include "utils.h"
 #include "system_monitor.h"
+#include "publish.h"
 
 #define TAG "system_monitor"
 
@@ -41,6 +42,7 @@
 typedef struct
 {
     const datastore_t * datastore;
+    const publish_context_t * publish_context;
 } task_inputs_t;
 
 static void system_task(void * pvParameter)
@@ -51,6 +53,7 @@ static void system_task(void * pvParameter)
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     const datastore_t * datastore = task_inputs->datastore;
+    const publish_context_t * publish_context = task_inputs->publish_context;
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
@@ -58,30 +61,41 @@ static void system_task(void * pvParameter)
     {
         last_wake_time = xTaskGetTickCount();
 
-//        bool system_time_set = false;
-//        datastore_get_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, &system_time_set);
-//        if (system_time_set)
-//        {
-//
-//        }
-
         uint32_t ram_free = esp_get_free_heap_size();  // byte-addressable heap memory
         uint32_t iram_free = heap_caps_get_free_size(MALLOC_CAP_32BIT);  // IRAM 32-bit aligned heap
         uint32_t uptime = microseconds_since_boot() / 1000000;
 
-        // TODO: mqtt_publish()
+        ESP_LOGI(TAG, "RAM free: %u bytes", ram_free);
+        ESP_LOGI(TAG, "RAM 32bit aligned free: %u bytes", iram_free);
+        ESP_LOGI(TAG, "Uptime: %u seconds", uptime);
+
+        bool mqtt_connected = false;
+        datastore_get_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, &mqtt_connected);
+        if (mqtt_connected)
+        {
+            // TODO: send via publish task
+            // For now, send via MQTT directly
+            char value_string[256] = "";
+            snprintf(value_string, sizeof(value_string) - 1, "%u", ram_free);
+            publish_direct(publish_context, ROOT_TOPIC"/system/ram_free", (uint8_t *)value_string, strlen(value_string) + 1);
+            snprintf(value_string, sizeof(value_string) - 1, "%u", iram_free);
+            publish_direct(publish_context, ROOT_TOPIC"/system/iram_free", (uint8_t *)value_string, strlen(value_string) + 1);
+            snprintf(value_string, sizeof(value_string) - 1, "%u", uptime);
+            publish_direct(publish_context, ROOT_TOPIC"/system/uptime", (uint8_t *)value_string, strlen(value_string) + 1);
+        }
 
         vTaskDelayUntil(&last_wake_time, CHECK_PERIOD / portTICK_PERIOD_MS);
     }
 }
 
-void system_monitor_init(UBaseType_t priority, const datastore_t * datastore)
+void system_monitor_init(UBaseType_t priority, const datastore_t * datastore, publish_context_t * publish_context)
 {
     task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
     if (task_inputs)
     {
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->datastore = datastore;
+        task_inputs->publish_context = publish_context;
         xTaskCreate(&system_task, "system_task", 4096, task_inputs, priority, NULL);
     }
 }

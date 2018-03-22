@@ -56,8 +56,6 @@
 
 #define TAG "app_main"
 
-#define ROOT_TOPIC "poolmon"
-
 //TODO: LED task, to blink LED when required
 // - count number of connected devices
 // - indicate when sampling
@@ -624,19 +622,12 @@ void app_main()
     control_init(control_priority, datastore);
     _delay();
 
-    system_monitor_init(system_priority, datastore);
+    system_monitor_init(system_priority, datastore, publish_context);
     _delay();
 
     while (running)
     {
         last_wake_time = xTaskGetTickCount();
-
-        if (seconds_since_boot() % 10 == 0)
-        {
-            ESP_LOGI(TAG, "RAM left %d", esp_get_free_heap_size());  // byte-addressable heap memory
-            ESP_LOGI(TAG, "32bit aligned RAM left %d", heap_caps_get_free_size(MALLOC_CAP_32BIT));  // IRAM 32-bit aligned heap
-            ESP_LOGI(TAG, "uptime %d seconds", seconds_since_boot());
-        }
 
         //avr_test_sequence();
 

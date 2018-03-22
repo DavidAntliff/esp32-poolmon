@@ -116,13 +116,13 @@ typedef struct
     datastore_instance_id_t instance_id;
 } publish_request_t;
 
-static void process_request(publish_request_t request, const char * root_topic)
+static void process_request(const publish_request_t * request, const char * root_topic)
 {
-    ESP_LOGD(TAG, "Received request: id %d, name %s, instance %d", request.resource_id, datastore_get_name(request.datastore, request.resource_id), request.instance_id);
+    ESP_LOGD(TAG, "Received request: id %d, name %s, instance %d", request->resource_id, datastore_get_name(request->datastore, request->resource_id), request->instance_id);
 
     // check if MQTT is ready before attempting to send
     mqtt_status_t mqtt_status = MQTT_STATUS_DISCONNECTED;
-    if (datastore_get_uint32(request.datastore, RESOURCE_ID_MQTT_STATUS, 0, &mqtt_status) == DATASTORE_STATUS_OK)
+    if (datastore_get_uint32(request->datastore, RESOURCE_ID_MQTT_STATUS, 0, &mqtt_status) == DATASTORE_STATUS_OK)
     {
         if (mqtt_status == MQTT_STATUS_CONNECTED)
         {
@@ -130,8 +130,8 @@ static void process_request(publish_request_t request, const char * root_topic)
             bool found = false;
             for (size_t i = 0; found == false && i < sizeof(values_info) / sizeof(values_info[0]); ++i)
             {
-                if (values_info[i].resource_id == request.resource_id
-                    && values_info[i].instance_id == request.instance_id)
+                if (values_info[i].resource_id == request->resource_id
+                    && values_info[i].instance_id == request->instance_id)
                 {
                     // retrieve value as string
                     found = true;
@@ -140,22 +140,22 @@ static void process_request(publish_request_t request, const char * root_topic)
                     snprintf(topic, sizeof(topic) - 1, "%s/%s", root_topic, values_info[i].topic);
                     if (values_info[i].renderer != NULL)
                     {
-                        values_info[i].renderer(request.datastore, request.resource_id, request.instance_id, value_string, sizeof(value_string));
-                        //datastore_get_as_string(request.datastore, request.resource_id, request.instance_id, value_string, sizeof(value_string));
+                        values_info[i].renderer(request->datastore, request->resource_id, request->instance_id, value_string, sizeof(value_string));
+                        //datastore_get_as_string(request->datastore, request->resource_id, request->instance_id, value_string, sizeof(value_string));
                         size_t value_size = strlen(value_string);
                         ESP_LOGD(TAG, "Topic %s, value \"%s\" [%d bytes]", topic, value_string, value_size);
                         mqtt_publish(topic, (uint8_t *)value_string, strlen(value_string) + 1, 0, false);
                     }
                     else
                     {
-                        ESP_LOGE(TAG, "No value renderer for ID %d\n", request.resource_id);
+                        ESP_LOGE(TAG, "No value renderer for ID %d\n", request->resource_id);
                     }
                 }
             }
 
             if (found == false)
             {
-                ESP_LOGW(TAG, "Request id %d, name %s, instance %d not published", request.resource_id, datastore_get_name(request.datastore, request.resource_id), request.instance_id);
+                ESP_LOGW(TAG, "Request id %d, name %s, instance %d not published", request->resource_id, datastore_get_name(request->datastore, request->resource_id), request->instance_id);
             }
         }
         else
@@ -181,7 +181,7 @@ static void publish_task(void * pvParameter)
         BaseType_t sensor_queue_status = xQueueReceive(publish_queue, &request, portMAX_DELAY);
         if (sensor_queue_status == pdPASS)
         {
-            process_request(request, root_topic);
+            process_request(&request, root_topic);
         }
         else
         {
@@ -192,7 +192,7 @@ static void publish_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
-void publish_resource(publish_context_t * publish_context, const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance)
+void publish_resource(const publish_context_t * publish_context, const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance)
 {
     // push the datastore ID and instance to the queue so that the task can send an MQTT update
     ESP_LOGD(TAG, "publish_resource: context %p, datastore %p, resource id %d, instance id %d", publish_context, datastore, id, instance);
@@ -212,6 +212,18 @@ void publish_resource(publish_context_t * publish_context, const datastore_t * d
                 ESP_LOGE(TAG, "Could not send to queue");
             }
         }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "publish_context is NULL");
+    }
+}
+
+void publish_direct(const publish_context_t * publish_context, const char * topic, const uint8_t * data, size_t length)
+{
+    if (publish_context != NULL)
+    {
+        mqtt_publish(topic, data, length, 0, false);
     }
     else
     {

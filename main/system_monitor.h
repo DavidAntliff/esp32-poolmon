@@ -29,7 +29,8 @@
 #include "freertos/task.h"
 
 #include "datastore/datastore.h"
+#include "publish.h"
 
-void system_monitor_init(UBaseType_t priority, const datastore_t * datastore);
+void system_monitor_init(UBaseType_t priority, const datastore_t * datastore, publish_context_t * publish_context);
 
 #endif // SYSTEM_MONITOR_H

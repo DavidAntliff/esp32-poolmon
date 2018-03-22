@@ -25,6 +25,10 @@
 #ifndef PUBLISH_H
 #define PUBLISH_H
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+
 #include "mqtt.h"
 
 typedef struct
@@ -35,7 +39,8 @@ typedef struct
 publish_context_t * publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority, const char * root_topic);
 void publish_free(publish_context_t ** publish_context);
 
-void publish_resource(publish_context_t * publish_context, const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance);
+void publish_resource(const publish_context_t * publish_context, const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance);
+void publish_direct(const publish_context_t * publish_context, const char * topic, const uint8_t * data, size_t length);
 
 // Called by datastore whenever a subscribed value is set
 void publish_callback(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context);
