@@ -39,7 +39,6 @@
 #include "i2c-lcd1602.h"
 #include "avr_support.h"
 #include "sensor_temp.h"
-#include "convert_string.h"
 #include "wifi_support.h"
 #include "mqtt.h"
 #include "datastore/datastore.h"

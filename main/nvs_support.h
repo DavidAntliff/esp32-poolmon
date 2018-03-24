@@ -22,21 +22,14 @@
  * SOFTWARE.
  */
 
-#ifndef CONVERT_STRING_H
-#define CONVERT_STRING_H
+#ifndef NVS_SUPPORT_H
+#define NVS_SUPPORT_H
 
-#include <stdint.h>
-#include <stdbool.h>
+#include "esp_err.h"
 
-bool string_to_uint8(const char * in_str, uint8_t * value);
-bool string_to_uint16(const char * in_str, uint16_t * value);
-bool string_to_uint32(const char * in_str, uint32_t * value);
+esp_err_t nvs_support_init(const char * namespace);
 
-bool string_to_int8(const char * in_str, int8_t * value);
-bool string_to_int16(const char * in_str, int16_t * value);
-bool string_to_int32(const char * in_str, int32_t * value);
+// destructive clear of all saved NVS data in this namespace
+esp_err_t nvs_support_erase_all(const char * namespace);
 
-bool string_to_float(const char * in_str, float * value);
-bool string_to_double(const char * in_str, double * value);
-
-#endif // CONVERT_STRING_H
+#endif // NVS_SUPPORT_H

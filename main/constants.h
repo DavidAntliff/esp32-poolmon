@@ -38,6 +38,10 @@
 #define LOCAL_TIMEZONE_CODE      "NZST-12NZDT,M9.5.0,M4.1.0/3"
 #define UTC_TIMEZONE_CODE        "UTC0"
 
+#define NVS_NAMESPACE_RESOURCES  "resources"
+#define NVS_MAX_STRING_LEN       256
+#define NVS_MAX_KEY_LEN          64
+
 // RMT channel allocations
 #define OWB_RMT_CHANNEL_RX       RMT_CHANNEL_0
 #define OWB_RMT_CHANNEL_TX       RMT_CHANNEL_1

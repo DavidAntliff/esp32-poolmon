@@ -44,6 +44,7 @@
 #include "sensor_flow.h"
 #include "sensor_light.h"
 #include "publish.h"
+#include "nvs_support.h"
 #include "wifi_support.h"
 #include "mqtt.h"
 #include "avr_support.h"
@@ -99,13 +100,47 @@ static void do_avr_alarm(const char * topic, bool value, void * context)
 
 static void do_datastore_dump(const char * topic, bool value, void * context)
 {
+    if (value && context)
+    {
+        const datastore_t * datastore = (const datastore_t *)context;
+        datastore_dump(datastore);
+    }
+}
+
+static void do_datastore_save(const char * topic, bool value, void * context)
+{
+    if (value && context)
+    {
+        const datastore_t * datastore = (const datastore_t *)context;
+        resources_save(datastore);
+    }
+}
+
+static void do_datastore_load(const char * topic, bool value, void * context)
+{
+    if (value && context)
+    {
+        const datastore_t * datastore = (const datastore_t *)context;
+        resources_load(datastore);
+    }
+}
+
+static void do_nvs_erase_all(const char * topic, bool value, void * context)
+{
     if (value)
     {
-        if (context != NULL)
-        {
-            const datastore_t * datastore = (const datastore_t *)context;
-            datastore_dump(datastore);
-        }
+        ESP_LOGW(TAG, "Erasing all resources from NVS");
+        nvs_support_erase_all(NVS_NAMESPACE_RESOURCES);
+    }
+}
+
+static void do_nvs_erase(const char * topic, const char * description, void * context)
+{
+    if (description && context)
+    {
+        ESP_LOGW(TAG, "Erasing resource %s from NVS", description);
+        const datastore_t * datastore = (const datastore_t *)context;
+        resources_erase(datastore, description);
     }
 }
 
@@ -429,6 +464,26 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
                 ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
             }
 
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/datastore/save", &do_datastore_save, (void *)globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/datastore/load", &do_datastore_load, (void *)globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_string(globals->mqtt_info, ROOT_TOPIC"/datastore/erase", &do_nvs_erase, (void *)globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
+            }
+
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/datastore/erase_all", &do_nvs_erase_all, NULL)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
+
             // temp sensor labels and device assignments
             for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
             {
@@ -485,6 +540,7 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
             {
                 ESP_LOGE(TAG, "mqtt_register_topic_as_int32 failed: %d", mqtt_error);
             }
+
         }
     }
 }
@@ -493,6 +549,8 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
 void app_main()
 {
     esp_log_level_set("*", ESP_LOG_WARN);
+    esp_log_level_set("nvs_support", ESP_LOG_DEBUG);
+    esp_log_level_set("resources", ESP_LOG_DEBUG);
 //    esp_log_level_set("*", ESP_LOG_INFO);
 //    esp_log_level_set("*", ESP_LOG_DEBUG);
     esp_log_level_set("i2c", ESP_LOG_INFO);
@@ -500,11 +558,11 @@ void app_main()
 //    esp_log_level_set("avr_support", ESP_LOG_DEBUG);
     esp_log_level_set("wifi_support", ESP_LOG_INFO);
     esp_log_level_set("datastore", ESP_LOG_INFO);
-    esp_log_level_set("mqtt", ESP_LOG_INFO);
+    esp_log_level_set("mqtt", ESP_LOG_DEBUG);
     esp_log_level_set("publish", ESP_LOG_INFO);
 //    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
-    esp_log_level_set("control", ESP_LOG_DEBUG);
+//    esp_log_level_set("control", ESP_LOG_DEBUG);
     esp_log_level_set("sntp_rtc", ESP_LOG_DEBUG);
 //    esp_log_level_set("power", ESP_LOG_DEBUG);
 
@@ -523,6 +581,9 @@ void app_main()
     uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
     ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
+
+    // initialise NVS
+    ESP_ERROR_CHECK(nvs_support_init(NVS_NAMESPACE_RESOURCES));
 
     datastore_t * datastore = resources_init();
     resources_load(datastore);
@@ -584,8 +645,7 @@ void app_main()
     }
 
     _delay();
-    nvs_flash_init();
-    wifi_support_init(wifi_monitor_priority, datastore);
+    wifi_support_init(wifi_monitor_priority, datastore);   // requires NVS to be initialised
 
     _delay();
     publish_context_t * publish_context = publish_init(mqtt_info, PUBLISH_QUEUE_DEPTH, publish_priority, ROOT_TOPIC);

@@ -96,5 +96,9 @@ typedef enum
 
 datastore_t * resources_init(void);
 void resources_load(const datastore_t * datastore);
+void resources_save(const datastore_t * datastore);
+
+// description is in the format "ResourceName:InstanceId"
+void resources_erase(const datastore_t * datastore, const char * description);
 
 #endif // RESOURCES_H
