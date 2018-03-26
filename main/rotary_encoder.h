@@ -22,8 +22,8 @@
  * SOFTWARE.
  */
 
-#ifndef BUTTON_H
-#define BUTTON_H
+#ifndef ROTARY_ENCODER_H
+#define ROTARY_ENCODER_H
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -32,11 +32,11 @@
 typedef enum
 {
     // zero means "no event"
-    BUTTON_EVENT_SHORT = 10,   // single button press less than 100ms
-    BUTTON_EVENT_LONG  = 11,    // single button press less than 500ms
-} button_event_t;
+    ROTARY_ENCODER_EVENT_CLOCKWISE = 20,
+    ROTARY_ENCODER_EVENT_COUNTER_CLOCKWISE = 21,
+} rotary_encoder_event_t;
 
-// GPIO must be capable of internal pull-up, or have external pull-up.
-void button_init(UBaseType_t priority, QueueHandle_t input_queue, gpio_num_t gpio);
+// GPIO A is "CLK", GPIO B is "DT". Both GPIOs must be capable of internal pull-up, or have external pull-ups.
+void rotary_encoder_init(UBaseType_t priority, QueueHandle_t input_queue, gpio_num_t gpio_a, gpio_num_t gpio_b);
 
-#endif // BUTTON_H
+#endif // ROTARY_ENCODER_H

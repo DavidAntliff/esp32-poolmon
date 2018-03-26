@@ -45,9 +45,27 @@ config ONE_WIRE_GPIO
 config DISPLAY_BUTTON_GPIO
     int "Display Button GPIO number"
     range 0 34
-    default 22
+    default 32
     help
         GPIO number (IOxx) to read the Display Button state.
+
+        Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used.
+
+config DISPLAY_ROTARY_ENCODER_A_GPIO
+    int "Display Rotary Encoder input A (CLK) GPIO number"
+    range 0 34
+    default 25
+    help
+        GPIO number (IOxx) to read the Display Rotary Encoder A (CLK) pin state.
+
+        Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used.
+
+config DISPLAY_ROTARY_ENCODER_B_GPIO
+    int "Display Rotary Encoder input B (DT) GPIO number"
+    range 0 34
+    default 33
+    help
+        GPIO number (IOxx) to read the Display Rotary Encoder B (DT) pin state.
 
         Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used.
 

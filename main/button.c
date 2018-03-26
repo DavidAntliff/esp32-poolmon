@@ -45,7 +45,7 @@ typedef struct
 static void button_task(void * pvParameter)
 {
     assert(pvParameter);
-    ESP_LOGI(TAG, "[button] Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     QueueHandle_t input_queue = task_inputs->input_queue;
@@ -73,7 +73,7 @@ static void button_task(void * pvParameter)
         bool raw_state = gpio_get_level(gpio) ? false : true;
         if (raw_state == last_raw_state)
         {
-            input_t input = BUTTON_INPUT_NONE;
+            button_event_t event = 0;
             TickType_t now = xTaskGetTickCount();
 
             // detect edges
@@ -87,7 +87,7 @@ static void button_task(void * pvParameter)
                     ESP_LOGD(TAG, "pressed for %d ticks", now - last_pressed);
                     if (now - last_pressed < SHORT_PRESS_THRESHOLD)
                     {
-                        input = BUTTON_INPUT_SHORT;
+                        event = BUTTON_EVENT_SHORT;
                         ESP_LOGD(TAG, "short");
                     }
                     long_sent = false;
@@ -101,14 +101,14 @@ static void button_task(void * pvParameter)
             // detect long hold
             if (!long_sent && debounced_state && now - last_pressed > SHORT_PRESS_THRESHOLD)
             {
-                input = BUTTON_INPUT_LONG;
+                event = BUTTON_EVENT_LONG;
                 ESP_LOGD(TAG, "long");
                 long_sent = true;
             }
 
-            if (input != BUTTON_INPUT_NONE)
+            if (event)
             {
-                if (xQueueSendToBack(input_queue, &input, 0) != pdTRUE)
+                if (xQueueSendToBack(input_queue, &event, 0) != pdTRUE)
                 {
                     ESP_LOGE(TAG, "xQueueSendToBack failed");
                 }

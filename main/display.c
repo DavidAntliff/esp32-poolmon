@@ -42,6 +42,7 @@
 #include "wifi_support.h"
 #include "mqtt.h"
 #include "button.h"
+#include "rotary_encoder.h"
 #include "datastore/datastore.h"
 
 #define TAG "display"
@@ -69,14 +70,8 @@ typedef enum
     PAGE_SENSORS_FLOW,
     PAGE_PUMPS_SSRS,
     PAGE_ALARM,
-    PAGE_ADVANCED,
-    PAGE_LAST_ERROR,
     PAGE_WIFI_STATUS,
     PAGE_MQTT_STATUS,
-    PAGE_SENSORS_STATUS_1,
-    PAGE_SENSORS_STATUS_2,
-    PAGE_SENSORS_STATUS_3,
-    PAGE_SENSORS_STATUS_4,
     PAGE_ESP32_STATUS,
     PAGE_AVR_STATUS,
     PAGE_LAST,
@@ -103,14 +98,8 @@ static void _handle_page_sensors_light(const i2c_lcd1602_info_t * lcd_info, void
 static void _handle_page_sensors_flow(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_pump_ssrs(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_alarm(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
-static void _handle_page_advanced(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
-static void _handle_page_last_error(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_mqtt_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
-static void _handle_page_sensors_status_1(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
-static void _handle_page_sensors_status_2(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
-static void _handle_page_sensors_status_3(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
-static void _handle_page_sensors_status_4(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_avr_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 
@@ -130,14 +119,8 @@ static const page_spec_t page_specs[] = {
     { PAGE_SENSORS_FLOW,        _handle_page_sensors_flow,     NULL },
     { PAGE_PUMPS_SSRS,          _handle_page_pump_ssrs,        NULL },
     { PAGE_ALARM,               _handle_page_alarm,            &alarm_display_count },
-    { PAGE_ADVANCED,            _handle_page_advanced,         NULL },
-    { PAGE_LAST_ERROR,          _handle_page_last_error,       NULL },
     { PAGE_WIFI_STATUS,         _handle_page_wifi_status,      NULL },
     { PAGE_MQTT_STATUS,         _handle_page_mqtt_status,      &mqtt_status_state },
-    { PAGE_SENSORS_STATUS_1,    _handle_page_sensors_status_1, NULL },
-    { PAGE_SENSORS_STATUS_2,    _handle_page_sensors_status_2, NULL },
-    { PAGE_SENSORS_STATUS_3,    _handle_page_sensors_status_3, NULL },
-    { PAGE_SENSORS_STATUS_4,    _handle_page_sensors_status_4, NULL },
     { PAGE_ESP32_STATUS,        _handle_page_esp32_status,     &esp32_status_state },
     { PAGE_AVR_STATUS,          _handle_page_avr_status,       NULL },
 };
@@ -146,31 +129,27 @@ static const page_spec_t page_specs[] = {
 typedef struct
 {
     page_id_t current;
-    page_id_t on_short;    // new page on single short press
-    page_id_t on_long;     // new page on single long press
+    page_id_t on_counter_clockwise;  // next page on turn counter-clockwise
+    page_id_t on_clockwise;          // next page on turn clockwise
+    page_id_t on_short;              // new page on single short press
+    page_id_t on_long;               // new page on single long press
 } transition_t;
 
 static const transition_t transitions[] = {
-    // ID                       short                  long
-    { PAGE_BLANK,               PAGE_IGNORE,           PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_SPLASH,              PAGE_SENSORS_TEMP_1_2, PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_SENSORS_TEMP_1_2,    PAGE_SENSORS_TEMP_3_4, PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_SENSORS_TEMP_3_4,    PAGE_SENSORS_TEMP_5_P, PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_SENSORS_TEMP_5_P,    PAGE_SENSORS_LIGHT,    PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_SENSORS_LIGHT,       PAGE_SENSORS_FLOW,     PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_SENSORS_FLOW,        PAGE_PUMPS_SSRS,       PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_PUMPS_SSRS,          PAGE_ALARM,            PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_ALARM,               PAGE_ADVANCED,         PAGE_LAST_ERROR /*PAGE_IGNORE*/ },
-    { PAGE_ADVANCED,            PAGE_SENSORS_TEMP_1_2, PAGE_LAST_ERROR },
-    { PAGE_LAST_ERROR,          PAGE_WIFI_STATUS,      PAGE_SENSORS_TEMP_1_2 },
-    { PAGE_WIFI_STATUS,         PAGE_MQTT_STATUS,      PAGE_SENSORS_TEMP_1_2 },
-    { PAGE_MQTT_STATUS,         PAGE_SENSORS_STATUS_1, PAGE_SENSORS_TEMP_1_2 },
-    { PAGE_SENSORS_STATUS_1,    PAGE_SENSORS_STATUS_2, PAGE_SENSORS_TEMP_1_2 },
-    { PAGE_SENSORS_STATUS_2,    PAGE_SENSORS_STATUS_3, PAGE_SENSORS_TEMP_1_2 },
-    { PAGE_SENSORS_STATUS_3,    PAGE_SENSORS_STATUS_4, PAGE_SENSORS_TEMP_1_2 },
-    { PAGE_SENSORS_STATUS_4,    PAGE_ESP32_STATUS,     PAGE_SENSORS_TEMP_1_2 },
-    { PAGE_ESP32_STATUS,        PAGE_AVR_STATUS,       PAGE_SENSORS_TEMP_1_2 },
-    { PAGE_AVR_STATUS,          PAGE_LAST_ERROR,       PAGE_SENSORS_TEMP_1_2 },
+    // ID                       counter-clockwise      clockwise               short                  long
+    { PAGE_BLANK,               PAGE_SPLASH,           PAGE_SPLASH,            PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_SPLASH,              PAGE_AVR_STATUS,       PAGE_SENSORS_TEMP_1_2,  PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_SENSORS_TEMP_1_2,    PAGE_SPLASH,           PAGE_SENSORS_TEMP_3_4,  PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_SENSORS_TEMP_3_4,    PAGE_SENSORS_TEMP_1_2, PAGE_SENSORS_TEMP_5_P,  PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_SENSORS_TEMP_5_P,    PAGE_SENSORS_TEMP_3_4, PAGE_SENSORS_LIGHT,     PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_SENSORS_LIGHT,       PAGE_SENSORS_TEMP_5_P, PAGE_SENSORS_FLOW,      PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_SENSORS_FLOW,        PAGE_SENSORS_LIGHT,    PAGE_PUMPS_SSRS,        PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_PUMPS_SSRS,          PAGE_SENSORS_FLOW,     PAGE_ALARM,             PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_ALARM,               PAGE_PUMPS_SSRS,       PAGE_WIFI_STATUS,       PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_WIFI_STATUS,         PAGE_ALARM,            PAGE_MQTT_STATUS,       PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_MQTT_STATUS,         PAGE_WIFI_STATUS,      PAGE_ESP32_STATUS,      PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_ESP32_STATUS,        PAGE_MQTT_STATUS,      PAGE_AVR_STATUS,        PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_AVR_STATUS,          PAGE_ESP32_STATUS,     PAGE_SPLASH,            PAGE_IGNORE,           PAGE_IGNORE },
 };
 
 static const char * BLANK_LINE = "                ";
@@ -496,18 +475,6 @@ static void _handle_page_alarm(const i2c_lcd1602_info_t * lcd_info, void * state
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "ABCDEFGHIJKLMNOP"));
 }
 
-static void _handle_page_advanced(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
-{
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "ADVANCED"));
-}
-
-static void _handle_page_last_error(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
-{
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "LAST_ERROR"));
-}
-
 static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
 {
     wifi_status_t wifi_status = 0;
@@ -658,30 +625,6 @@ static void _handle_page_mqtt_status(const i2c_lcd1602_info_t * lcd_info, void *
     ++*page_state;
 }
 
-static void _handle_page_sensors_status_1(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
-{
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "SENSORS_STATUS_1"));
-}
-
-static void _handle_page_sensors_status_2(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
-{
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "SENSORS_STATUS_2"));
-}
-
-static void _handle_page_sensors_status_3(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
-{
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "SENSORS_STATUS_3"));
-}
-
-static void _handle_page_sensors_status_4(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
-{
-    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, "SENSORS_STATUS_4"));
-}
-
 static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
 {
     int * page_state = (int *)state;
@@ -758,34 +701,51 @@ static void dispatch_to_handler(i2c_lcd1602_info_t * lcd_info, page_id_t current
     }
 }
 
-static page_id_t handle_transition(input_t input, page_id_t current_page)
+static page_id_t handle_transition(int input, page_id_t current_page)
 {
     page_id_t new_page = PAGE_BLANK;
     if (current_page >= 0 && current_page < PAGE_LAST)
     {
         switch (input)
         {
-            case BUTTON_INPUT_NONE:
-                new_page = current_page;
+            case ROTARY_ENCODER_EVENT_CLOCKWISE:
+                new_page = transitions[current_page].on_clockwise;
                 break;
-            case BUTTON_INPUT_SHORT:
+            case ROTARY_ENCODER_EVENT_COUNTER_CLOCKWISE:
+                new_page = transitions[current_page].on_counter_clockwise;
+                break;
+            case BUTTON_EVENT_SHORT:
                 new_page = transitions[current_page].on_short;
                 break;
-            case BUTTON_INPUT_LONG:
+            case BUTTON_EVENT_LONG:
                 new_page = transitions[current_page].on_long;
                 break;
             default:
                 ESP_LOGE(TAG, "invalid input %d", input);
+                new_page = current_page;
                 break;
         }
     }
     return new_page;
 }
 
+static void dump_datastore_task(void * pvParameter)
+{
+    assert(pvParameter);
+    const datastore_t * datastore = (datastore_t *)pvParameter;
+    datastore_dump(datastore);
+    vTaskDelete(NULL);
+}
+
+static void _dump_datastore(const datastore_t * datastore)
+{
+    xTaskCreate(&dump_datastore_task, "dump_datastore_task", 4096, (void *)datastore, tskIDLE_PRIORITY, NULL);
+}
+
 static void display_task(void * pvParameter)
 {
     assert(pvParameter);
-    ESP_LOGI(TAG, "[display] Core ID %d", xPortGetCoreID());
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
@@ -823,7 +783,7 @@ static void display_task(void * pvParameter)
         dispatch_to_handler(lcd_info, current_page, datastore);
         i2c_master_unlock(i2c_master_info);
 
-        input_t input = BUTTON_INPUT_NONE;
+        button_event_t input = 0;
         BaseType_t rc = xQueueReceive(input_queue, &input, TICKS_PER_UPDATE);
         if (rc == pdTRUE)
         {
@@ -834,27 +794,28 @@ static void display_task(void * pvParameter)
                 ESP_LOGI(TAG, "change to page %d", new_page);
                 current_page = new_page;
 
-                // reset display when changing page
-                _display_reset(lcd_info);
-
-                I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
-
-                // special case - when changing to the Last Error page, dump the entire datastore
-                if (current_page == PAGE_LAST_ERROR)
+                // reset the display when going through the Splash page
+                if (current_page == PAGE_SPLASH)
                 {
-                    datastore_dump(datastore);
+                    // reset display when changing page
+                    _display_reset(lcd_info);
+                    I2C_LCD1602_ERROR_CHECK(_clear(lcd_info));
                 }
+            }
+
+            // special case - short button press on Splash page will dump datastore to console
+            if (current_page == PAGE_SPLASH && input == BUTTON_EVENT_SHORT)
+            {
+                _dump_datastore(datastore);
             }
         }
 
-        // TODO: reset every 5 seconds as a precaution
+        // TODO: reset display every 5 seconds as a precaution
     }
 
     free(task_inputs);
     vTaskDelete(NULL);
 }
-
-
 
 void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore)
 {
@@ -863,7 +824,7 @@ void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, con
     static bool init = false;
     if (!init)
     {
-        QueueHandle_t input_queue = xQueueCreate(10, sizeof(input_t));
+        QueueHandle_t input_queue = xQueueCreate(10, sizeof(button_event_t));
 
         // task will take ownership of this struct
         task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
@@ -877,6 +838,7 @@ void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, con
         }
 
         button_init(priority, input_queue, CONFIG_DISPLAY_BUTTON_GPIO);
+        rotary_encoder_init(priority, input_queue, CONFIG_DISPLAY_ROTARY_ENCODER_A_GPIO, CONFIG_DISPLAY_ROTARY_ENCODER_B_GPIO);
         init = true;
     }
     else
