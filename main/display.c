@@ -41,6 +41,7 @@
 #include "sensor_temp.h"
 #include "wifi_support.h"
 #include "mqtt.h"
+#include "button.h"
 #include "datastore/datastore.h"
 
 #define TAG "display"
@@ -49,7 +50,6 @@
 #define DISPLAY_WIDTH      I2C_LCD1602_NUM_VISIBLE_COLUMNS
 #define ROW_STRING_WIDTH   (DISPLAY_WIDTH + 1)    // room for null terminator
 #define TICKS_PER_UPDATE   (500 / portTICK_RATE_MS)
-#define TICKS_PER_POLL     (5)    // ticks per button poll
 #define MEASUREMENT_EXPIRY (15 * 1000000)  // microseconds after which a measurement is not displayed
 
 #ifndef BUILD_TIMESTAMP
@@ -83,13 +83,6 @@ typedef enum
 } page_id_t;
 
 #define INITIAL_PAGE PAGE_SPLASH
-
-typedef enum
-{
-    INPUT_NONE,
-    INPUT_SHORT,   // single button press less than 100ms
-    INPUT_LONG,    // single button press less than 500ms
-} input_t;
 
 typedef void (*page_handler_t)(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 
@@ -149,9 +142,6 @@ static const page_spec_t page_specs[] = {
     { PAGE_AVR_STATUS,          _handle_page_avr_status,       NULL },
 };
 
-// any press longer than this is considered "long"
-#define SHORT_PRESS_THRESHOLD 40  // ticks
-
 // page transition table
 typedef struct
 {
@@ -183,14 +173,13 @@ static const transition_t transitions[] = {
     { PAGE_AVR_STATUS,          PAGE_LAST_ERROR,       PAGE_SENSORS_TEMP_1_2 },
 };
 
-static QueueHandle_t button_queue;
-
 static const char * BLANK_LINE = "                ";
 
 typedef struct
 {
     i2c_master_info_t * i2c_master_info;
     const datastore_t * datastore;
+    QueueHandle_t input_queue;
 } task_inputs_t;
 
 static const uint8_t degrees_C[8]  = { 0x10, 0x06, 0x09, 0x08, 0x08, 0x09, 0x06, 0x00 };
@@ -776,13 +765,13 @@ static page_id_t handle_transition(input_t input, page_id_t current_page)
     {
         switch (input)
         {
-            case INPUT_NONE:
+            case BUTTON_INPUT_NONE:
                 new_page = current_page;
                 break;
-            case INPUT_SHORT:
+            case BUTTON_INPUT_SHORT:
                 new_page = transitions[current_page].on_short;
                 break;
-            case INPUT_LONG:
+            case BUTTON_INPUT_LONG:
                 new_page = transitions[current_page].on_long;
                 break;
             default:
@@ -802,6 +791,7 @@ static void display_task(void * pvParameter)
     i2c_master_info_t * i2c_master_info = task_inputs->i2c_master_info;
     i2c_port_t i2c_port = i2c_master_info->port;
     const datastore_t * datastore = task_inputs->datastore;
+    QueueHandle_t input_queue = task_inputs->input_queue;
 
     // before accessing I2C, use a lock to gain exclusive use of the bus
     i2c_master_lock(i2c_master_info, portMAX_DELAY);
@@ -833,8 +823,8 @@ static void display_task(void * pvParameter)
         dispatch_to_handler(lcd_info, current_page, datastore);
         i2c_master_unlock(i2c_master_info);
 
-        input_t input = INPUT_NONE;
-        BaseType_t rc = xQueueReceive(button_queue, &input, TICKS_PER_UPDATE);
+        input_t input = BUTTON_INPUT_NONE;
+        BaseType_t rc = xQueueReceive(input_queue, &input, TICKS_PER_UPDATE);
         if (rc == pdTRUE)
         {
             ESP_LOGI(TAG, "from queue: %d", input);
@@ -864,82 +854,7 @@ static void display_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
-static void button_task(void * pvParameter)
-{
-    ESP_LOGI(TAG, "[button] Core ID %d", xPortGetCoreID());
 
-    // TODO: improve this, it's too naive
-
-    // Configure button
-    gpio_config_t btn_config;
-    btn_config.intr_type = GPIO_INTR_ANYEDGE;    // Enable interrupt on both rising and falling edges
-    btn_config.mode = GPIO_MODE_INPUT;           // Set as Input
-    btn_config.pin_bit_mask = (UINT64_C(1) << CONFIG_DISPLAY_BUTTON_GPIO); // Bitmask
-    btn_config.pull_up_en = GPIO_PULLUP_ENABLE;      // Disable pullup
-    btn_config.pull_down_en = GPIO_PULLDOWN_DISABLE; // Disable pulldown
-    gpio_config(&btn_config);
-
-    bool last_raw_state = false;
-    bool debounced_state = false;
-
-    TickType_t last_pressed = xTaskGetTickCount();
-
-    bool long_sent = false;
-
-    while (1)
-    {
-        // debounce first
-        bool raw_state = gpio_get_level(CONFIG_DISPLAY_BUTTON_GPIO) ? false : true;
-        if (raw_state == last_raw_state)
-        {
-            input_t input = INPUT_NONE;
-            TickType_t now = xTaskGetTickCount();
-
-            // detect edges
-            if (raw_state != debounced_state)
-            {
-                debounced_state = raw_state;
-
-                // if a falling edge, measure time since rising edge to detect short press
-                if (!debounced_state)
-                {
-                    ESP_LOGD(TAG, "pressed for %d ticks", now - last_pressed);
-                    if (now - last_pressed < SHORT_PRESS_THRESHOLD)
-                    {
-                        input = INPUT_SHORT;
-                        ESP_LOGD(TAG, "short");
-                    }
-                    long_sent = false;
-                }
-                else
-                {
-                    last_pressed = now;
-                }
-            }
-
-            // detect long hold
-            if (!long_sent && debounced_state && now - last_pressed > SHORT_PRESS_THRESHOLD)
-            {
-                input = INPUT_LONG;
-                ESP_LOGD(TAG, "long");
-                long_sent = true;
-            }
-
-            if (input != INPUT_NONE)
-            {
-                if (xQueueSendToBack(button_queue, &input, 0) != pdTRUE)
-                {
-                    ESP_LOGE(TAG, "xQueueSendToBack failed");
-                }
-            }
-        }
-        last_raw_state = raw_state;
-
-        vTaskDelay(TICKS_PER_POLL);
-    }
-
-    vTaskDelete(NULL);
-}
 
 void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore)
 {
@@ -948,7 +863,7 @@ void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, con
     static bool init = false;
     if (!init)
     {
-        button_queue = xQueueCreate(10, sizeof(input_t));
+        QueueHandle_t input_queue = xQueueCreate(10, sizeof(input_t));
 
         // task will take ownership of this struct
         task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
@@ -957,10 +872,11 @@ void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, con
             memset(task_inputs, 0, sizeof(*task_inputs));
             task_inputs->i2c_master_info = i2c_master_info;
             task_inputs->datastore = datastore;
+            task_inputs->input_queue = input_queue;
             xTaskCreate(&display_task, "display_task", 4096, task_inputs, priority, NULL);
         }
 
-        xTaskCreate(&button_task, "button_task", 2048, NULL, priority, NULL);
+        button_init(priority, input_queue, CONFIG_DISPLAY_BUTTON_GPIO);
         init = true;
     }
     else
