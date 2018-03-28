@@ -346,7 +346,7 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info, const datastore_t * datastore)
         {
             // sadly the esp_mqtt component only supports a single instance
             esp_mqtt_init(_status_callback, _message_callback, 256 /*buffer size*/, 2000 /*timeout*/);
-            datastore_set_uint32(datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_CONNECTING);
+            datastore_set_uint32(datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_DISCONNECTED);
             private->trie = trie_create();
 
             if (private->trie)
@@ -376,7 +376,7 @@ mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info, const datastore_t * datastore)
     return err;
 }
 
-mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info)
+mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info, const datastore_t * datastore)
 {
     mqtt_error_t err = MQTT_ERROR_UNKNOWN;
     if (mqtt_info != NULL)
@@ -384,7 +384,9 @@ mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info)
         private_t * private = (private_t *)mqtt_info->private;
         if (private != NULL)
         {
-            esp_mqtt_init(_status_callback, _message_callback, 256 /*buffer size*/, 2000 /*timeout*/);
+            // sadly the esp_mqtt component only supports a single instance
+            datastore_set_uint32(datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_CONNECTING);
+            esp_mqtt_start(CONFIG_MQTT_BROKER_IP_ADDRESS, CONFIG_MQTT_BROKER_TCP_PORT, "esp-mqtt", "username", "password");
             err = MQTT_OK;
         }
         else

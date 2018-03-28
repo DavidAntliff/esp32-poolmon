@@ -55,7 +55,7 @@ typedef struct
 mqtt_info_t * mqtt_malloc(void);
 void mqtt_free(mqtt_info_t ** mqtt_info);
 mqtt_error_t mqtt_init(mqtt_info_t * mqtt_info, const datastore_t * datastore);
-mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info);
+mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info, const datastore_t * datastore);
 
 bool mqtt_publish(const char * topic, const uint8_t * payload, size_t len, int qos, bool retained);
 

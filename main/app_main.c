@@ -565,6 +565,7 @@ void app_main()
 //    esp_log_level_set("control", ESP_LOG_DEBUG);
     esp_log_level_set("sntp_rtc", ESP_LOG_DEBUG);
 //    esp_log_level_set("power", ESP_LOG_DEBUG);
+    esp_log_level_set("app_main", ESP_LOG_INFO);
 
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_ESP_MQTT_TASK_STACK_PRIORITY;
@@ -673,9 +674,6 @@ void app_main()
         ESP_LOGE(TAG, "datastore_add_set_callback for resource %d failed: %d", RESOURCE_ID_MQTT_STATUS, status);
     }
 
-    mqtt_start(mqtt_info);
-    _delay();
-
     sntp_rtc_init(wifi_monitor_priority, datastore);
     _delay();
 
@@ -690,6 +688,35 @@ void app_main()
         last_wake_time = xTaskGetTickCount();
 
         //avr_test_sequence();
+
+        // network connection state machine
+        wifi_status_t wifi_status = WIFI_STATUS_DISCONNECTED;
+        mqtt_status_t mqtt_status = MQTT_STATUS_DISCONNECTED;
+        datastore_get_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, &wifi_status);
+        datastore_get_uint32(datastore, RESOURCE_ID_MQTT_STATUS, 0, &mqtt_status);
+        ESP_LOGD(TAG, "wifi_status %d, mqtt_status %d", wifi_status, mqtt_status);
+
+        if (wifi_status == WIFI_STATUS_DISCONNECTED)
+        {
+            if (mqtt_status != MQTT_STATUS_DISCONNECTED)
+            {
+                ESP_LOGI(TAG, "MQTT stop");
+                esp_mqtt_stop();
+            }
+            ESP_LOGI(TAG, "WiFi connect");
+            esp_wifi_connect();
+        }
+        else if (wifi_status == WIFI_STATUS_GOT_ADDRESS)
+        {
+            if (mqtt_status == MQTT_STATUS_DISCONNECTED)
+            {
+                ESP_LOGI(TAG, "MQTT start");
+                if ((mqtt_error = mqtt_start(mqtt_info, datastore)) != MQTT_OK)
+                {
+                    ESP_LOGE(TAG, "mqtt_start failed: %d", mqtt_error);
+                }
+            }
+        }
 
         vTaskDelayUntil(&last_wake_time, 1000 / portTICK_RATE_MS);
     }

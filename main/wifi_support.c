@@ -37,8 +37,6 @@
 #include "utils.h"
 #include "datastore/datastore.h"
 
-#include "esp_mqtt.h"
-
 #define TAG "wifi_support"
 
 typedef struct
@@ -56,7 +54,7 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
 
     switch(event->event_id) {
         case SYSTEM_EVENT_STA_START:
-            esp_wifi_connect();
+            datastore_set_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_DISCONNECTED);
             break;
         case SYSTEM_EVENT_STA_CONNECTED:
             ESP_LOGI(TAG, "WiFi connected");
@@ -69,15 +67,12 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             datastore_set_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_GOT_ADDRESS);
             datastore_set_uint32(datastore, RESOURCE_ID_WIFI_TIMESTAMP, 0, seconds_since_boot());
             datastore_set_uint32(datastore, RESOURCE_ID_WIFI_ADDRESS, 0, event->event_info.got_ip.ip_info.ip.addr);
-            esp_mqtt_start(CONFIG_MQTT_BROKER_IP_ADDRESS, CONFIG_MQTT_BROKER_TCP_PORT, "esp-mqtt", "username", "password");
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             // This is a workaround as ESP32 WiFi libs don't currently auto-reassociate.
             ESP_LOGI(TAG, "WiFi disconnected");
             datastore_set_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, WIFI_STATUS_DISCONNECTED);
             datastore_set_uint32(datastore, RESOURCE_ID_WIFI_ADDRESS, 0, 0);
-            esp_mqtt_stop();
-            esp_wifi_connect();
             xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
             break;
         default:
@@ -107,7 +102,7 @@ static void wifi_conn_init(const datastore_t * datastore)
 
 static void wifi_monitor_task(void * pvParameter)
 {
-    //assert(pvParameter);
+    assert(pvParameter);
     ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     const datastore_t * datastore = task_inputs->datastore;
