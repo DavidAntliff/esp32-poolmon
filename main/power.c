@@ -96,6 +96,7 @@ static void power_calculation_task(void * pvParameter)
                 ESP_LOGI(TAG, "flow %f lpm, temp delta %f K, power %f W", lpm, delta, power);
 
                 datastore_set_float(datastore, RESOURCE_ID_POWER_VALUE, 0, power);
+                datastore_set_float(datastore, RESOURCE_ID_POWER_TEMP_DELTA, 0, delta);
             }
             else
             {

@@ -89,8 +89,9 @@ static void button_task(void * pvParameter)
                     {
                         event = BUTTON_EVENT_SHORT;
                         ESP_LOGD(TAG, "short");
-                        volatile task_inputs_t * die = 0;
-                        die->gpio = 7;
+//                        // crash on demand...
+//                        volatile task_inputs_t * die = 0;
+//                        die->gpio = 7;
                     }
                     long_sent = false;
                 }

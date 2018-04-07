@@ -91,6 +91,7 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_FLOW_FREQUENCY,         "FLOW_FREQUENCY",         datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
         _add_resource(datastore, RESOURCE_ID_FLOW_RATE,              "FLOW_RATE",              datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
 
+        _add_resource(datastore, RESOURCE_ID_POWER_TEMP_DELTA,       "POWER_TEMP_DELTA",       datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
         _add_resource(datastore, RESOURCE_ID_POWER_VALUE,            "POWER_VALUE",            datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
 
         _add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, "SWITCHES_CP_MODE_VALUE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
