@@ -48,10 +48,16 @@
 #define TAG "display"
 
 #define SMBUS_TIMEOUT      1000   // milliseconds
-#define DISPLAY_WIDTH      I2C_LCD1602_NUM_VISIBLE_COLUMNS
-#define ROW_STRING_WIDTH   (DISPLAY_WIDTH + 1)    // room for null terminator
-#define TICKS_PER_UPDATE   (500 / portTICK_RATE_MS)
+#define TICKS_PER_UPDATE   (100 / portTICK_RATE_MS)
 #define MEASUREMENT_EXPIRY (15 * 1000000)  // microseconds after which a measurement is not displayed
+
+#define LCD_NUM_ROWS               4
+#define LCD_NUM_COLUMNS            40
+#define LCD_NUM_VISIBLE_COLUMNS    20
+
+#define DISPLAY_WIDTH      LCD_NUM_VISIBLE_COLUMNS
+#define ROW_STRING_WIDTH   (DISPLAY_WIDTH + 1)    // room for null terminator
+
 
 #ifndef BUILD_TIMESTAMP
 #  warning "Please ensure BUILD_TIMESTAMP is defined"
@@ -72,7 +78,7 @@ typedef enum
     PAGE_ALARM,
     PAGE_WIFI_STATUS,
     PAGE_MQTT_STATUS,
-    PAGE_ESP32_STATUS,
+    PAGE_RESOURCE_STATUS,
     PAGE_AVR_STATUS,
     PAGE_LAST,
 } page_id_t;
@@ -100,13 +106,11 @@ static void _handle_page_pump_ssrs(const i2c_lcd1602_info_t * lcd_info, void * s
 static void _handle_page_alarm(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_mqtt_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
-static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
+static void _handle_page_resource_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 static void _handle_page_avr_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore);
 
 static int alarm_display_count = 0;
 static bool splash_activity = false;
-static int esp32_status_state = 0;
-static int mqtt_status_state = 0;
 
 static const page_spec_t page_specs[] = {
     // ID                       handler                        state
@@ -120,8 +124,8 @@ static const page_spec_t page_specs[] = {
     { PAGE_PUMPS_SSRS,          _handle_page_pump_ssrs,        NULL },
     { PAGE_ALARM,               _handle_page_alarm,            &alarm_display_count },
     { PAGE_WIFI_STATUS,         _handle_page_wifi_status,      NULL },
-    { PAGE_MQTT_STATUS,         _handle_page_mqtt_status,      &mqtt_status_state },
-    { PAGE_ESP32_STATUS,        _handle_page_esp32_status,     &esp32_status_state },
+    { PAGE_MQTT_STATUS,         _handle_page_mqtt_status,      NULL },
+    { PAGE_RESOURCE_STATUS,     _handle_page_resource_status,  NULL },
     { PAGE_AVR_STATUS,          _handle_page_avr_status,       NULL },
 };
 
@@ -147,12 +151,12 @@ static const transition_t transitions[] = {
     { PAGE_PUMPS_SSRS,          PAGE_SENSORS_FLOW,     PAGE_ALARM,             PAGE_IGNORE,           PAGE_IGNORE },
     { PAGE_ALARM,               PAGE_PUMPS_SSRS,       PAGE_WIFI_STATUS,       PAGE_IGNORE,           PAGE_IGNORE },
     { PAGE_WIFI_STATUS,         PAGE_ALARM,            PAGE_MQTT_STATUS,       PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_MQTT_STATUS,         PAGE_WIFI_STATUS,      PAGE_ESP32_STATUS,      PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_ESP32_STATUS,        PAGE_MQTT_STATUS,      PAGE_AVR_STATUS,        PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_AVR_STATUS,          PAGE_ESP32_STATUS,     PAGE_SPLASH,            PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_MQTT_STATUS,         PAGE_WIFI_STATUS,      PAGE_RESOURCE_STATUS,   PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_RESOURCE_STATUS,     PAGE_MQTT_STATUS,      PAGE_AVR_STATUS,        PAGE_IGNORE,           PAGE_IGNORE },
+    { PAGE_AVR_STATUS,          PAGE_RESOURCE_STATUS,  PAGE_SPLASH,            PAGE_IGNORE,           PAGE_IGNORE },
 };
 
-static const char * BLANK_LINE = "                ";
+static const char * BLANK_LINE = "                    ";
 
 typedef struct
 {
@@ -237,12 +241,29 @@ static void _handle_page_splash(const i2c_lcd1602_info_t * lcd_info, void * stat
     datastore_get_string(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, 0, build_date_time, sizeof(build_date_time));
 
     char line[ROW_STRING_WIDTH] = "";
-    snprintf(line, ROW_STRING_WIDTH, "PoolControl v%s", version);
+    snprintf(line, ROW_STRING_WIDTH, "PoolControl v%-6s%c", version, *activity ? I2C_LCD1602_CHARACTER_DOT : ' ');
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
-    snprintf(line, ROW_STRING_WIDTH, "%c%s", *activity ? I2C_LCD1602_CHARACTER_DOT : ' ', build_date_time);
+    snprintf(line, ROW_STRING_WIDTH, "%20s", build_date_time);
     I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    for (int i = 0; i < DISPLAY_WIDTH; ++i)
+    {
+        line[i] = ' ';
+    }
+    line[DISPLAY_WIDTH] = '\0';
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 2));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    uint32_t uptime = seconds_since_boot(); // in seconds
+    uint32_t days = uptime / 60 / 60 / 24;
+    uint32_t hours = uptime / 60 / 60 % 24;
+    uint32_t minutes = uptime / 60 % 60;
+    uint32_t seconds = uptime % 60;
+    snprintf(line, ROW_STRING_WIDTH, "Up %4dd %02d:%02d:%02d    ", days, hours, minutes, seconds);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 3));
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
     *activity = !(*activity);
@@ -482,6 +503,29 @@ static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void *
 
     char line[ROW_STRING_WIDTH] = "";
 
+    // connection state
+    switch (wifi_status)
+    {
+        case WIFI_STATUS_DISCONNECTED:
+            snprintf(line, ROW_STRING_WIDTH, "WiFi disconnected   ");
+            break;
+        case WIFI_STATUS_CONNECTED:
+            snprintf(line, ROW_STRING_WIDTH, "WiFi connecting     ");
+            break;
+        case WIFI_STATUS_GOT_ADDRESS:
+        {
+            uint32_t connection_count = 0;
+            datastore_get_uint32(datastore, RESOURCE_ID_WIFI_CONNECTION_COUNT, 0, &connection_count);
+            snprintf(line, ROW_STRING_WIDTH, "WiFi connected %-5d", connection_count);
+            break;
+        }
+        default:
+            ESP_LOGE(TAG, "unhandled wifi status %d", wifi_status);
+            break;
+    }
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
     char ssid[WIFI_LEN_SSID] = "";
     int8_t rssi = 0;
 
@@ -490,22 +534,8 @@ static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void *
 
     // truncate ssid at 7 characters
     ssid[8] = '\0';
-
-    switch (wifi_status)
-    {
-        case WIFI_STATUS_DISCONNECTED:
-            snprintf(line, ROW_STRING_WIDTH, "WiFi %-11s", "disconnect");
-            break;
-        case WIFI_STATUS_CONNECTED:
-        case WIFI_STATUS_GOT_ADDRESS:
-            snprintf(line, ROW_STRING_WIDTH, "WiFi %-7s %3d", ssid, rssi);
-            break;
-        default:
-            ESP_LOGE(TAG, "unhandled wifi status %d", wifi_status);
-            break;
-    }
-
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    snprintf(line, ROW_STRING_WIDTH, "%-16s %3d", ssid, rssi);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
     switch (wifi_status)
@@ -514,13 +544,13 @@ static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void *
             snprintf(line, ROW_STRING_WIDTH, BLANK_LINE);
             break;
         case WIFI_STATUS_CONNECTED:
-            snprintf(line, ROW_STRING_WIDTH, "  waiting for IP");
+            snprintf(line, ROW_STRING_WIDTH, "Waiting for IP      ");
             break;
         case WIFI_STATUS_GOT_ADDRESS:
         {
             uint32_t ip_address = 0;
             datastore_get_uint32(datastore, RESOURCE_ID_WIFI_ADDRESS, 0, &ip_address);
-            snprintf(line, ROW_STRING_WIDTH, "%d.%d.%d.%d        ",
+            snprintf(line, ROW_STRING_WIDTH, "%d.%d.%d.%d             ",
                      (ip_address & 0xff),
                      (ip_address & 0xff00) >> 8,
                      (ip_address & 0xff0000) >> 16,
@@ -531,30 +561,44 @@ static void _handle_page_wifi_status(const i2c_lcd1602_info_t * lcd_info, void *
             ESP_LOGE(TAG, "unhandled wifi status %d", wifi_status);
             break;
     }
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 2));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    // calculate time since last connection
+    uint32_t timestamp = 0;
+    datastore_get_uint32(datastore, RESOURCE_ID_WIFI_TIMESTAMP, 0, &timestamp);
+    uint32_t connected_time = seconds_since_boot() - timestamp;
+    uint32_t days = connected_time / 60 / 60 / 24;
+    uint32_t hours = connected_time / 60 / 60 % 24;
+    uint32_t minutes = connected_time / 60 % 60;
+    uint32_t seconds = connected_time % 60;
+    snprintf(line, ROW_STRING_WIDTH, "Up %4dd %02d:%02d:%02d   ", days, hours, minutes, seconds);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 3));
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 }
 
-static void _handle_page_mqtt_status_1(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
+static void _handle_page_mqtt_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
 {
     mqtt_status_t mqtt_status = 0;
     datastore_get_uint32(datastore, RESOURCE_ID_MQTT_STATUS, 0, &mqtt_status);
+    int row = 0;
 
     char line[ROW_STRING_WIDTH] = "";
 
+    // connection state
     switch (mqtt_status)
     {
         case MQTT_STATUS_DISCONNECTED:
-            snprintf(line, ROW_STRING_WIDTH, "MQTT disconnect ");
+            snprintf(line, ROW_STRING_WIDTH, "MQTT disconnected   ");
             break;
         case MQTT_STATUS_CONNECTING:
-            snprintf(line, ROW_STRING_WIDTH, "MQTT connecting ");
+            snprintf(line, ROW_STRING_WIDTH, "MQTT connecting     ");
             break;
         case MQTT_STATUS_CONNECTED:
         {
             uint32_t connection_count = 0;
             datastore_get_uint32(datastore, RESOURCE_ID_MQTT_CONNECTION_COUNT, 0, &connection_count);
-            snprintf(line, ROW_STRING_WIDTH, "MQTT connect %-3d", connection_count);
+            snprintf(line, ROW_STRING_WIDTH, "MQTT connected %-5d", connection_count);
             break;
         }
         default:
@@ -562,34 +606,31 @@ static void _handle_page_mqtt_status_1(const i2c_lcd1602_info_t * lcd_info, void
             break;
     }
 
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, row++));
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
-    uint32_t count_rx = 0, count_tx = 0;
-    datastore_get_uint32(datastore, RESOURCE_ID_MQTT_MESSAGE_RX_COUNT, 0, &count_rx);
-    datastore_get_uint32(datastore, RESOURCE_ID_MQTT_MESSAGE_TX_COUNT, 0, &count_tx);
-
-    snprintf(line, ROW_STRING_WIDTH, "RX %-4d TX %-4d ", count_rx, count_tx);
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
-}
-
-static void _handle_page_mqtt_status_2(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
-{
+    // broker address
     char broker_address[MQTT_LEN_BROKER_ADDRESS] = "";
     uint32_t broker_port = 0;
     datastore_get_string(datastore, RESOURCE_ID_MQTT_BROKER_ADDRESS, 0, broker_address, sizeof(broker_address));
     datastore_get_uint32(datastore, RESOURCE_ID_MQTT_BROKER_PORT, 0, &broker_port);
 
-    char line[ROW_STRING_WIDTH] = "";
-
     char port[6] = "";
     snprintf(port, 6, "%d", broker_port);
     int port_len = strlen(port);
     int addr_len = DISPLAY_WIDTH - port_len - 1;  // space for the colon
-    snprintf(line, ROW_STRING_WIDTH, "%.*s:%-*d", addr_len, broker_address, port_len, broker_port);
+    snprintf(line, ROW_STRING_WIDTH, "%.*s:%-*d    ", addr_len, broker_address, port_len, broker_port);
 
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, row++));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+    // counters
+    uint32_t count_rx = 0, count_tx = 0;
+    datastore_get_uint32(datastore, RESOURCE_ID_MQTT_MESSAGE_RX_COUNT, 0, &count_rx);
+    datastore_get_uint32(datastore, RESOURCE_ID_MQTT_MESSAGE_TX_COUNT, 0, &count_tx);
+
+    snprintf(line, ROW_STRING_WIDTH, "RX %-6d TX %-6d ", count_rx, count_tx);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, row++));
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
     // calculate time since last connection
@@ -600,68 +641,29 @@ static void _handle_page_mqtt_status_2(const i2c_lcd1602_info_t * lcd_info, void
     uint32_t hours = connected_time / 60 / 60 % 24;
     uint32_t minutes = connected_time / 60 % 60;
     uint32_t seconds = connected_time % 60;
-    snprintf(line, ROW_STRING_WIDTH, "Up%4dd %02d:%02d:%02d", days, hours, minutes, seconds);
-    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+    snprintf(line, ROW_STRING_WIDTH, "Up %4dd %02d:%02d:%02d   ", days, hours, minutes, seconds);
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, row++));
     I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 }
 
-static void _handle_page_mqtt_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
+static void _handle_page_resource_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
 {
-    int * page_state = (int *)state;
-    mqtt_status_t mqtt_status = 0;
-    datastore_get_uint32(datastore, RESOURCE_ID_MQTT_STATUS, 0, &mqtt_status);
-    if (*page_state < 8 || mqtt_status != MQTT_STATUS_CONNECTED)
-    {
-        _handle_page_mqtt_status_1(lcd_info, state, datastore);
-    }
-    else if (*page_state < 16)
-    {
-        _handle_page_mqtt_status_2(lcd_info, state, datastore);
-    }
-    else
-    {
-        *page_state = -1;
-    }
-    ++*page_state;
-}
-
-static void _handle_page_esp32_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
-{
-    int * page_state = (int *)state;
     char line[ROW_STRING_WIDTH] = "";
-    if (*page_state < 8)
-    {
-        char version[SYSTEM_LEN_VERSION] = "";
-        datastore_get_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, version, SYSTEM_LEN_VERSION);
+    snprintf(line, ROW_STRING_WIDTH, "MEM Free  %8d B", esp_get_free_heap_size());
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
-        snprintf(line, ROW_STRING_WIDTH, "ESP32 v%3s      ", version);
-        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    snprintf(line, ROW_STRING_WIDTH, "IRAM Free %8d B", heap_caps_get_free_size(MALLOC_CAP_32BIT));
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
-        uint32_t uptime = seconds_since_boot(); // in seconds
-        uint32_t days = uptime / 60 / 60 / 24;
-        uint32_t hours = uptime / 60 / 60 % 24;
-        uint32_t minutes = uptime / 60 % 60;
-        uint32_t seconds = uptime % 60;
-        snprintf(line, ROW_STRING_WIDTH, "Up%4dd %02d:%02d:%02d", days, hours, minutes, seconds);
-        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
-    }
-    else if (*page_state < 10)
-    {
-        snprintf(line, ROW_STRING_WIDTH, "MEM Free %7d", esp_get_free_heap_size());
-        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+    snprintf(line, ROW_STRING_WIDTH, "Datastore %8d B", datastore_get_ram_usage(datastore));
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 2));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 
-        snprintf(line, ROW_STRING_WIDTH, "IRAM Free %6d", heap_caps_get_free_size(MALLOC_CAP_32BIT));
-        I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-        I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
-    }
-    else
-    {
-        *page_state = -1;
-    }
-    ++*page_state;
+    snprintf(line, ROW_STRING_WIDTH, "Tasks %14d", uxTaskGetNumberOfTasks());
+    I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 3));
+    I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
 }
 
 static void _handle_page_avr_status(const i2c_lcd1602_info_t * lcd_info, void * state, const datastore_t * datastore)
@@ -763,7 +765,8 @@ static void display_task(void * pvParameter)
 
     // Set up the LCD1602 device with backlight on
     i2c_lcd1602_info_t * lcd_info = i2c_lcd1602_malloc();
-    ESP_ERROR_CHECK(i2c_lcd1602_init(lcd_info, smbus_info, true));
+    ESP_ERROR_CHECK(i2c_lcd1602_init(lcd_info, smbus_info, true,
+            LCD_NUM_ROWS, LCD_NUM_COLUMNS, LCD_NUM_VISIBLE_COLUMNS));
     ESP_ERROR_CHECK(_display_reset(lcd_info));
 
     // Move to home position
@@ -787,6 +790,19 @@ static void display_task(void * pvParameter)
         BaseType_t rc = xQueueReceive(input_queue, &input, TICKS_PER_UPDATE);
         if (rc == pdTRUE)
         {
+            // Remove this later: test for incomplete lines
+            char line[ROW_STRING_WIDTH] = "";
+            snprintf(line, ROW_STRING_WIDTH, "####################");
+            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
+            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
+            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 2));
+            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 3));
+            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
+
+
             ESP_LOGI(TAG, "from queue: %d", input);
             page_id_t new_page = handle_transition(input, current_page);
             if (new_page != current_page && new_page >= 0 && new_page < PAGE_LAST)

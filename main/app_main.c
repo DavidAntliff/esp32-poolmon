@@ -567,6 +567,10 @@ void app_main()
 //    esp_log_level_set("power", ESP_LOG_DEBUG);
     esp_log_level_set("app_main", ESP_LOG_INFO);
 
+    // Ensure RMT peripheral is reset properly, in case of prior crash
+    periph_module_disable(PERIPH_RMT_MODULE);
+    periph_module_enable(PERIPH_RMT_MODULE);
+
     // Priority of queue consumer should be higher than producers
     UBaseType_t publish_priority = CONFIG_ESP_MQTT_TASK_STACK_PRIORITY;
     UBaseType_t display_priority = publish_priority - 1;
