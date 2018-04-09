@@ -67,7 +67,7 @@ static void do_esp32_reset(const char * topic, bool value, void * context)
 {
     if (value)
     {
-        ESP_LOGW(TAG, "ESP32 restart requested");
+        ESP_LOGW(TAG, "ESP32 reset requested");
         bool * running = (bool *)context;
         *running = false;
     }
@@ -77,7 +77,7 @@ static void do_avr_reset(const char * topic, bool value, void * context)
 {
     if (value)
     {
-        ESP_LOGW(TAG, "AVR restart requested");
+        ESP_LOGW(TAG, "AVR reset requested");
         avr_support_reset();
 
     }
@@ -691,7 +691,7 @@ void app_main()
     {
         last_wake_time = xTaskGetTickCount();
 
-        //avr_test_sequence();
+        avr_test_sequence();
 
         // network connection state machine
         wifi_status_t wifi_status = WIFI_STATUS_DISCONNECTED;

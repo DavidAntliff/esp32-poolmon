@@ -171,6 +171,8 @@ typedef struct
     QueueHandle_t input_queue;
 } task_inputs_t;
 
+#define DOT "\xa5"    // 0b10100101
+
 static const uint8_t degrees_C[8]  = { 0x10, 0x06, 0x09, 0x08, 0x08, 0x09, 0x06, 0x00 };
 #define DEGREES_C "\x8"
 
@@ -192,7 +194,7 @@ static const uint8_t arrow_up[8]  = { 0b00000,
                                       0b11111,
                                       0b11111,
                                       0b00000 };
-#define ARROW_UP "\x10"
+#define ARROW_UP "\xa"
 
 static esp_err_t _display_reset(const i2c_lcd1602_info_t * lcd_info)
 {
@@ -269,6 +271,15 @@ static void _handle_page_blank(page_buffer_t * page_buffer, void * state, const 
     }
 }
 
+static void _render_uptime(char * buffer, size_t size, uint32_t uptime)
+{
+    uint32_t days = uptime / 60 / 60 / 24;
+    uint32_t hours = uptime / 60 / 60 % 24;
+    uint32_t minutes = uptime / 60 % 60;
+    uint32_t seconds = uptime % 60;
+    snprintf(buffer, size, "Up %4dd %02d:%02d:%02d", days, hours, minutes, seconds);
+}
+
 static void _handle_page_splash(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
 {
     bool * activity = (bool *)state;
@@ -279,16 +290,16 @@ static void _handle_page_splash(page_buffer_t * page_buffer, void * state, const
     datastore_get_string(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, 0, build_date_time, sizeof(build_date_time));
 
     snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "PoolControl v%-6s", version);
-    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "%20s", build_date_time);
-    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, BLANK_LINE);
+    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, BLANK_LINE);
+    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "%s", build_date_time);
 
     uint32_t uptime = seconds_since_boot(); // in seconds
-    uint32_t days = uptime / 60 / 60 / 24;
-    uint32_t hours = uptime / 60 / 60 % 24;
-    uint32_t minutes = uptime / 60 % 60;
-    uint32_t seconds = uptime % 60;
-    snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "Up %4dd %02d:%02d:%02d  %c", days, hours, minutes, seconds, *activity ? I2C_LCD1602_CHARACTER_DOT : ' ');
+    _render_uptime(page_buffer->row[3], ROW_STRING_WIDTH, uptime);
 
+    if (*activity)
+    {
+        strncat(page_buffer->row[3], "  "DOT, ROW_STRING_WIDTH);
+    }
     *activity = !(*activity);
 }
 
@@ -532,16 +543,16 @@ static void _handle_page_wifi_status(page_buffer_t * page_buffer, void * state, 
     switch (wifi_status)
     {
         case WIFI_STATUS_DISCONNECTED:
-            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "WiFi disconnected   ");
+            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "WiFi disconnected");
             break;
         case WIFI_STATUS_CONNECTED:
-            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "WiFi connecting     ");
+            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "WiFi connecting");
             break;
         case WIFI_STATUS_GOT_ADDRESS:
         {
             uint32_t connection_count = 0;
             datastore_get_uint32(datastore, RESOURCE_ID_WIFI_CONNECTION_COUNT, 0, &connection_count);
-            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "WiFi connected %-5d", connection_count);
+            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "WiFi connected %d", connection_count);
             break;
         }
         default:
@@ -565,13 +576,13 @@ static void _handle_page_wifi_status(page_buffer_t * page_buffer, void * state, 
             snprintf(page_buffer->row[2], ROW_STRING_WIDTH, BLANK_LINE);
             break;
         case WIFI_STATUS_CONNECTED:
-            snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "Waiting for IP      ");
+            snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "Waiting for IP");
             break;
         case WIFI_STATUS_GOT_ADDRESS:
         {
             uint32_t ip_address = 0;
             datastore_get_uint32(datastore, RESOURCE_ID_WIFI_ADDRESS, 0, &ip_address);
-            snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "%d.%d.%d.%d             ",
+            snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "%d.%d.%d.%d",
                      (ip_address & 0xff),
                      (ip_address & 0xff00) >> 8,
                      (ip_address & 0xff0000) >> 16,
@@ -587,11 +598,7 @@ static void _handle_page_wifi_status(page_buffer_t * page_buffer, void * state, 
     uint32_t timestamp = 0;
     datastore_get_uint32(datastore, RESOURCE_ID_WIFI_TIMESTAMP, 0, &timestamp);
     uint32_t connected_time = seconds_since_boot() - timestamp;
-    uint32_t days = connected_time / 60 / 60 / 24;
-    uint32_t hours = connected_time / 60 / 60 % 24;
-    uint32_t minutes = connected_time / 60 % 60;
-    uint32_t seconds = connected_time % 60;
-    snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "Up %4dd %02d:%02d:%02d   ", days, hours, minutes, seconds);
+    _render_uptime(page_buffer->row[3], ROW_STRING_WIDTH, connected_time);
 }
 
 static void _handle_page_mqtt_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
@@ -603,16 +610,16 @@ static void _handle_page_mqtt_status(page_buffer_t * page_buffer, void * state, 
     switch (mqtt_status)
     {
         case MQTT_STATUS_DISCONNECTED:
-            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "MQTT disconnected   ");
+            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "MQTT disconnected");
             break;
         case MQTT_STATUS_CONNECTING:
-            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "MQTT connecting     ");
+            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "MQTT connecting");
             break;
         case MQTT_STATUS_CONNECTED:
         {
             uint32_t connection_count = 0;
             datastore_get_uint32(datastore, RESOURCE_ID_MQTT_CONNECTION_COUNT, 0, &connection_count);
-            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "MQTT connected %-5d", connection_count);
+            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "MQTT connected %d", connection_count);
             break;
         }
         default:
@@ -630,23 +637,19 @@ static void _handle_page_mqtt_status(page_buffer_t * page_buffer, void * state, 
     snprintf(port, 6, "%d", broker_port);
     int port_len = strlen(port);
     int addr_len = DISPLAY_WIDTH - port_len - 1;  // space for the colon
-    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "%.*s:%-*d    ", addr_len, broker_address, port_len, broker_port);
+    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "%.*s:%-*d", addr_len, broker_address, port_len, broker_port);
 
     // counters
     uint32_t count_rx = 0, count_tx = 0;
     datastore_get_uint32(datastore, RESOURCE_ID_MQTT_MESSAGE_RX_COUNT, 0, &count_rx);
     datastore_get_uint32(datastore, RESOURCE_ID_MQTT_MESSAGE_TX_COUNT, 0, &count_tx);
-    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "RX %-6d TX %-6d ", count_rx, count_tx);
+    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "RX %d  TX %d", count_rx, count_tx);
 
     // calculate time since last connection
     uint32_t timestamp = 0;
     datastore_get_uint32(datastore, RESOURCE_ID_MQTT_TIMESTAMP, 0, &timestamp);
     uint32_t connected_time = seconds_since_boot() - timestamp;
-    uint32_t days = connected_time / 60 / 60 / 24;
-    uint32_t hours = connected_time / 60 / 60 % 24;
-    uint32_t minutes = connected_time / 60 % 60;
-    uint32_t seconds = connected_time % 60;
-    snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "Up %4dd %02d:%02d:%02d   ", days, hours, minutes, seconds);
+    _render_uptime(page_buffer->row[3], ROW_STRING_WIDTH, connected_time);
 }
 
 static void _handle_page_resource_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
@@ -659,10 +662,18 @@ static void _handle_page_resource_status(page_buffer_t * page_buffer, void * sta
 
 static void _handle_page_avr_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
 {
-    snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "AVR Status");
-    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, BLANK_LINE);
+    uint8_t version = 0;
+    uint32_t count_reset = 0;
+    datastore_age_t age_us = 0;
+    datastore_get_uint8(datastore, RESOURCE_ID_AVR_VERSION, 0, &version);
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_RESET, 0, &count_reset);
+    datastore_get_age(datastore, RESOURCE_ID_AVR_COUNT_RESET, 0, &age_us);
+
+    snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "AVR Version %d", version);
+    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "    Resets %d", count_reset);
     snprintf(page_buffer->row[2], ROW_STRING_WIDTH, BLANK_LINE);
-    snprintf(page_buffer->row[3], ROW_STRING_WIDTH, BLANK_LINE);
+
+    _render_uptime(page_buffer->row[3], ROW_STRING_WIDTH, age_us / 1000000);
 }
 
 static void dispatch_to_handler(page_buffer_t * buffer, page_id_t current_page, const datastore_t * datastore)

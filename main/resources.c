@@ -116,6 +116,16 @@ datastore_t * resources_init(void)
 
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR,           "CONTROL_PP_DAILY_HOUR",           datastore_create_resource(DATASTORE_TYPE_INT32, 1));
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE,         "CONTROL_PP_DAILY_MINUTE",         datastore_create_resource(DATASTORE_TYPE_INT32, 1));
+
+        _add_resource(datastore, RESOURCE_ID_AVR_VERSION,       "AVR_VERSION",       datastore_create_resource(DATASTORE_TYPE_UINT8, 1));
+        _add_resource(datastore, RESOURCE_ID_AVR_COUNT_RESET,   "AVR_COUNT_RESET",   datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_AVR_COUNT_CP,      "AVR_COUNT_CP",      datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_AVR_COUNT_PP,      "AVR_COUNT_PP",      datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_AVR_COUNT_CP_MODE, "AVR_COUNT_CP_MODE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_AVR_COUNT_CP_MAN,  "AVR_COUNT_CP_MAN",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_AVR_COUNT_PP_MODE, "AVR_COUNT_PP_MODE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_AVR_COUNT_PP_MAN,  "AVR_COUNT_PP_MAN",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_AVR_COUNT_BUZZER,  "AVR_COUNT_BUZZER",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
     }
 
     // defaults
