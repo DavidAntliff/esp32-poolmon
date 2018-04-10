@@ -451,8 +451,8 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
 void app_main()
 {
     esp_log_level_set("*", ESP_LOG_WARN);
-    esp_log_level_set("nvs_support", ESP_LOG_DEBUG);
-    esp_log_level_set("resources", ESP_LOG_DEBUG);
+    esp_log_level_set("nvs_support", ESP_LOG_INFO);
+    esp_log_level_set("resources", ESP_LOG_INFO);
 //    esp_log_level_set("*", ESP_LOG_INFO);
 //    esp_log_level_set("*", ESP_LOG_DEBUG);
     esp_log_level_set("i2c", ESP_LOG_INFO);
@@ -465,7 +465,7 @@ void app_main()
 //    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
 //    esp_log_level_set("control", ESP_LOG_DEBUG);
-    esp_log_level_set("sntp_rtc", ESP_LOG_DEBUG);
+    esp_log_level_set("sntp_rtc", ESP_LOG_INFO);
 //    esp_log_level_set("power", ESP_LOG_DEBUG);
     esp_log_level_set("app_main", ESP_LOG_INFO);
 
