@@ -190,7 +190,7 @@ typedef struct
     OneWireBus_ROMCode * rom_codes;
 } context_t;
 
-void _recalc_assignments(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * ctxt)
+void _recalc_assignments_handler(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * ctxt)
 {
     ESP_LOGD(TAG, "_recalc_assignments: datastore %p, resource id %d, instance id %d, ctxt %p", datastore, id, instance, ctxt);
     context_t * context = (context_t *)ctxt;
@@ -241,8 +241,15 @@ static void sensor_temp_task(void * pvParameter)
         .map = &map[0],
         .rom_codes = &task_inputs->sensors->rom_codes[0],
     };
+
+    // apply any default or nvs-loaded assignments
+    for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
+    {
+        _recalc_assignments_handler(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i, &context);
+    }
+
     // Callback if any assignments change
-    datastore_add_set_callback(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, _recalc_assignments, &context);
+    datastore_add_set_callback(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, _recalc_assignments_handler, &context);
 
     int errors_count[MAX_DEVICES] = {0};
     if (task_inputs->sensors->num_ds18b20s > 0)
@@ -315,8 +322,7 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const data
     // Assume that new devices are not connected during operation.
     temp_sensors_t * sensors = detect_sensors(gpio);
 
-    // TODO: separate "Detected Sensor ROM Codes" from "Assignments" - instead, assignments
-    // should be made by the user (via a list of detected devices) and stored in NV.
+    // assignments are made by the user (via a list of detected devices) and stored in NV.
 
     // publish detected ROM codes
     for (size_t i = 0; i < sensors->num_ds18b20s; ++i)

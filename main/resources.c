@@ -127,7 +127,8 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_AVR_COUNT_PP_MAN,  "AVR_COUNT_PP_MAN",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_AVR_COUNT_BUZZER,  "AVR_COUNT_BUZZER",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
-        _add_resource(datastore, RESOURCE_ID_DISPLAY_PAGE,      "DISPLAY_PAGE",      datastore_create_resource(DATASTORE_TYPE_INT32, 1));
+        _add_resource(datastore, RESOURCE_ID_DISPLAY_PAGE,              "DISPLAY_PAGE",              datastore_create_resource(DATASTORE_TYPE_INT32, 1));
+        _add_resource(datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, "DISPLAY_BACKLIGHT_TIMEOUT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
     }
 
@@ -143,7 +144,6 @@ datastore_t * resources_init(void)
     ERROR_CHECK(datastore_set_uint32(datastore, RESOURCE_ID_MQTT_BROKER_PORT, 0, CONFIG_MQTT_BROKER_TCP_PORT));
 
     ERROR_CHECK(datastore_set_uint8(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS));
-
     return datastore;
 }
 
@@ -219,6 +219,8 @@ void resources_load(const datastore_t * datastore)
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, "5"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, "60"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, "30"));
+
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0, "120"));
     }
 }
 
@@ -266,6 +268,8 @@ void resources_save(const datastore_t * datastore)
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0));
+
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0));
 
             nvs_commit(nh);
             nvs_close(nh);

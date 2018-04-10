@@ -807,6 +807,9 @@ static void display_task(void * pvParameter)
         buffer.row[i] = (char *)malloc(LCD_NUM_COLUMNS + 1);
     }
 
+    // backlight age
+    uint32_t backlight_timestamp = seconds_since_boot();
+
     // update pages once per second
     while (1)
     {
@@ -826,6 +829,11 @@ static void display_task(void * pvParameter)
         if (rc == pdTRUE)
         {
             ESP_LOGI(TAG, "from queue: %d", input);
+
+            // turn on backlight
+            i2c_lcd1602_set_backlight(lcd_info, true);
+            backlight_timestamp = seconds_since_boot();
+
             display_page_id_t new_page = _handle_transition(input, current_page);
             if (new_page != current_page && new_page >= 0 && new_page < DISPLAY_PAGE_LAST)
             {
@@ -850,6 +858,14 @@ static void display_task(void * pvParameter)
         }
 
         // TODO: reset display every 5 seconds as a precaution
+
+        // backlight timeout
+        uint32_t backlight_timeout = 0;
+        datastore_get_uint32(datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0, &backlight_timeout);
+        if (backlight_timeout > 0 && ((seconds_since_boot() - backlight_timestamp) > backlight_timeout))
+        {
+            i2c_lcd1602_set_backlight(lcd_info, false);
+        }
     }
 
     free(task_inputs);

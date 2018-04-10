@@ -216,53 +216,10 @@ static void do_control_pp_daily_minute(const char * topic, int32_t value, void *
     datastore_set_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, value);
 }
 
-static void echo_bool(const char * topic, bool value, void * context)
+static void do_display_backlight_timeout(const char * topic, uint32_t value, void * context)
 {
-    int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_bool: context %d, topic %s, value %d", ctxt_val, topic, value);
-}
-
-static void echo_uint8(const char * topic, uint8_t value, void * context)
-{
-    int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_uint8: context %d, topic %s, value %d", ctxt_val, topic, value);
-}
-
-static void echo_uint32(const char * topic, uint32_t value, void * context)
-{
-    int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_uint32: context %d, topic %s, value %u", ctxt_val, topic, value);
-}
-
-static void echo_int8(const char * topic, int8_t value, void * context)
-{
-    int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_int8: context %d, topic %s, value %d", ctxt_val, topic, value);
-}
-
-static void echo_int32(const char * topic, int32_t value, void * context)
-{
-    int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_int32: context %d, topic %s, value %d", ctxt_val, topic, value);
-}
-
-static void echo_float(const char * topic, float value, void * context)
-{
-    int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_float: context %d, topic %s, value %.7f", ctxt_val, topic, value);
-}
-
-static void echo_double(const char * topic, double value, void * context)
-{
-    int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_double: context %d, topic %s, value %.17f", ctxt_val, topic, value);
-}
-
-static void echo_string(const char * topic, const char * value, void * context)
-{
-    int ctxt_val = *(int *)context;
-    ESP_LOGW(TAG, "echo_string: context %d, topic %s, value \'%s\'", ctxt_val, topic, value);
-    esp_log_buffer_hex(TAG, value, strlen(value) + 1);
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_uint32(datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0, value);
 }
 
 // brief delay during startup sequence
@@ -270,8 +227,6 @@ static void _delay(void)
 {
     vTaskDelay(100 / portTICK_RATE_MS);
 }
-
-
 
 static void avr_test_sequence(void)
 {
@@ -344,61 +299,6 @@ void init_publish_subscriptions(const datastore_t * datastore, publish_context_t
     }
 }
 
-void init_mqtt_echo_subscriptions(mqtt_info_t * mqtt_info, const datastore_t * datastore)
-{
-    // These will leak!
-    int * context_echo_bool = malloc(sizeof(*context_echo_bool)); *context_echo_bool = 1;
-    int * context_echo_uint8 = malloc(sizeof(*context_echo_uint8)); *context_echo_uint8 = 2;
-    int * context_echo_uint32 = malloc(sizeof(*context_echo_uint32)); *context_echo_uint32 = 3;
-    int * context_echo_int8 = malloc(sizeof(*context_echo_int8)); *context_echo_int8 = 4;
-    int * context_echo_int32 = malloc(sizeof(*context_echo_int32)); *context_echo_int32 = 5;
-    int * context_echo_float = malloc(sizeof(*context_echo_float)); *context_echo_float = 6;
-    int * context_echo_double = malloc(sizeof(*context_echo_double)); *context_echo_double = 7;
-    int * context_echo_string = malloc(sizeof(*context_echo_string)); *context_echo_string = 8;
-
-    mqtt_error_t mqtt_error = MQTT_ERROR_UNKNOWN;
-
-    if ((mqtt_error = mqtt_register_topic_as_bool(mqtt_info, ROOT_TOPIC"/echo/bool", &echo_bool, &context_echo_bool)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
-    }
-
-    if ((mqtt_error = mqtt_register_topic_as_uint8(mqtt_info, ROOT_TOPIC"/echo/uint8", &echo_uint8, &context_echo_uint8)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_uint8 failed: %d", mqtt_error);
-    }
-
-    if ((mqtt_error = mqtt_register_topic_as_uint32(mqtt_info, ROOT_TOPIC"/echo/uint32", &echo_uint32, &context_echo_uint32)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_uint32 failed: %d", mqtt_error);
-    }
-
-    if ((mqtt_error = mqtt_register_topic_as_int8(mqtt_info, ROOT_TOPIC"/echo/int8", &echo_int8, &context_echo_int8)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_int8 failed: %d", mqtt_error);
-    }
-
-    if ((mqtt_error = mqtt_register_topic_as_int32(mqtt_info, ROOT_TOPIC"/echo/int32", &echo_int32, &context_echo_int32)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_int32 failed: %d", mqtt_error);
-    }
-
-    if ((mqtt_error = mqtt_register_topic_as_float(mqtt_info, ROOT_TOPIC"/echo/float", &echo_float, &context_echo_float)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
-    }
-
-    if ((mqtt_error = mqtt_register_topic_as_double(mqtt_info, ROOT_TOPIC"/echo/double", &echo_double, &context_echo_double)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_double failed: %d", mqtt_error);
-    }
-
-    if ((mqtt_error = mqtt_register_topic_as_string(mqtt_info, ROOT_TOPIC"/echo/string", &echo_string, &context_echo_string)) != MQTT_OK)
-    {
-        ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
-    }
-}
-
 typedef struct
 {
     mqtt_info_t * mqtt_info;
@@ -426,14 +326,12 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
             publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_WIFI_ADDRESS, 0);
             for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
             {
-                // TODO: store assignment of detected sensors to instances in NV
+                // store assignment of detected sensors to instances in NV
                 publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i);
                 publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_TEMP_DETECTED, i);
             }
 
             // subscribe to some topics
-            init_mqtt_echo_subscriptions(globals->mqtt_info, datastore);
-
             if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/esp32/reset", &do_esp32_reset, (void *)globals->running)) != MQTT_OK)
             {
                 ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
@@ -541,6 +439,10 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
                 ESP_LOGE(TAG, "mqtt_register_topic_as_int32 failed: %d", mqtt_error);
             }
 
+            if ((mqtt_error = mqtt_register_topic_as_uint32(globals->mqtt_info, ROOT_TOPIC"/display/backlight/timeout", &do_display_backlight_timeout, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_uint32 failed: %d", mqtt_error);
+            }
         }
     }
 }
@@ -613,17 +515,6 @@ void app_main()
     // Temp sensors
     _delay();
     temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, datastore);
-
-    // TODO: restore assignments from NV
-    // For now, assign them in the same order they are detected:
-    _delay();   // make sure sensor_temp's task's callbacks are installed
-    for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
-    {
-        // TODO: store assignment of detected sensors to instances in NV
-        char rom_code[SENSOR_TEMP_LEN_ROM_CODE] = "";
-        datastore_get_string(datastore, RESOURCE_ID_TEMP_DETECTED, i, rom_code, sizeof(rom_code));
-        datastore_set_string(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i, rom_code);
-    }
 
     // I2C devices - AVR, Light Sensor, LCD
     _delay();
