@@ -102,6 +102,8 @@ typedef enum
     RESOURCE_ID_AVR_COUNT_PP_MAN,
     RESOURCE_ID_AVR_COUNT_BUZZER,
 
+    RESOURCE_ID_DISPLAY_PAGE,
+
     RESOURCE_ID_LAST,
 } resource_id_t;
 

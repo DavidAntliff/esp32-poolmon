@@ -31,6 +31,7 @@
 #include "esp_log.h"
 #include "driver/rmt.h"
 #include "driver/pcnt.h"
+#include "driver/gpio.h"
 
 #include "sensor_flow.h"
 #include "constants.h"
@@ -38,6 +39,7 @@
 #include "publish.h"
 #include "utils.h"
 #include "datastore/datastore.h"
+#include "display.h"
 
 #define TAG "sensor_flow"
 
@@ -170,6 +172,24 @@ static double calc_flow_rate_lpm(double hz)
     return rate_lpm;
 }
 
+static void _display_page_changed(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context)
+{
+    display_page_id_t page = DISPLAY_PAGE_IGNORE;
+    if (datastore_get_int32(datastore, RESOURCE_ID_DISPLAY_PAGE, instance, &page) == DATASTORE_STATUS_OK)
+    {
+        if (page == DISPLAY_PAGE_SENSORS_FLOW)
+        {
+            gpio_matrix_out(CONFIG_ONBOARD_LED_GPIO, SIG_IN_FUNC228_IDX, false, false);
+            gpio_matrix_in(CONFIG_FLOW_METER_PULSE_GPIO, SIG_IN_FUNC228_IDX, false);
+        }
+        else
+        {
+            gpio_matrix_out(CONFIG_ONBOARD_LED_GPIO, SIG_GPIO_OUT_IDX, false, false);
+            gpio_matrix_in(GPIO_CONSTANT_LOW, SIG_IN_FUNC228_IDX, false);
+        }
+    }
+}
+
 static void sensor_flow_task(void * pvParameter)
 {
     assert(pvParameter);
@@ -189,6 +209,9 @@ static void sensor_flow_task(void * pvParameter)
     assert(num_rmt_items < RMT_MEM_ITEM_NUM);
 
     TickType_t last_wake_time = xTaskGetTickCount();
+
+    // subscribe to display changes
+    datastore_add_set_callback(datastore, RESOURCE_ID_DISPLAY_PAGE, _display_page_changed, NULL);
 
     while (1)
     {

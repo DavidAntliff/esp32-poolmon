@@ -33,6 +33,8 @@
 #include "resources.h"
 #include "utils.h"
 #include "datastore/datastore.h"
+#include "display.h"
+#include "led.h"
 
 #define TAG "power"
 
@@ -97,6 +99,11 @@ static void power_calculation_task(void * pvParameter)
 
                 datastore_set_float(datastore, RESOURCE_ID_POWER_VALUE, 0, power);
                 datastore_set_float(datastore, RESOURCE_ID_POWER_TEMP_DELTA, 0, delta);
+
+                if (display_is_currently(datastore, DISPLAY_PAGE_POWER))
+                {
+                    led_flash(50, 0, 1);
+                }
             }
             else
             {

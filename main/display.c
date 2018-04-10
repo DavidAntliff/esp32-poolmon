@@ -44,6 +44,8 @@
 #include "button.h"
 #include "rotary_encoder.h"
 #include "datastore/datastore.h"
+#include "led.h"
+#include "sdkconfig.h"
 
 #define TAG "display"
 
@@ -58,32 +60,12 @@
 #define DISPLAY_WIDTH      LCD_NUM_VISIBLE_COLUMNS
 #define ROW_STRING_WIDTH   (DISPLAY_WIDTH + 1)    // room for null terminator
 
-
 #ifndef BUILD_TIMESTAMP
 #  warning "Please ensure BUILD_TIMESTAMP is defined"
 #  define BUILD_TIMESTAMP "undefined"
 #endif
 
-typedef enum
-{
-    PAGE_IGNORE = -1,        // when used in a transition, ignore the rule
-    PAGE_BLANK = 0,
-    PAGE_SPLASH ,
-    PAGE_SENSORS_TEMP,
-    PAGE_SENSORS_TEMP_2,
-    PAGE_SENSORS_LIGHT,
-    PAGE_SENSORS_FLOW,
-    PAGE_POWER,
-    PAGE_PUMPS_SSRS,
-    PAGE_ALARM,
-    PAGE_WIFI_STATUS,
-    PAGE_MQTT_STATUS,
-    PAGE_RESOURCE_STATUS,
-    PAGE_AVR_STATUS,
-    PAGE_LAST,
-} page_id_t;
-
-#define INITIAL_PAGE PAGE_SPLASH
+#define INITIAL_PAGE DISPLAY_PAGE_MAIN
 
 typedef struct
 {
@@ -94,7 +76,7 @@ typedef void (*page_handler_t)(page_buffer_t * page_buffer, void * state, const 
 
 typedef struct
 {
-    page_id_t id;
+    display_page_id_t id;
     page_handler_t handler;
     void * state;
 } page_spec_t;
@@ -102,7 +84,7 @@ typedef struct
 
 // page handlers are responsible for displaying their content
 static void _handle_page_blank(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
-static void _handle_page_splash(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
+static void _handle_page_main(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_sensors_temp(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_sensors_temp2(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_sensors_light(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
@@ -115,51 +97,51 @@ static void _handle_page_mqtt_status(page_buffer_t * page_buffer, void * state, 
 static void _handle_page_resource_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_avr_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 
-static bool splash_activity = false;
+static bool main_activity = false;
 static bool blink_arrow = false;
 
 static const page_spec_t page_specs[] = {
     // ID                       handler                        state
-    { PAGE_BLANK,               _handle_page_blank,            NULL },
-    { PAGE_SPLASH,              _handle_page_splash,           &splash_activity },
-    { PAGE_SENSORS_TEMP,        _handle_page_sensors_temp,     &blink_arrow },
-    { PAGE_SENSORS_TEMP_2,      _handle_page_sensors_temp2,    &blink_arrow },
-    { PAGE_SENSORS_LIGHT,       _handle_page_sensors_light,    NULL },
-    { PAGE_SENSORS_FLOW,        _handle_page_sensors_flow,     NULL },
-    { PAGE_POWER,               _handle_page_power,            NULL },
-    { PAGE_PUMPS_SSRS,          _handle_page_pump_ssrs,        NULL },
-    { PAGE_ALARM,               _handle_page_alarm,            NULL },
-    { PAGE_WIFI_STATUS,         _handle_page_wifi_status,      NULL },
-    { PAGE_MQTT_STATUS,         _handle_page_mqtt_status,      NULL },
-    { PAGE_RESOURCE_STATUS,     _handle_page_resource_status,  NULL },
-    { PAGE_AVR_STATUS,          _handle_page_avr_status,       NULL },
+    { DISPLAY_PAGE_BLANK,               _handle_page_blank,            NULL },
+    { DISPLAY_PAGE_MAIN,                _handle_page_main,             &main_activity },
+    { DISPLAY_PAGE_SENSORS_TEMP,        _handle_page_sensors_temp,     &blink_arrow },
+    { DISPLAY_PAGE_SENSORS_TEMP_2,      _handle_page_sensors_temp2,    &blink_arrow },
+    { DISPLAY_PAGE_SENSORS_LIGHT,       _handle_page_sensors_light,    NULL },
+    { DISPLAY_PAGE_SENSORS_FLOW,        _handle_page_sensors_flow,     NULL },
+    { DISPLAY_PAGE_POWER,               _handle_page_power,            NULL },
+    { DISPLAY_PAGE_PUMPS_SSRS,          _handle_page_pump_ssrs,        NULL },
+    { DISPLAY_PAGE_ALARM,               _handle_page_alarm,            NULL },
+    { DISPLAY_PAGE_WIFI_STATUS,         _handle_page_wifi_status,      NULL },
+    { DISPLAY_PAGE_MQTT_STATUS,         _handle_page_mqtt_status,      NULL },
+    { DISPLAY_PAGE_RESOURCE_STATUS,     _handle_page_resource_status,  NULL },
+    { DISPLAY_PAGE_AVR_STATUS,          _handle_page_avr_status,       NULL },
 };
 
 // page transition table
 typedef struct
 {
-    page_id_t current;
-    page_id_t on_counter_clockwise;  // next page on turn counter-clockwise
-    page_id_t on_clockwise;          // next page on turn clockwise
-    page_id_t on_short;              // new page on single short press
-    page_id_t on_long;               // new page on single long press
+    display_page_id_t current;
+    display_page_id_t on_counter_clockwise;  // next page on turn counter-clockwise
+    display_page_id_t on_clockwise;          // next page on turn clockwise
+    display_page_id_t on_short;              // new page on single short press
+    display_page_id_t on_long;               // new page on single long press
 } transition_t;
 
 static const transition_t transitions[] = {
     // ID                       counter-clockwise      clockwise               short                  long
-    { PAGE_BLANK,               PAGE_SPLASH,           PAGE_SPLASH,            PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_SPLASH,              PAGE_AVR_STATUS,       PAGE_SENSORS_TEMP,      PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_SENSORS_TEMP,        PAGE_SPLASH,           PAGE_SENSORS_LIGHT,     PAGE_SENSORS_TEMP_2,   PAGE_IGNORE },
-    { PAGE_SENSORS_TEMP_2,      PAGE_SPLASH,           PAGE_SENSORS_LIGHT,     PAGE_SENSORS_TEMP,     PAGE_IGNORE },
-    { PAGE_SENSORS_LIGHT,       PAGE_SENSORS_TEMP,     PAGE_SENSORS_FLOW,      PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_SENSORS_FLOW,        PAGE_SENSORS_LIGHT,    PAGE_POWER,             PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_POWER,               PAGE_SENSORS_FLOW,     PAGE_PUMPS_SSRS,        PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_PUMPS_SSRS,          PAGE_SENSORS_FLOW,     PAGE_ALARM,             PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_ALARM,               PAGE_PUMPS_SSRS,       PAGE_WIFI_STATUS,       PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_WIFI_STATUS,         PAGE_ALARM,            PAGE_MQTT_STATUS,       PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_MQTT_STATUS,         PAGE_WIFI_STATUS,      PAGE_RESOURCE_STATUS,   PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_RESOURCE_STATUS,     PAGE_MQTT_STATUS,      PAGE_AVR_STATUS,        PAGE_IGNORE,           PAGE_IGNORE },
-    { PAGE_AVR_STATUS,          PAGE_RESOURCE_STATUS,  PAGE_SPLASH,            PAGE_IGNORE,           PAGE_IGNORE },
+    { DISPLAY_PAGE_BLANK,               DISPLAY_PAGE_MAIN,             DISPLAY_PAGE_MAIN,              DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_MAIN,                DISPLAY_PAGE_AVR_STATUS,       DISPLAY_PAGE_SENSORS_TEMP,      DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_SENSORS_TEMP,        DISPLAY_PAGE_MAIN,             DISPLAY_PAGE_SENSORS_LIGHT,     DISPLAY_PAGE_SENSORS_TEMP_2,   DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_SENSORS_TEMP_2,      DISPLAY_PAGE_MAIN,             DISPLAY_PAGE_SENSORS_LIGHT,     DISPLAY_PAGE_SENSORS_TEMP,     DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_SENSORS_LIGHT,       DISPLAY_PAGE_SENSORS_TEMP,     DISPLAY_PAGE_SENSORS_FLOW,      DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_SENSORS_FLOW,        DISPLAY_PAGE_SENSORS_LIGHT,    DISPLAY_PAGE_POWER,             DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_POWER,               DISPLAY_PAGE_SENSORS_FLOW,     DISPLAY_PAGE_PUMPS_SSRS,        DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_PUMPS_SSRS,          DISPLAY_PAGE_SENSORS_FLOW,     DISPLAY_PAGE_ALARM,             DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_ALARM,               DISPLAY_PAGE_PUMPS_SSRS,       DISPLAY_PAGE_WIFI_STATUS,       DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_WIFI_STATUS,         DISPLAY_PAGE_ALARM,            DISPLAY_PAGE_MQTT_STATUS,       DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_MQTT_STATUS,         DISPLAY_PAGE_WIFI_STATUS,      DISPLAY_PAGE_RESOURCE_STATUS,   DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_RESOURCE_STATUS,     DISPLAY_PAGE_MQTT_STATUS,      DISPLAY_PAGE_AVR_STATUS,        DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_AVR_STATUS,          DISPLAY_PAGE_RESOURCE_STATUS,  DISPLAY_PAGE_MAIN,              DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
 };
 
 static const char * BLANK_LINE = "                    ";
@@ -280,7 +262,7 @@ static void _render_uptime(char * buffer, size_t size, uint32_t uptime)
     snprintf(buffer, size, "Up %4dd %02d:%02d:%02d", days, hours, minutes, seconds);
 }
 
-static void _handle_page_splash(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
+static void _handle_page_main(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
 {
     bool * activity = (bool *)state;
 
@@ -300,6 +282,8 @@ static void _handle_page_splash(page_buffer_t * page_buffer, void * state, const
     {
         strncat(page_buffer->row[3], "  "DOT, ROW_STRING_WIDTH);
     }
+
+    led_flash(50, 0, 1);
     *activity = !(*activity);
 }
 
@@ -524,9 +508,18 @@ static void _handle_page_pump_ssrs(page_buffer_t * page_buffer, void * state, co
     _build_pump_string(pp_pump, PUMP_LEN, RESOURCE_ID_PUMPS_PP_STATE, datastore);
 
     snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "Pumps CP %-5s  %-3s", cp_switches, cp_pump);
-    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, BLANK_LINE);
+    uint32_t count_cp_mode = 0, count_cp_man = 0, count_cp = 0;
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_CP_MODE, 0, &count_cp_mode);
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_CP_MAN, 0, &count_cp_man);
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_CP, 0, &count_cp);
+    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "      %-3d  %-3d  %-3d", count_cp_mode, count_cp_man, count_cp);
+
     snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "      PP %-5s  %-3s", pp_switches, pp_pump);
-    snprintf(page_buffer->row[3], ROW_STRING_WIDTH, BLANK_LINE);
+    uint32_t count_pp_mode = 0, count_pp_man = 0, count_pp = 0;
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP_MODE, 0, &count_cp_mode);
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP_MAN, 0, &count_cp_man);
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP, 0, &count_cp);
+    snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "      %-3d  %-3d  %-3d", count_pp_mode, count_pp_man, count_pp);
 }
 
 static void _handle_page_alarm(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
@@ -670,17 +663,17 @@ static void _handle_page_avr_status(page_buffer_t * page_buffer, void * state, c
     datastore_get_age(datastore, RESOURCE_ID_AVR_COUNT_RESET, 0, &age_us);
 
     snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "AVR Version %d", version);
-    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "    Resets %d", count_reset);
+    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "Reset Count %d", count_reset);
     snprintf(page_buffer->row[2], ROW_STRING_WIDTH, BLANK_LINE);
 
     _render_uptime(page_buffer->row[3], ROW_STRING_WIDTH, age_us / 1000000);
 }
 
-static void dispatch_to_handler(page_buffer_t * buffer, page_id_t current_page, const datastore_t * datastore)
+static void dispatch_to_handler(page_buffer_t * buffer, display_page_id_t current_page, const datastore_t * datastore)
 {
-    assert(sizeof(page_specs) / sizeof(page_specs[0]) == PAGE_LAST);
+    assert(sizeof(page_specs) / sizeof(page_specs[0]) == DISPLAY_PAGE_LAST);
 
-    if (current_page >= 0 && current_page < PAGE_LAST)
+    if (current_page >= 0 && current_page < DISPLAY_PAGE_LAST)
     {
         if (page_specs[current_page].id == current_page)
         {
@@ -691,26 +684,26 @@ static void dispatch_to_handler(page_buffer_t * buffer, page_id_t current_page, 
             else
             {
                 ESP_LOGE(TAG, "page %d has no handler", current_page);
-                current_page = PAGE_BLANK;
+                current_page = DISPLAY_PAGE_BLANK;
             }
         }
         else
         {
             ESP_LOGE(TAG, "page spec mismatch at position %d", current_page);
-            current_page = PAGE_BLANK;
+            current_page = DISPLAY_PAGE_BLANK;
         }
     }
     else
     {
         ESP_LOGE(TAG, "current page %d out of range", current_page);
-        current_page = PAGE_BLANK;
+        current_page = DISPLAY_PAGE_BLANK;
     }
 }
 
-static page_id_t handle_transition(int input, page_id_t current_page)
+static display_page_id_t _handle_transition(int input, display_page_id_t current_page)
 {
-    page_id_t new_page = PAGE_BLANK;
-    if (current_page >= 0 && current_page < PAGE_LAST)
+    display_page_id_t new_page = DISPLAY_PAGE_BLANK;
+    if (current_page >= 0 && current_page < DISPLAY_PAGE_LAST)
     {
         switch (input)
         {
@@ -806,7 +799,7 @@ static void display_task(void * pvParameter)
 
     i2c_master_unlock(i2c_master_info);
 
-    page_id_t current_page = INITIAL_PAGE;
+    display_page_id_t current_page = INITIAL_PAGE;
 
     page_buffer_t buffer;
     for (int i = 0; i < LCD_NUM_ROWS; ++i)
@@ -832,28 +825,16 @@ static void display_task(void * pvParameter)
         BaseType_t rc = xQueueReceive(input_queue, &input, TICKS_PER_UPDATE);
         if (rc == pdTRUE)
         {
-            // Remove this later: test for incomplete lines
-            char line[ROW_STRING_WIDTH] = "";
-            snprintf(line, ROW_STRING_WIDTH, "####################");
-            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 0));
-            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
-            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 1));
-            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
-            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 2));
-            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
-            I2C_LCD1602_ERROR_CHECK(_move_cursor(lcd_info, 0, 3));
-            I2C_LCD1602_ERROR_CHECK(_write_string(lcd_info, line));
-
-
             ESP_LOGI(TAG, "from queue: %d", input);
-            page_id_t new_page = handle_transition(input, current_page);
-            if (new_page != current_page && new_page >= 0 && new_page < PAGE_LAST)
+            display_page_id_t new_page = _handle_transition(input, current_page);
+            if (new_page != current_page && new_page >= 0 && new_page < DISPLAY_PAGE_LAST)
             {
                 ESP_LOGI(TAG, "change to page %d", new_page);
                 current_page = new_page;
+                datastore_set_int32(datastore, RESOURCE_ID_DISPLAY_PAGE, 0, current_page);
 
-                // reset the display when going through the Splash page
-                if (current_page == PAGE_SPLASH)
+                // reset the display when going through the Main page
+                if (current_page == DISPLAY_PAGE_MAIN)
                 {
                     // reset display when changing page
                     _display_reset(lcd_info);
@@ -861,8 +842,8 @@ static void display_task(void * pvParameter)
                 }
             }
 
-            // special case - short button press on Splash page will dump datastore to console
-            if (current_page == PAGE_SPLASH && input == BUTTON_EVENT_SHORT)
+            // special case - short button press on Main page will dump datastore to console
+            if (current_page == DISPLAY_PAGE_MAIN && input == BUTTON_EVENT_SHORT)
             {
                 _dump_datastore(datastore);
             }
@@ -907,4 +888,18 @@ void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, con
     {
         ESP_LOGE(TAG, "display already initialised");
     }
+}
+
+bool display_is_currently(const datastore_t * datastore, display_page_id_t page)
+{
+    bool displaying = false;
+    if (datastore)
+    {
+        display_page_id_t current_page = DISPLAY_PAGE_IGNORE;
+        if (datastore_get_int32(datastore, RESOURCE_ID_DISPLAY_PAGE, 0, &current_page) == DATASTORE_STATUS_OK)
+        {
+            displaying = page == current_page;
+        }
+    }
+    return displaying;
 }

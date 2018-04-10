@@ -38,6 +38,8 @@
 #include "tsl2561.h"
 #include "publish.h"
 #include "datastore/datastore.h"
+#include "display.h"
+#include "led.h"
 
 #define TAG "sensor_light"
 
@@ -90,9 +92,20 @@ static void sensor_light_task(void * pvParameter)
             tsl2561_visible_t visible = 0;
             tsl2561_infrared_t infrared = 0;
 
+            bool control_led = display_is_currently(datastore, DISPLAY_PAGE_SENSORS_LIGHT);
+            if (control_led)
+            {
+                led_on();
+            }
+
             i2c_master_lock(i2c_master_info, portMAX_DELAY);
             esp_err_t err = tsl2561_read(tsl2561_info, &visible, &infrared);
             i2c_master_unlock(i2c_master_info);
+
+            if (control_led)
+            {
+                led_off();
+            }
 
             if (err == ESP_OK)
             {

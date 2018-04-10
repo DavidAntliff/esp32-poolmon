@@ -27,6 +27,10 @@
 
 #include <stdint.h>
 
+// GPIO routing matrix values for constant high and low signals
+#define GPIO_CONSTANT_LOW   0x30
+#define GPIO_CONSTANT_HIGH  0x38
+
 /**
  * @brief Obtain time since boot in microseconds.
  */

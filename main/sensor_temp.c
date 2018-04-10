@@ -40,6 +40,7 @@
 #include "owb_rmt.h"
 #include "ds18b20.h"
 #include "datastore/datastore.h"
+#include "display.h"
 
 #define MAX_DEVICES          (8)
 #define DS18B20_RESOLUTION   (DS18B20_RESOLUTION_10_BIT)
@@ -255,7 +256,11 @@ static void sensor_temp_task(void * pvParameter)
         {
             last_wake_time = xTaskGetTickCount();
 
-            led_on();
+            bool control_led = display_is_currently(datastore, DISPLAY_PAGE_SENSORS_TEMP) || display_is_currently(datastore, DISPLAY_PAGE_SENSORS_TEMP_2);
+            if (control_led)
+            {
+                led_on();
+            }
 
             float readings[MAX_DEVICES] = { 0 };
             DS18B20_ERROR errors[MAX_DEVICES] = { 0 };
@@ -263,7 +268,10 @@ static void sensor_temp_task(void * pvParameter)
             read_temperatures(task_inputs->sensors->ds18b20_infos, readings, errors, task_inputs->sensors->num_ds18b20s);
             ++sample_count;
 
-            led_off();
+            if (control_led)
+            {
+                led_off();
+            }
 
             // print results in a separate loop, after all have been read
             ESP_LOGI(TAG, "Temperature readings (degrees C): sample %d", sample_count);

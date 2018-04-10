@@ -32,7 +32,28 @@
 #include "i2c_master.h"
 #include "datastore/datastore.h"
 
+typedef enum
+{
+    DISPLAY_PAGE_IGNORE = -1,        // when used in a transition, ignore the rule
+    DISPLAY_PAGE_BLANK = 0,
+    DISPLAY_PAGE_MAIN,
+    DISPLAY_PAGE_SENSORS_TEMP,
+    DISPLAY_PAGE_SENSORS_TEMP_2,
+    DISPLAY_PAGE_SENSORS_LIGHT,
+    DISPLAY_PAGE_SENSORS_FLOW,
+    DISPLAY_PAGE_POWER,
+    DISPLAY_PAGE_PUMPS_SSRS,
+    DISPLAY_PAGE_ALARM,
+    DISPLAY_PAGE_WIFI_STATUS,
+    DISPLAY_PAGE_MQTT_STATUS,
+    DISPLAY_PAGE_RESOURCE_STATUS,
+    DISPLAY_PAGE_AVR_STATUS,
+    DISPLAY_PAGE_LAST,
+} display_page_id_t;
+
 void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore);
 
+// Return true if the specified page is currently being displayed
+bool display_is_currently(const datastore_t * datastore, display_page_id_t page);
 
 #endif // DISPLAY_H

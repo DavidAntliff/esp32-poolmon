@@ -126,6 +126,9 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_AVR_COUNT_PP_MODE, "AVR_COUNT_PP_MODE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_AVR_COUNT_PP_MAN,  "AVR_COUNT_PP_MAN",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_AVR_COUNT_BUZZER,  "AVR_COUNT_BUZZER",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+
+        _add_resource(datastore, RESOURCE_ID_DISPLAY_PAGE,      "DISPLAY_PAGE",      datastore_create_resource(DATASTORE_TYPE_INT32, 1));
+
     }
 
     // defaults
