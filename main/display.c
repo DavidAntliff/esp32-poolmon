@@ -516,9 +516,9 @@ static void _handle_page_pump_ssrs(page_buffer_t * page_buffer, void * state, co
 
     snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "      PP %-5s  %-3s", pp_switches, pp_pump);
     uint32_t count_pp_mode = 0, count_pp_man = 0, count_pp = 0;
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP_MODE, 0, &count_cp_mode);
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP_MAN, 0, &count_cp_man);
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP, 0, &count_cp);
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP_MODE, 0, &count_pp_mode);
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP_MAN, 0, &count_pp_man);
+    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP, 0, &count_pp);
     snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "      %-3d  %-3d  %-3d", count_pp_mode, count_pp_man, count_pp);
 }
 
