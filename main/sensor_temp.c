@@ -51,7 +51,7 @@
 struct _temp_sensors_t
 {
     OneWireBus * owb;
-    OneWireBus_ROMCode * rom_codes;
+    OneWireBus_ROMCode * rom_codes;   // a pointer to an *array* of ROM codes
     DS18B20_Info ** ds18b20_infos;
     int num_ds18b20s;
 };
@@ -194,8 +194,9 @@ void _recalc_assignments_handler(const datastore_t * datastore, datastore_resour
 {
     ESP_LOGD(TAG, "_recalc_assignments: datastore %p, resource id %d, instance id %d, ctxt %p", datastore, id, instance, ctxt);
     context_t * context = (context_t *)ctxt;
+    assert(context != NULL);
 
-    // search for match between assignment rom code and detected rom codes
+    // get the assigned rom code
     char rom_code_str[SENSOR_TEMP_LEN_ROM_CODE] = "";
     datastore_get_as_string(datastore, id, instance, rom_code_str, SENSOR_TEMP_LEN_ROM_CODE);
     ESP_LOGD(TAG, "rom_code_str [%s]", rom_code_str);
@@ -211,15 +212,18 @@ void _recalc_assignments_handler(const datastore_t * datastore, datastore_resour
     }
     ESP_LOG_BUFFER_HEXDUMP(TAG, &rom_code, sizeof(rom_code), ESP_LOG_DEBUG);
 
-    for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
+    // search for match between assignment rom code and detected rom codes
+    if (context->rom_codes != NULL)
     {
-        ESP_LOG_BUFFER_HEXDUMP(TAG, &context->rom_codes[i], sizeof(rom_code), ESP_LOG_DEBUG);
-
-        if (memcmp(&rom_code, &context->rom_codes[i], sizeof(OneWireBus_ROMCode)) == 0)
+        for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
         {
-            context->map[instance] = i;
-            ESP_LOGI(TAG, "Assigned rom code [%s] (detected instance %d) to T%d", rom_code_str, i, instance + 1);
-            break;
+            ESP_LOG_BUFFER_HEXDUMP(TAG, &context->rom_codes[i], sizeof(rom_code), ESP_LOG_DEBUG);
+            if (memcmp(&rom_code, &context->rom_codes[i], sizeof(OneWireBus_ROMCode)) == 0)
+            {
+                context->map[instance] = i;
+                ESP_LOGI(TAG, "Assigned rom code [%s] (detected instance %d) to T%d", rom_code_str, i, instance + 1);
+                break;
+            }
         }
     }
 }
