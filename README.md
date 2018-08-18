@@ -4,7 +4,7 @@ Requires at least ESP IDF v3.0rc1.
 
 Raspberry Pi side of the project: [DavidAntliff/poolmon](https://github.com/DavidAntliff/poolmon)
 
-ESP32 [schematics](https://easyeda.com/ef784f36/Test_Project-2fcb46b5097649a4b018bc6c12a2d6d0)
+[system block diagram, software architecture diagram and ESP32 schematic](https://easyeda.com/ef784f36/Test_Project-2fcb46b5097649a4b018bc6c12a2d6d0)
 
 Veroboard [design](https://www.draw.io/?lightbox=1&highlight=0000ff&edit=_blank&layers=1&nav=1&title=Veroboard.xml#Uhttps%3A%2F%2Fraw.githubusercontent.com%2FDavidAntliff%2Fpoolmon%2Fmaster%2Fsupport%2Fboard%2FVeroboard.xml)
 
