@@ -462,7 +462,7 @@ void app_main()
     esp_log_level_set("datastore", ESP_LOG_INFO);
     esp_log_level_set("mqtt", ESP_LOG_DEBUG);
     esp_log_level_set("publish", ESP_LOG_INFO);
-//    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
+    esp_log_level_set("sensor_temp", ESP_LOG_DEBUG);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
 //    esp_log_level_set("control", ESP_LOG_DEBUG);
     esp_log_level_set("sntp_rtc", ESP_LOG_INFO);
@@ -582,7 +582,7 @@ void app_main()
     {
         last_wake_time = xTaskGetTickCount();
 
-        avr_test_sequence();
+        //avr_test_sequence();
 
         // network connection state machine
         wifi_status_t wifi_status = WIFI_STATUS_DISCONNECTED;

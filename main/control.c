@@ -249,90 +249,85 @@ static void control_pp_task(void * pvParameter)
             ESP_LOGD(TAG, "Waiting for system time to be set");
         }
 
-        // TODO: handle tick count overflow
-
-        // TODO: confirm pump state matches
-
         //ESP_LOGD(TAG, "cp_state %d, FR %f", cp_state, flow_rate);
 
         // outputs are on transitions
-
-        switch(state)
+        switch (state)
         {
-        case STATE_PP_OFF:
-        {
-            datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &age);
-            if (age < MEASUREMENT_EXPIRY)
+            case STATE_PP_OFF:
             {
-                float flow_rate = 0.0f;
-                datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);
-                avr_pump_state_t cp_state = AVR_PUMP_STATE_OFF;
-                datastore_get_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_state);
-                float flow_threshold = 0.0f;
-                datastore_get_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, &flow_threshold);
-
-                ESP_LOGD(TAG, "flow rate %f, cp state %d, threshold %f", flow_rate, cp_state, flow_threshold);
-
-                if (daily_trigger || ((cp_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold)))
+                datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &age);
+                if (age < MEASUREMENT_EXPIRY)
                 {
-                    state = STATE_PP_ON;
-                    avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
-                    cycle_start_time = now;
-                    datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, &n);
-                    --n;
+                    float flow_rate = 0.0f;
+                    datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);
+                    avr_pump_state_t cp_state = AVR_PUMP_STATE_OFF;
+                    datastore_get_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_state);
+                    float flow_threshold = 0.0f;
+                    datastore_get_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, &flow_threshold);
+
+                    ESP_LOGD(TAG, "flow rate %f, cp state %d, threshold %f", flow_rate, cp_state, flow_threshold);
+
+                    if (daily_trigger || ((cp_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold)))
+                    {
+                        state = STATE_PP_ON;
+                        avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
+                        cycle_start_time = now;
+                        datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, &n);
+                        --n;
+                    }
                 }
+                else
+                {
+                    ESP_LOGW(TAG, "Flow measurement expired");
+                }
+                break;
             }
-            else
+
+            case STATE_PP_ON:
             {
-                ESP_LOGW(TAG, "Flow measurement expired");
-            }
-            break;
-        }
+                uint32_t duration = 0;
+                datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, &duration);
+                uint32_t cycle_end_time = cycle_start_time + duration;
 
-        case STATE_PP_ON:
-        {
-            uint32_t duration = 0;
-            datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, &duration);
-            uint32_t cycle_end_time = cycle_start_time + duration;
-
-            if (now >= cycle_end_time)
-            {
-                state = STATE_PP_PAUSE;
-                cycle_start_time = now;
-                avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
-            }
-            break;
-        }
-
-        case STATE_PP_PAUSE:
-        {
-            uint32_t duration = 0;
-            datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, &duration);
-            TickType_t cycle_end_time = cycle_start_time + duration;
-
-            if (n > 0)
-            {
                 if (now >= cycle_end_time)
                 {
-                    state = STATE_PP_ON;
-                    avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
+                    state = STATE_PP_PAUSE;
                     cycle_start_time = now;
-                    --n;
-                }
-            }
-            else
-            {
-                if (now >= cycle_end_time)
-                {
-                    state = STATE_PP_OFF;
                     avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
                 }
+                break;
             }
-            break;
-        }
 
-        default:
-            ESP_LOGE(TAG, "invalid case %d", state);
+            case STATE_PP_PAUSE:
+            {
+                uint32_t duration = 0;
+                datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, &duration);
+                TickType_t cycle_end_time = cycle_start_time + duration;
+
+                if (n > 0)
+                {
+                    if (now >= cycle_end_time)
+                    {
+                        state = STATE_PP_ON;
+                        avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
+                        cycle_start_time = now;
+                        --n;
+                    }
+                }
+                else
+                {
+                    if (now >= cycle_end_time)
+                    {
+                        state = STATE_PP_OFF;
+                        avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
+                    }
+                }
+                break;
+            }
+
+            default:
+                ESP_LOGE(TAG, "invalid case %d", state);
         }
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
