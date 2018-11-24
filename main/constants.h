@@ -29,7 +29,7 @@
 
 #define VERSION "0.90"
 
-#define SYSTEM_LEN_VERSION          4
+#define SYSTEM_LEN_VERSION          6  // XX.XX + null
 #define SYSTEM_LEN_BUILD_DATE_TIME 16
 
 #define PUBLISH_QUEUE_DEPTH      16
