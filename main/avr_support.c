@@ -360,6 +360,7 @@ static void avr_support_task(void * pvParameter)
     }
 
   stop: ;
+    i2c_master_unlock(i2c_master_info);
     free(task_inputs);
     vTaskDelete(NULL);
 }

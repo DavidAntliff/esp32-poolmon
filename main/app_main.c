@@ -497,6 +497,7 @@ void app_main()
     //esp_log_level_set("*", ESP_LOG_INFO);
     //esp_log_level_set("*", ESP_LOG_DEBUG);
     esp_log_level_set("nvs_support", ESP_LOG_INFO);
+    esp_log_level_set("display", ESP_LOG_WARN);
     esp_log_level_set("resources", ESP_LOG_INFO);
     esp_log_level_set("i2c", ESP_LOG_INFO);
     esp_log_level_set("avr_support", ESP_LOG_INFO);
