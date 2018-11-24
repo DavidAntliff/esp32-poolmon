@@ -96,6 +96,9 @@ static const value_info_t values_info[] =
     { RESOURCE_ID_FLOW_FREQUENCY, 0, "sensors/flow/1/freq", _as_string },
     { RESOURCE_ID_FLOW_RATE,      0, "sensors/flow/1/rate", _as_string },
 
+    { RESOURCE_ID_POWER_VALUE,      0, "power/value", _as_string },
+    { RESOURCE_ID_POWER_TEMP_DELTA, 0, "power/delta", _as_string },
+
     { RESOURCE_ID_SWITCHES_CP_MODE_VALUE, 0, "switches/cp/mode",   _as_string },
     { RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  0, "switches/cp/manual", _as_string },
     { RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, "switches/pp/mode",   _as_string },

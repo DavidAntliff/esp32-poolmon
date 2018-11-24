@@ -45,6 +45,7 @@
 #define MAX_DEVICES          (8)
 #define DS18B20_RESOLUTION   (DS18B20_RESOLUTION_10_BIT)
 #define SAMPLE_PERIOD        (5000)  // sensor sampling period in milliseconds
+#define MEASUREMENT_EXPIRY   (15 * 1000000)    // microseconds
 
 #define TAG "sensor_temp"
 
@@ -293,17 +294,29 @@ static void sensor_temp_task(void * pvParameter)
                 int num_errors = map[i] >= 0 ? errors_count[map[i]] : 0;
                 DS18B20_ERROR error = map[i] >= 0 ? errors[map[i]] : DS18B20_OK;
 
-                // filter out unmapped and errored readings
-                if (map[i] >= 0)
+                datastore_age_t override_age = 0;
+                datastore_get_age(datastore, RESOURCE_ID_TEMP_OVERRIDE, i, &override_age);
+                if (override_age < (esp_timer_get_time() - 10))
                 {
-                    if (error == DS18B20_OK)
+                    float override_value = 0.0f;
+                    datastore_get_float(datastore, RESOURCE_ID_TEMP_OVERRIDE, i, &override_value);
+                    datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, override_value);
+                    ESP_LOGI(TAG, "  T%d: %.1f    %d errors  OVERRIDE", i + 1, override_value, num_errors);
+                }
+                else
+                {
+                    // filter out unmapped and errored readings
+                    if (map[i] >= 0)
                     {
-                        datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, reading);
-                        ESP_LOGI(TAG, "  T%d: %.1f    %d errors", i + 1, reading, num_errors);
-                    }
-                    else
-                    {
-                        ++errors_count[map[i]];
+                        if (error == DS18B20_OK)
+                        {
+                            datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, reading);
+                            ESP_LOGI(TAG, "  T%d: %.1f    %d errors", i + 1, reading, num_errors);
+                        }
+                        else
+                        {
+                            ++errors_count[map[i]];
+                        }
                     }
                 }
             }

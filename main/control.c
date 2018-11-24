@@ -24,6 +24,7 @@
 
 #include <string.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -37,6 +38,9 @@
 
 #define POLL_PERIOD        (1000)  // control loop period in milliseconds
 #define MEASUREMENT_EXPIRY (15 * 1000000)    // microseconds
+#define SENSOR_HIGH        (1)     // instance of high temperature sensor
+#define SENSOR_LOW         (0)     // instance of low temperature sensor
+#define PP_HOLD_OFF        (30 * 1000000)    // to check for flow when CP is on, wait at least this many seconds before deciding to start PP if flow rate is below threshold
 
 #define TAG "control"
 
@@ -57,20 +61,20 @@ static void control_cp_task(void * pvParameter)
     avr_pump_state_t state = AVR_PUMP_STATE_OFF;
     avr_support_set_cp_pump(AVR_PUMP_STATE_OFF);
 
-    datastore_age_t t1_age = DATASTORE_INVALID_AGE;
-    datastore_age_t t2_age = DATASTORE_INVALID_AGE;
+    datastore_age_t t_high_age = DATASTORE_INVALID_AGE;
+    datastore_age_t t_low_age = DATASTORE_INVALID_AGE;
 
     // wait for stable sensor readings
     bool stable = false;
-    while(!stable)
+    while (!stable)
     {
         last_wake_time = xTaskGetTickCount();
         ESP_LOGD(TAG, "CP control loop: wait for stable sensors");
 
-        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, 0, &t1_age);
-        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, 1, &t2_age);
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_HIGH, &t_high_age);
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_LOW, &t_low_age);
 
-        if ((t1_age < MEASUREMENT_EXPIRY) && (t2_age < MEASUREMENT_EXPIRY))
+        if ((t_high_age < MEASUREMENT_EXPIRY) && (t_low_age < MEASUREMENT_EXPIRY))
         {
             stable = true;
             ESP_LOGI(TAG, "CP control loop: sensors stable");
@@ -82,33 +86,35 @@ static void control_cp_task(void * pvParameter)
     while (1)
     {
         last_wake_time = xTaskGetTickCount();
+        ESP_LOGD(TAG, "--");
         ESP_LOGD(TAG, "CP control loop: state %d", state);
 
-        float t1 = 0.0f;
-        float t2 = 0.0f;
+        float t_high = 0.0f;
+        float t_low = 0.0f;
         bool transition = false;
 
-        t1_age = DATASTORE_INVALID_AGE;
-        t2_age = DATASTORE_INVALID_AGE;
-        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, 0, &t1_age);
-        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, 1, &t2_age);
+        t_high_age = DATASTORE_INVALID_AGE;
+        t_low_age = DATASTORE_INVALID_AGE;
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_HIGH, &t_high_age);
+        datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_LOW, &t_low_age);
 
-        if (t1_age < MEASUREMENT_EXPIRY)
+        if (t_high_age < MEASUREMENT_EXPIRY)
         {
-            if (t2_age < MEASUREMENT_EXPIRY)
+            if (t_low_age < MEASUREMENT_EXPIRY)
             {
-                datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, 0, &t1);
-                datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, 1, &t2);
-                ESP_LOGD(TAG, "T1 %f, T2 %f", t1, t2);
+                datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_HIGH, &t_high);
+                datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_LOW, &t_low);
+                ESP_LOGD(TAG, "CP control loop: T HIGH %.2f, T LOW %.2f", t_high, t_low);
 
                 // transitions
                 if (state == AVR_PUMP_STATE_OFF)
                 {
                     float delta = 0.0f;
                     datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, &delta);
-        //            ESP_LOGD(TAG, "delta on %f", delta);
-                    if (t1 - t2 >= delta)
+                    ESP_LOGD(TAG, "CP control loop: delta on %f", delta);
+                    if (t_high - t_low >= delta)
                     {
+                        ESP_LOGD(TAG, "CP control loop: circulation pump ON");
                         state = AVR_PUMP_STATE_ON;
                         transition = true;
                     }
@@ -117,9 +123,10 @@ static void control_cp_task(void * pvParameter)
                 {
                     float delta = 0.0f;
                     datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, &delta);
-        //            ESP_LOGD(TAG, "delta off %f", delta);
-                    if (t1 - t2 <= delta)
+                    ESP_LOGD(TAG, "CP control loop: delta off %f", delta);
+                    if (t_high - t_low <= delta)
                     {
+                        ESP_LOGD(TAG, "CP control loop: circulation pump OFF");
                         state = AVR_PUMP_STATE_OFF;
                         transition = true;
                     }
@@ -133,12 +140,12 @@ static void control_cp_task(void * pvParameter)
             }
             else
             {
-                ESP_LOGW(TAG, "T2 measurement timeout");
+                ESP_LOGW(TAG, "CP control loop: T LOW measurement timeout");
             }
         }
         else
         {
-            ESP_LOGW(TAG, "T1 measurement timeout");
+            ESP_LOGW(TAG, "CP control loop: T HIGH measurement timeout");
         }
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
@@ -167,7 +174,7 @@ static void control_pp_task(void * pvParameter)
     // wait for stable sensor readings
     datastore_age_t age = DATASTORE_INVALID_AGE;
     bool stable = false;
-    while(!stable)
+    while (!stable)
     {
         last_wake_time = xTaskGetTickCount();
         ESP_LOGD(TAG, "PP control loop: wait for stable sensors");
@@ -218,15 +225,15 @@ static void control_pp_task(void * pvParameter)
                 time_t now;
                 struct tm timeinfo;
                 _get_local_time(&now, &timeinfo);
-                ESP_LOGD(TAG, "timeinfo.tm_hour %d, last_timeinfo.tm_hour %d", timeinfo.tm_hour, last_timeinfo.tm_hour);
-                ESP_LOGD(TAG, "timeinfo.tm_min %d, last_timeinfo.tm_min %d", timeinfo.tm_min, last_timeinfo.tm_min);
+                ESP_LOGD(TAG, "PP control loop: timeinfo.tm_hour %d, last_timeinfo.tm_hour %d", timeinfo.tm_hour, last_timeinfo.tm_hour);
+                ESP_LOGD(TAG, "PP control loop: timeinfo.tm_min %d, last_timeinfo.tm_min %d", timeinfo.tm_min, last_timeinfo.tm_min);
                 if ((timeinfo.tm_min != last_timeinfo.tm_min)
                     && (timeinfo.tm_hour == daily_hour && timeinfo.tm_min == daily_minute))
                 {
                     daily_trigger = true;
                     char strftime_buf[64];
                     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-                    ESP_LOGI(TAG, "Triggered Purge Pump at %s", strftime_buf);
+                    ESP_LOGI(TAG, "PP control loop: triggered Purge Pump at %s", strftime_buf);
                 }
                 else
                 {
@@ -235,18 +242,18 @@ static void control_pp_task(void * pvParameter)
                     int rem_minutes = now_minutes <= set_minutes ? set_minutes - now_minutes : 24 * 60 - now_minutes + set_minutes;
                     int hours_remaining = rem_minutes / 60;  // floor
                     int minutes_remaining = rem_minutes - (hours_remaining * 60);
-                    ESP_LOGD(TAG, "%dh%02dm until daily purge (now %d, set %d, rem %d)", hours_remaining, minutes_remaining, now_minutes, set_minutes, rem_minutes);
+                    ESP_LOGD(TAG, "PP control loop: %dh%02dm until daily purge (now %d, set %d, rem %d)", hours_remaining, minutes_remaining, now_minutes, set_minutes, rem_minutes);
                 }
                 last_timeinfo = timeinfo;
             }
             else
             {
-                ESP_LOGD(TAG, "Daily PP timer disabled");
+                ESP_LOGD(TAG, "PP control loop: daily PP timer disabled");
             }
         }
         else
         {
-            ESP_LOGD(TAG, "Waiting for system time to be set");
+            ESP_LOGD(TAG, "PP control loop: waiting for system time to be set");
         }
 
         //ESP_LOGD(TAG, "cp_state %d, FR %f", cp_state, flow_rate);
@@ -262,14 +269,20 @@ static void control_pp_task(void * pvParameter)
                     float flow_rate = 0.0f;
                     datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);
                     avr_pump_state_t cp_state = AVR_PUMP_STATE_OFF;
+
                     datastore_get_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_state);
+                    datastore_age_t cp_state_age = 0;
+                    datastore_get_age(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_state_age);
+                    ESP_LOGD(TAG, "PP control loop: cp_state_age %" PRIu64, cp_state_age);
+
                     float flow_threshold = 0.0f;
                     datastore_get_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, &flow_threshold);
 
-                    ESP_LOGD(TAG, "flow rate %f, cp state %d, threshold %f", flow_rate, cp_state, flow_threshold);
+                    ESP_LOGD(TAG, "PP control loop: flow rate %f, cp state %d, threshold %f", flow_rate, cp_state, flow_threshold);
 
-                    if (daily_trigger || ((cp_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold)))
+                    if (daily_trigger || ((cp_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold) && (cp_state_age > PP_HOLD_OFF)))
                     {
+                        ESP_LOGD(TAG, "PP control loop: purge pump ON");
                         state = STATE_PP_ON;
                         avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
                         cycle_start_time = now;
@@ -279,7 +292,7 @@ static void control_pp_task(void * pvParameter)
                 }
                 else
                 {
-                    ESP_LOGW(TAG, "Flow measurement expired");
+                    ESP_LOGW(TAG, "PP control loop: flow measurement expired");
                 }
                 break;
             }
@@ -292,6 +305,7 @@ static void control_pp_task(void * pvParameter)
 
                 if (now >= cycle_end_time)
                 {
+                    ESP_LOGD(TAG, "PP control loop: purge pump PAUSE");
                     state = STATE_PP_PAUSE;
                     cycle_start_time = now;
                     avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
@@ -309,6 +323,7 @@ static void control_pp_task(void * pvParameter)
                 {
                     if (now >= cycle_end_time)
                     {
+                        ESP_LOGD(TAG, "PP control loop: purge pump ON");
                         state = STATE_PP_ON;
                         avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
                         cycle_start_time = now;
@@ -319,6 +334,7 @@ static void control_pp_task(void * pvParameter)
                 {
                     if (now >= cycle_end_time)
                     {
+                        ESP_LOGD(TAG, "PP control loop: purge pump OFF");
                         state = STATE_PP_OFF;
                         avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
                     }
@@ -327,7 +343,7 @@ static void control_pp_task(void * pvParameter)
             }
 
             default:
-                ESP_LOGE(TAG, "invalid case %d", state);
+                ESP_LOGE(TAG, "PP control loop: invalid case %d", state);
         }
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);

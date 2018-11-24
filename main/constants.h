@@ -27,7 +27,7 @@
 
 #include "sdkconfig.h"
 
-#define VERSION "0.1"
+#define VERSION "0.90"
 
 #define SYSTEM_LEN_VERSION          4
 #define SYSTEM_LEN_BUILD_DATE_TIME 16

@@ -72,9 +72,9 @@ static void power_calculation_task(void * pvParameter)
         ESP_LOGD(TAG, "power calculation loop");
         last_wake_time = xTaskGetTickCount();
 
-        // for now, use T1 and T2
-        const uint8_t in = 0;
-        const uint8_t out = 1;
+        // for now, use T1 and T3
+        const uint8_t in = 0;  // Pool
+        const uint8_t out = 2; // Output
 
         datastore_age_t age_in = DATASTORE_INVALID_AGE;
         datastore_age_t age_out = DATASTORE_INVALID_AGE;

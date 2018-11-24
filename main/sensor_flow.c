@@ -230,15 +230,30 @@ static void sensor_flow_task(void * pvParameter)
         int16_t count = 0;
         pcnt_get_counter_value(task_inputs->pcnt_unit, &count);
 
-        // TODO: check for overflow?
+        double frequency_hz = 0.0;
+        double rate_lpm = 0.0;
+        bool override = false;
 
-        double frequency_hz = count / 2.0 / task_inputs->sampling_window;
-        double rate_lpm = calc_flow_rate_lpm(frequency_hz);
+        datastore_age_t override_age = 0;
+        datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE_OVERRIDE, 0, &override_age);
+        override = override_age < (esp_timer_get_time() - 10);
+        if (override)
+        {
+            float override_value = 0.0f;
+            datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE_OVERRIDE, 0, &override_value);
+            frequency_hz = -1.0;  // to indicate override
+            rate_lpm = override_value;
+        }
+        else
+        {
+            // TODO: check for overflow?
+            frequency_hz = count / 2.0 / task_inputs->sampling_window;
+            rate_lpm = calc_flow_rate_lpm(frequency_hz);
+        }
 
         datastore_set_float(datastore, RESOURCE_ID_FLOW_FREQUENCY, 0, frequency_hz);
         datastore_set_float(datastore, RESOURCE_ID_FLOW_RATE, 0, rate_lpm);
-
-        ESP_LOGI(TAG, "counter %d, frequency %f Hz, rate %f LPM", count, frequency_hz, rate_lpm);
+        ESP_LOGI(TAG, "counter %d, frequency %f Hz, rate %f LPM%s", count, frequency_hz, rate_lpm, override ? " OVERRIDE" : "");
 
         vTaskDelayUntil(&last_wake_time, task_inputs->sampling_period * 1000 / portTICK_PERIOD_MS);
     }

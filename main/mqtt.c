@@ -406,9 +406,14 @@ mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info, const datastore_t * datastore)
 bool mqtt_publish(const char * topic, const uint8_t * payload, size_t len, int qos, bool retained)
 {
     bool result = false;
+    ESP_LOGD(TAG, "topic %s, len %d, qos %d, retained %d", topic, len, qos, retained);
     if ((result = esp_mqtt_publish(topic, (uint8_t *)payload, len, qos, retained)) != false)
     {
         datastore_increment(g_datastore, RESOURCE_ID_MQTT_MESSAGE_TX_COUNT, 0);
+    }
+    else
+    {
+        ESP_LOGW(TAG, "esp_mqtt_publish failed");
     }
     return result;
 }

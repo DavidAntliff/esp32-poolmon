@@ -77,7 +77,8 @@ static void sensor_light_task(void * pvParameter)
     if (tsl2561_init(tsl2561_info, smbus_info) == ESP_OK)
     {
         // Set sensor integration time and gain
-        tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_1X);
+        //tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_1X);
+        tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_101MS, TSL2561_GAIN_1X);
         //tsl2561_set_integration_time_and_gain(tsl2561_info, TSL2561_INTEGRATION_TIME_402MS, TSL2561_GAIN_16X);
 
         datastore_set_bool(datastore, RESOURCE_ID_LIGHT_DETECTED, 0, true);

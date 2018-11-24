@@ -365,17 +365,17 @@ static void _handle_page_sensors_light(page_buffer_t * page_buffer, void * state
             datastore_get_uint32(datastore, RESOURCE_ID_LIGHT_INFRARED, 0, &infrared);
             datastore_get_uint32(datastore, RESOURCE_ID_LIGHT_ILLUMINANCE, 0, &illuminance);
 
-            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "Light Full    %5d", full);
-            snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "      Lux     %5d", illuminance);
-            snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "      Infrared%5d", infrared);
-            snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "      Visible %5d", visible);
+            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "Light Full     %5d", full);
+            snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "      Lux      %5d", illuminance);
+            snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "      Infrared %5d", infrared);
+            snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "      Visible  %5d", visible);
         }
         else
         {
-            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "Light Full     ----");
-            snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "      Lux      ----");
-            snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "      Infrared ----");
-            snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "      Visible  ----");
+            snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "Light Full     -----");
+            snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "      Lux      -----");
+            snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "      Infrared -----");
+            snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "      Visible  -----");
         }
     }
     else

@@ -57,6 +57,8 @@
 
 #define TAG "app_main"
 
+#define MARK_PERIOD (60 * 10)  // emit something in the log every 10 minutes
+
 //TODO: LED task, to blink LED when required
 // - count number of connected devices
 // - indicate when sampling
@@ -165,6 +167,30 @@ static void do_sensors_temp_assignment(const char * topic, const char * value, v
     if (instance > 0 && instance <= SENSOR_TEMP_INSTANCES)
     {
         datastore_set_string(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, instance - 1, value);
+    }
+}
+
+static void do_sensors_temp_override(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    uint32_t instance = 0;
+    sscanf(topic, ROOT_TOPIC"/sensors/temp/%u/override", &instance);
+    ESP_LOGD(TAG, "instance %u, value %f", instance, value);
+    if (instance > 0 && instance <= SENSOR_TEMP_INSTANCES)
+    {
+        datastore_set_float(datastore, RESOURCE_ID_TEMP_OVERRIDE, instance - 1, value);
+    }
+}
+
+static void do_sensors_flow_override(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    uint32_t instance = 0;
+    sscanf(topic, ROOT_TOPIC"/sensors/flow/%u/override", &instance);
+    ESP_LOGD(TAG, "instance %u, value %f", instance, value);
+    if (instance == 1)
+    {
+        datastore_set_float(datastore, RESOURCE_ID_FLOW_RATE_OVERRIDE, instance - 1, value);
     }
 }
 
@@ -280,6 +306,8 @@ void init_publish_subscriptions(const datastore_t * datastore, publish_context_t
             RESOURCE_ID_LIGHT_ILLUMINANCE,
             RESOURCE_ID_FLOW_FREQUENCY,
             RESOURCE_ID_FLOW_RATE,
+            RESOURCE_ID_POWER_VALUE,
+            RESOURCE_ID_POWER_TEMP_DELTA,
             RESOURCE_ID_SWITCHES_CP_MODE_VALUE,
             RESOURCE_ID_SWITCHES_CP_MAN_VALUE,
             RESOURCE_ID_SWITCHES_PP_MODE_VALUE,
@@ -397,6 +425,21 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
                 {
                     ESP_LOGE(TAG, "mqtt_register_topic_as_string failed: %d", mqtt_error);
                 }
+
+                // debug override of temperature values - once set, only a reset will clear
+                snprintf(topic, 64, ROOT_TOPIC"/sensors/temp/%d/override", i + 1);
+                if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, topic, &do_sensors_temp_override, globals->datastore)) != MQTT_OK)
+                {
+                    ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
+                }
+            }
+
+            // debug override of flow value - once set, only a reset will clear
+            char topic[64] = "";
+            snprintf(topic, 64, ROOT_TOPIC"/sensors/flow/1/override");
+            if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, topic, &do_sensors_flow_override, globals->datastore)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_float failed: %d", mqtt_error);
             }
 
             if ((mqtt_error = mqtt_register_topic_as_float(globals->mqtt_info, ROOT_TOPIC"/control/cp/delta_on", &do_control_cp_delta_on, globals->datastore)) != MQTT_OK)
@@ -451,22 +494,22 @@ void mqtt_status_callback(const datastore_t * datastore, datastore_resource_id_t
 void app_main()
 {
     esp_log_level_set("*", ESP_LOG_WARN);
+    //esp_log_level_set("*", ESP_LOG_INFO);
+    //esp_log_level_set("*", ESP_LOG_DEBUG);
     esp_log_level_set("nvs_support", ESP_LOG_INFO);
     esp_log_level_set("resources", ESP_LOG_INFO);
-//    esp_log_level_set("*", ESP_LOG_INFO);
-//    esp_log_level_set("*", ESP_LOG_DEBUG);
     esp_log_level_set("i2c", ESP_LOG_INFO);
-//    esp_log_level_set("display", ESP_LOG_DEBUG);
-//    esp_log_level_set("avr_support", ESP_LOG_DEBUG);
+    esp_log_level_set("avr_support", ESP_LOG_INFO);
     esp_log_level_set("wifi_support", ESP_LOG_INFO);
     esp_log_level_set("datastore", ESP_LOG_INFO);
-    esp_log_level_set("mqtt", ESP_LOG_DEBUG);
+    esp_log_level_set("mqtt", ESP_LOG_INFO);
     esp_log_level_set("publish", ESP_LOG_INFO);
-    esp_log_level_set("sensor_temp", ESP_LOG_DEBUG);
+    esp_log_level_set("sensor_temp", ESP_LOG_WARN);
+    esp_log_level_set("sensor_light", ESP_LOG_WARN);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
-//    esp_log_level_set("control", ESP_LOG_DEBUG);
+    esp_log_level_set("control", ESP_LOG_INFO);
     esp_log_level_set("sntp_rtc", ESP_LOG_INFO);
-//    esp_log_level_set("power", ESP_LOG_DEBUG);
+    esp_log_level_set("power", ESP_LOG_WARN);
     esp_log_level_set("app_main", ESP_LOG_INFO);
 
     // Ensure RMT peripheral is reset properly, in case of prior crash
@@ -578,11 +621,21 @@ void app_main()
     system_monitor_init(system_priority, datastore, publish_context);
     _delay();
 
+    uint32_t last_mark_time = 0;
+
     while (running)
     {
         last_wake_time = xTaskGetTickCount();
 
         //avr_test_sequence();
+
+        // period mark in log
+        uint32_t now = seconds_since_boot();
+        if (now >= last_mark_time + MARK_PERIOD)
+        {
+            ESP_LOGI(TAG, "-- mark --");
+            last_mark_time = now;
+        }
 
         // network connection state machine
         wifi_status_t wifi_status = WIFI_STATUS_DISCONNECTED;
