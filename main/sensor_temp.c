@@ -333,6 +333,72 @@ static void sensor_temp_task(void * pvParameter)
     vTaskDelete(NULL);
 }
 
+static void sensor_temp_sim_task(void * pvParameter)
+{
+    // When no devices are detected, this task can be used to simulate temperature sensors
+    // The override resources are also available.
+
+    ESP_LOGD(TAG, "%s", __FUNCTION__);
+    assert(pvParameter);
+    ESP_LOGI(TAG, "Core ID %d", xPortGetCoreID());
+
+    task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
+    const datastore_t * datastore = task_inputs->datastore;
+
+    int sample_count = 0;
+
+    // wait a second before starting commencing sampling
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    TickType_t last_wake_time = xTaskGetTickCount();
+
+    while (1)
+    {
+        last_wake_time = xTaskGetTickCount();
+
+        bool control_led = display_is_currently(datastore, DISPLAY_PAGE_SENSORS_TEMP) || display_is_currently(datastore, DISPLAY_PAGE_SENSORS_TEMP_2);
+        if (control_led)
+        {
+            led_on();
+        }
+
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+        ++sample_count;
+
+        if (control_led)
+        {
+            led_off();
+        }
+
+        ESP_LOGI(TAG, "Temperature readings (degrees C): sample %d ** SIMULATED **", sample_count);
+        for (int i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
+        {
+            float reading = -2048.0;
+            int num_errors = -1;  // indicate that something isn't quite right about these measurements
+            datastore_age_t override_age = 0;
+            datastore_get_age(datastore, RESOURCE_ID_TEMP_OVERRIDE, i, &override_age);
+            bool override = override_age < (esp_timer_get_time() - 10);
+
+            if (override)
+            {
+                datastore_get_float(datastore, RESOURCE_ID_TEMP_OVERRIDE, i, &reading);
+            }
+            else
+            {
+                reading = 20.0 + 1.0 * i;
+            }
+
+            datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, reading);
+            ESP_LOGI(TAG, "  T%d: %.1f    %d errors%s", i + 1, reading, num_errors, override ? " OVERRIDE" : " SIMULATED");
+        }
+
+        vTaskDelayUntil(&last_wake_time, SAMPLE_PERIOD / portTICK_PERIOD_MS);
+    }
+
+    free(task_inputs);
+    vTaskDelete(NULL);
+}
+
 temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const datastore_t * datastore)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
@@ -365,7 +431,15 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const data
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->sensors = sensors;
         task_inputs->datastore = datastore;
-        xTaskCreate(&sensor_temp_task, "sensor_temp_task", 4096, task_inputs, priority, NULL);
+        if (sensors->num_ds18b20s > 0)
+        {
+            xTaskCreate(&sensor_temp_task, "sensor_temp_task", 4096, task_inputs, priority, NULL);
+        }
+        else
+        {
+            ESP_LOGW(TAG, "No temperature sensors detected - using simulated sensors");
+            xTaskCreate(&sensor_temp_sim_task, "sensor_temp_task", 4096, task_inputs, priority, NULL);
+        }
     }
     return sensors;
 }

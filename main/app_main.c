@@ -59,6 +59,12 @@
 
 #define MARK_PERIOD (60 * 10)  // emit something in the log every 10 minutes
 
+#ifdef __GNUC__
+#  define SYMBOL_IS_NOT_USED __attribute__ ((unused))
+#else
+#  define SYMBOL_IS_NOT_USED
+#endif
+
 //TODO: LED task, to blink LED when required
 // - count number of connected devices
 // - indicate when sampling
@@ -254,7 +260,7 @@ static void _delay(void)
     vTaskDelay(100 / portTICK_RATE_MS);
 }
 
-static void avr_test_sequence(void)
+static void SYMBOL_IS_NOT_USED avr_test_sequence(void)
 {
     static int state = 0;
 
@@ -505,7 +511,7 @@ void app_main()
     esp_log_level_set("datastore", ESP_LOG_INFO);
     esp_log_level_set("mqtt", ESP_LOG_INFO);
     esp_log_level_set("publish", ESP_LOG_INFO);
-    esp_log_level_set("sensor_temp", ESP_LOG_WARN);
+    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
     esp_log_level_set("sensor_light", ESP_LOG_WARN);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
     esp_log_level_set("control", ESP_LOG_INFO);
@@ -558,7 +564,7 @@ void app_main()
 
     // Temp sensors
     _delay();
-    temp_sensors_t * temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, datastore);
+    temp_sensors_t * SYMBOL_IS_NOT_USED temp_sensors = sensor_temp_init(CONFIG_ONE_WIRE_GPIO, sensor_priority, datastore);
 
     // I2C devices - AVR, Light Sensor, LCD
     _delay();
