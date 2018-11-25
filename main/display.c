@@ -662,11 +662,18 @@ static void _handle_page_avr_status(page_buffer_t * page_buffer, void * state, c
     datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_RESET, 0, &count_reset);
     datastore_get_age(datastore, RESOURCE_ID_AVR_COUNT_RESET, 0, &age_us);
 
-    snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "AVR Version %d", version);
-    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "Reset Count %d", count_reset);
-    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, BLANK_LINE);
-
-    _render_uptime(page_buffer->row[3], ROW_STRING_WIDTH, age_us / 1000000);
+    // if the AVR was detected, then it will have been reset at least once
+    if (count_reset > 0)
+    {
+        snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "AVR Version %d", version);
+        snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "Reset Count %d", count_reset);
+        snprintf(page_buffer->row[2], ROW_STRING_WIDTH, BLANK_LINE);
+        _render_uptime(page_buffer->row[3], ROW_STRING_WIDTH, age_us / 1000000);
+    }
+    else
+    {
+        snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "AVR not detected");
+    }
 }
 
 static void dispatch_to_handler(page_buffer_t * buffer, display_page_id_t current_page, const datastore_t * datastore)
