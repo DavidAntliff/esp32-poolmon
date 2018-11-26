@@ -67,7 +67,6 @@
 #endif
 
 
-
 // brief delay during startup sequence
 static void _delay(void)
 {
@@ -113,11 +112,6 @@ static void SYMBOL_IS_NOT_USED avr_test_sequence(void)
     }
     state = (state + 1) % 7;
 }
-
-
-
-
-
 
 void app_main()
 {
@@ -227,7 +221,7 @@ void app_main()
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
-    // be careful of the scope on this
+    // be careful of the scope on this - it needs to persist for the duration of the program:
     subscriptions_context_t globals = {
         .mqtt_info = mqtt_info,
         .running = &running,
@@ -298,15 +292,28 @@ void app_main()
         vTaskDelayUntil(&last_wake_time, 1000 / portTICK_RATE_MS);
     }
 
-    // TODO: signal to all tasks to close and wait for them to do so
-    // TODO: before deallocating structures that they might be using.
+    // Delete all tasks before deallocating structures that they might be using.
+    ESP_LOGD(TAG, "Deleting tasks");
 
-//    sensor_temp_close(temp_sensors);
-//    i2c_master_close(i2c_master_info);
+    // "delete" all tasks
+    system_monitor_delete();
+    control_delete();
+    sntp_rtc_delete();
+    power_delete();
+    publish_delete();
+    wifi_support_delete();
+    sensor_flow_delete();
+    sensor_light_delete();
+    avr_support_delete();
+    sensor_temp_delete();
+    display_delete();
+
+    sensor_temp_close(temp_sensors);
+    i2c_master_close(i2c_master_info);
     datastore_free(&datastore);
     publish_free(&publish_context);
 
-    ESP_LOGE(TAG, "Restarting...");
+    ESP_LOGW(TAG, "Restarting...");
     vTaskDelay(1000 / portTICK_RATE_MS);
     esp_restart();
 }

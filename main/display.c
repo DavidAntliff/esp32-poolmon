@@ -81,6 +81,7 @@ typedef struct
     void * state;
 } page_spec_t;
 
+static TaskHandle_t _task_handle = NULL;
 
 // page handlers are responsible for displaying their content
 static void _handle_page_blank(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
@@ -876,11 +877,11 @@ static void display_task(void * pvParameter)
         }
     }
 
-    free(task_inputs);
-
     for (int i = 0; i < LCD_NUM_ROWS; ++i) {
         free(buffer.row[i]);
     }
+    free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -901,7 +902,7 @@ void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, con
             task_inputs->i2c_master_info = i2c_master_info;
             task_inputs->datastore = datastore;
             task_inputs->input_queue = input_queue;
-            xTaskCreate(&display_task, "display_task", 4096, task_inputs, priority, NULL);
+            xTaskCreate(&display_task, "display_task", 4096, task_inputs, priority, &_task_handle);
         }
 
         button_init(priority, input_queue, CONFIG_DISPLAY_BUTTON_GPIO);
@@ -912,6 +913,14 @@ void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, con
     {
         ESP_LOGE(TAG, "display already initialised");
     }
+}
+
+void display_delete(void)
+{
+    rotary_encoder_delete();
+    button_delete();
+    if (_task_handle)
+        vTaskDelete(_task_handle);
 }
 
 bool display_is_currently(const datastore_t * datastore, display_page_id_t page)

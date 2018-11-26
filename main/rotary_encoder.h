@@ -38,5 +38,6 @@ typedef enum
 
 // GPIO A is "CLK", GPIO B is "DT". Both GPIOs must be capable of internal pull-up, or have external pull-ups.
 void rotary_encoder_init(UBaseType_t priority, QueueHandle_t input_queue, gpio_num_t gpio_a, gpio_num_t gpio_b);
+void rotary_encoder_delete(void);
 
 #endif // ROTARY_ENCODER_H

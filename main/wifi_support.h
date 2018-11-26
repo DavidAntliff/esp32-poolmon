@@ -40,5 +40,6 @@ typedef enum
 #define WIFI_LEN_PASSWORD    (sizeof(((wifi_sta_config_t *)0)->password))
 
 void wifi_support_init(UBaseType_t priority, const datastore_t * datastore);
+void wifi_support_delete(void);
 
 #endif // WIFI_SUPPORT_H

@@ -74,6 +74,8 @@ typedef struct
     const datastore_t * datastore;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 #define I2C_ERROR_CHECK(x) do {                                             \
         esp_err_t rc = (x);                                                 \
         if (rc != ESP_OK) {                                                 \
@@ -363,6 +365,7 @@ static void avr_support_task(void * pvParameter)
   stop: ;
     i2c_master_unlock(i2c_master_info);
     free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -379,7 +382,7 @@ void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority,
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->i2c_master_info = i2c_master_info;
         task_inputs->datastore = datastore;
-        xTaskCreate(&avr_support_task, "avr_support_task", 4096, task_inputs, priority, NULL);
+        xTaskCreate(&avr_support_task, "avr_support_task", 4096, task_inputs, priority, &_task_handle);
     }
 
     // set up the AVR reset line
@@ -387,6 +390,12 @@ void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority,
     gpio_pad_select_gpio(CONFIG_AVR_RESET_GPIO);
     gpio_set_level(CONFIG_AVR_RESET_GPIO, 1);
     gpio_set_direction(CONFIG_AVR_RESET_GPIO, GPIO_MODE_OUTPUT);
+}
+
+void avr_support_delete(void)
+{
+    if (_task_handle)
+        vTaskDelete(_task_handle);
 }
 
 void avr_support_reset(void)

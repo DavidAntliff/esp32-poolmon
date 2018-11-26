@@ -34,7 +34,7 @@
 #include "resources.h"
 #include "nvs_support.h"
 
-#define TAG "mqtt_handlers"
+#define TAG "subscriptions"
 
 static void do_esp32_reset(const char * topic, bool value, void * context)
 {
@@ -245,7 +245,7 @@ typedef struct
 } subscribe_item_t;
 
 static subscribe_item_t SUBSCRIPTIONS[] = {
-    { ROOT_TOPIC"/esp32/reset",                      MQTT_TYPE_BOOL,   (mqtt_receive_callback_generic)&do_esp32_reset },
+//    { ROOT_TOPIC"/esp32/reset",                      MQTT_TYPE_BOOL,   (mqtt_receive_callback_generic)&do_esp32_reset },  -- doesn't take datastore as context
     { ROOT_TOPIC"/avr/reset",                        MQTT_TYPE_BOOL,   (mqtt_receive_callback_generic)&do_avr_reset },
     { ROOT_TOPIC"/avr/cp",                           MQTT_TYPE_BOOL,   (mqtt_receive_callback_generic)&do_avr_cp },
     { ROOT_TOPIC"/avr/pp",                           MQTT_TYPE_BOOL,   (mqtt_receive_callback_generic)&do_avr_pp },
@@ -294,7 +294,12 @@ void subscriptions_init(const datastore_t * datastore, datastore_resource_id_t i
                 publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_TEMP_DETECTED, i);
             }
 
-            // subscribe to some topics
+            if ((mqtt_error = mqtt_register_topic_as_bool(globals->mqtt_info, ROOT_TOPIC"/esp32/reset", &do_esp32_reset, globals->running)) != MQTT_OK)
+            {
+                ESP_LOGE(TAG, "mqtt_register_topic_as_bool failed: %d", mqtt_error);
+            }
+
+            // subscribe to some topics that accept global->datastore as context:
             for (size_t i = 0; i < sizeof(SUBSCRIPTIONS) / sizeof(SUBSCRIPTIONS[0]); ++i)
             {
                 if ((mqtt_error = mqtt_register_topic(globals->mqtt_info, SUBSCRIPTIONS[i].topic, SUBSCRIPTIONS[i].handler, globals->datastore, SUBSCRIPTIONS[i].type)) != MQTT_OK)

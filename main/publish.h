@@ -39,6 +39,7 @@ typedef struct
 void publish_topics_init(const datastore_t * datastore, publish_context_t * publish_context);
 
 publish_context_t * publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority, const char * root_topic);
+void publish_delete(void);
 void publish_free(publish_context_t ** publish_context);
 
 void publish_resource(const publish_context_t * publish_context, const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance);

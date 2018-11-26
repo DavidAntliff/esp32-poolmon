@@ -42,6 +42,8 @@ typedef struct
     const char * root_topic;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 typedef void (*value_renderer)(const datastore_t * datastore, datastore_resource_id_t resource_id, datastore_instance_id_t instance_id, char * buffer, size_t buffer_size);
 
 typedef struct
@@ -205,6 +207,8 @@ static void publish_task(void * pvParameter)
         }
     }
 
+    free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -270,7 +274,7 @@ publish_context_t * publish_init(mqtt_info_t * mqtt_info, unsigned int queue_dep
         task_inputs->mqtt_info = mqtt_info;
         task_inputs->publish_queue = publish_queue;
         task_inputs->root_topic = root_topic;
-        xTaskCreate(&publish_task, "publish_task", 4096, task_inputs, priority, NULL);
+        xTaskCreate(&publish_task, "publish_task", 4096, task_inputs, priority, &_task_handle);
     }
 
     publish_context_t * publish_context = malloc(sizeof(*publish_context));
@@ -281,6 +285,12 @@ publish_context_t * publish_init(mqtt_info_t * mqtt_info, unsigned int queue_dep
     }
 
     return publish_context;
+}
+
+void publish_delete(void)
+{
+    if (_task_handle)
+        vTaskDelete(_task_handle);
 }
 
 void publish_free(publish_context_t ** publish_context)

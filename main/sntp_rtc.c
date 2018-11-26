@@ -45,6 +45,8 @@ typedef struct
     const datastore_t * datastore;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 static void _initialise_sntp(void)
 {
     ESP_LOGI(TAG, "Initializing SNTP");
@@ -139,6 +141,10 @@ static void sntp_rtc_task(void * pvParameter)
 
         vTaskDelayUntil(&last_wake_time, OUTER_CHECK_PERIOD / portTICK_PERIOD_MS);
     }
+
+    free(task_inputs);
+    _task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
 void sntp_rtc_init(UBaseType_t priority, const datastore_t * datastore)
@@ -148,6 +154,12 @@ void sntp_rtc_init(UBaseType_t priority, const datastore_t * datastore)
     {
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->datastore = datastore;
-        xTaskCreate(&sntp_rtc_task, "sntp_rtc_task", 4096, task_inputs, priority, NULL);
+        xTaskCreate(&sntp_rtc_task, "sntp_rtc_task", 4096, task_inputs, priority, &_task_handle);
     }
+}
+
+void sntp_rtc_delete(void)
+{
+    if (_task_handle)
+        vTaskDelete(_task_handle);
 }

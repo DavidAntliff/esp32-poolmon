@@ -29,5 +29,6 @@
 #include "datastore/datastore.h"
 
 void control_init(UBaseType_t priority, const datastore_t * datastore);
+void control_delete(void);
 
 #endif // CONTROL_H

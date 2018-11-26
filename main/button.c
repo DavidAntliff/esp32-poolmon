@@ -42,6 +42,8 @@ typedef struct
     gpio_num_t gpio;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 static void button_task(void * pvParameter)
 {
     assert(pvParameter);
@@ -122,6 +124,8 @@ static void button_task(void * pvParameter)
         vTaskDelay(TICKS_PER_POLL);
     }
 
+    free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -136,6 +140,13 @@ void button_init(UBaseType_t priority, QueueHandle_t input_queue, gpio_num_t gpi
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->input_queue = input_queue;
         task_inputs->gpio = gpio;
-        xTaskCreate(&button_task, "button_task", 2048, task_inputs, priority, NULL);
+        xTaskCreate(&button_task, "button_task", 2048, task_inputs, priority, &_task_handle);
     }
 }
+
+void button_delete(void)
+{
+    if (_task_handle)
+        vTaskDelete(_task_handle);
+}
+

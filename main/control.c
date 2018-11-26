@@ -50,6 +50,9 @@ typedef struct
     const datastore_t * datastore;
 } task_inputs_t;
 
+static TaskHandle_t _cp_task_handle = NULL;
+static TaskHandle_t _pp_task_handle = NULL;
+
 static void control_cp_task(void * pvParameter)
 {
     assert(pvParameter);
@@ -159,6 +162,10 @@ static void control_cp_task(void * pvParameter)
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
     }
+
+    free(task_inputs);
+    _cp_task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
 static void _get_local_time(time_t * now_time, struct tm * timeinfo)
@@ -424,6 +431,10 @@ static void control_pp_task(void * pvParameter)
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
     }
+
+    free(task_inputs);
+    _pp_task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
 void control_init(UBaseType_t priority, const datastore_t * datastore)
@@ -431,15 +442,30 @@ void control_init(UBaseType_t priority, const datastore_t * datastore)
     ESP_LOGD(TAG, "%s", __FUNCTION__);
 
     // task will take ownership of this struct
-    task_inputs_t * task_inputs = malloc(sizeof(*task_inputs));
-    if (task_inputs)
+    task_inputs_t * cp_task_inputs = malloc(sizeof(*cp_task_inputs));
+    if (cp_task_inputs)
     {
-        memset(task_inputs, 0, sizeof(*task_inputs));
-        task_inputs->datastore = datastore;
-        xTaskCreate(&control_cp_task, "control_cp_task", 4096, task_inputs, priority, NULL);
-        xTaskCreate(&control_pp_task, "control_pp_task", 4096, task_inputs, priority, NULL);
+        memset(cp_task_inputs, 0, sizeof(*cp_task_inputs));
+        cp_task_inputs->datastore = datastore;
+        xTaskCreate(&control_cp_task, "control_cp_task", 4096, cp_task_inputs, priority, &_cp_task_handle);
+    }
+
+    // task will take ownership of this struct
+    task_inputs_t * pp_task_inputs = malloc(sizeof(*pp_task_inputs));
+    if (pp_task_inputs)
+    {
+        memset(pp_task_inputs, 0, sizeof(*pp_task_inputs));
+        pp_task_inputs->datastore = datastore;
+        xTaskCreate(&control_pp_task, "control_pp_task", 4096, pp_task_inputs, priority, &_pp_task_handle);
     }
 }
 
+void control_delete(void)
+{
+    if (_cp_task_handle)
+        vTaskDelete(_cp_task_handle);
+    if (_pp_task_handle)
+        vTaskDelete(_pp_task_handle);
+}
 
 

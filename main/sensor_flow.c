@@ -57,6 +57,8 @@ typedef struct
     const datastore_t * datastore;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 static void init_rmt(uint8_t tx_gpio, rmt_channel_t channel, uint8_t clk_div)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
@@ -259,6 +261,7 @@ static void sensor_flow_task(void * pvParameter)
     }
 
     free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -283,7 +286,12 @@ void sensor_flow_init(uint8_t pcnt_gpio, pcnt_unit_t pcnt_unit, pcnt_channel_t p
         task_inputs->sampling_window = sampling_window;
         task_inputs->filter_length = filter_length;
         task_inputs->datastore = datastore;
-        xTaskCreate(&sensor_flow_task, "sensor_flow_task", 4096, task_inputs, priority, NULL);
+        xTaskCreate(&sensor_flow_task, "sensor_flow_task", 4096, task_inputs, priority, &_task_handle);
     }
 }
 
+void sensor_flow_delete(void)
+{
+    if (_task_handle)
+        vTaskDelete(_task_handle);
+}

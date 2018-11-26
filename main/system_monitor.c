@@ -45,6 +45,8 @@ typedef struct
     const publish_context_t * publish_context;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 static void system_task(void * pvParameter)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
@@ -86,6 +88,10 @@ static void system_task(void * pvParameter)
 
         vTaskDelayUntil(&last_wake_time, CHECK_PERIOD / portTICK_PERIOD_MS);
     }
+
+    free(task_inputs);
+    _task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
 void system_monitor_init(UBaseType_t priority, const datastore_t * datastore, publish_context_t * publish_context)
@@ -96,6 +102,12 @@ void system_monitor_init(UBaseType_t priority, const datastore_t * datastore, pu
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->datastore = datastore;
         task_inputs->publish_context = publish_context;
-        xTaskCreate(&system_task, "system_task", 4096, task_inputs, priority, NULL);
+        xTaskCreate(&system_task, "system_task", 4096, task_inputs, priority, &_task_handle);
     }
+}
+
+void system_monitor_delete(void)
+{
+    if (_task_handle)
+        vTaskDelete(_task_handle);
 }

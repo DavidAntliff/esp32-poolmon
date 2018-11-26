@@ -58,6 +58,7 @@ typedef enum
 } avr_alarm_state_t;
 
 void avr_support_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore);
+void avr_support_delete(void);
 
 // reset the AVR
 void avr_support_reset(void);

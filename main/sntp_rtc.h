@@ -31,5 +31,6 @@
 #include "datastore/datastore.h"
 
 void sntp_rtc_init(UBaseType_t priority, const datastore_t * datastore);
+void sntp_rtc_delete(void);
 
 #endif // SNTP_RTC_H

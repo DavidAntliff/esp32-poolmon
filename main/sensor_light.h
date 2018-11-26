@@ -32,5 +32,6 @@
 #include "datastore/datastore.h"
 
 void sensor_light_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore);
+void sensor_light_delete(void);
 
 #endif // SENSOR_LIGHT_H

@@ -38,5 +38,6 @@ typedef enum
 
 // GPIO must be capable of internal pull-up, or have external pull-up.
 void button_init(UBaseType_t priority, QueueHandle_t input_queue, gpio_num_t gpio);
+void button_delete(void);
 
 #endif // BUTTON_H

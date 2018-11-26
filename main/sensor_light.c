@@ -45,6 +45,8 @@
 
 #define SAMPLE_PERIOD (5000)  // sensor sampling period in milliseconds
 
+static TaskHandle_t _task_handle = NULL;
+
 typedef struct
 {
     i2c_master_info_t * i2c_master_info;
@@ -140,6 +142,7 @@ static void sensor_light_task(void * pvParameter)
     smbus_free(&smbus_info);
     tsl2561_free(&tsl2561_info);
     free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -154,7 +157,12 @@ void sensor_light_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->i2c_master_info = i2c_master_info;
         task_inputs->datastore = datastore;
-        xTaskCreate(&sensor_light_task, "sensor_light_task", 4096, task_inputs, priority, NULL);
+        xTaskCreate(&sensor_light_task, "sensor_light_task", 4096, task_inputs, priority, &_task_handle);
     }
 }
 
+void sensor_light_delete(void)
+{
+    if (_task_handle)
+        vTaskDelete(_task_handle);
+}

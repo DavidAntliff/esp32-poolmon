@@ -52,6 +52,7 @@ typedef enum
 } display_page_id_t;
 
 void display_init(i2c_master_info_t * i2c_master_info, UBaseType_t priority, const datastore_t * datastore);
+void display_delete(void);
 
 // Return true if the specified page is currently being displayed
 bool display_is_currently(const datastore_t * datastore, display_page_id_t page);

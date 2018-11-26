@@ -40,6 +40,8 @@ typedef struct
     gpio_num_t gpio_b;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 // if defined, show direct state of Rotary Encoder pins
 //#define DIRECT 1
 
@@ -314,6 +316,10 @@ static void rotary_encoder_task(void * pvParameter)
             }
         }
     }
+
+    free(task_inputs);
+    _task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
 void rotary_encoder_init(UBaseType_t priority, QueueHandle_t input_queue, gpio_num_t gpio_a, gpio_num_t gpio_b)
@@ -328,6 +334,12 @@ void rotary_encoder_init(UBaseType_t priority, QueueHandle_t input_queue, gpio_n
         task_inputs->input_queue = input_queue;
         task_inputs->gpio_a = gpio_a;
         task_inputs->gpio_b = gpio_b;
-        xTaskCreate(&rotary_encoder_task, "rotary_encoder_task", 2048, task_inputs, priority, NULL);
+        xTaskCreate(&rotary_encoder_task, "rotary_encoder_task", 2048, task_inputs, priority, &_task_handle);
     }
+}
+
+void rotary_encoder_delete(void)
+{
+    if (_task_handle)
+        vTaskDelete(_task_handle);
 }

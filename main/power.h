@@ -29,5 +29,6 @@
 #include "datastore/datastore.h"
 
 void power_init(UBaseType_t priority, const datastore_t * datastore);
+void power_delete(void);
 
 #endif // POWER_H

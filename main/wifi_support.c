@@ -44,6 +44,8 @@ typedef struct
     const datastore_t * datastore;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 static EventGroupHandle_t wifi_event_group;
 const static int CONNECTED_BIT = BIT0;
 
@@ -138,6 +140,8 @@ static void wifi_monitor_task(void * pvParameter)
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
 
+    free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -153,6 +157,15 @@ void wifi_support_init(UBaseType_t priority, const datastore_t * datastore)
     {
         memset(task_inputs, 0, sizeof(*task_inputs));
         task_inputs->datastore = datastore;
-        xTaskCreate(&wifi_monitor_task, "wifi_monitor_task", 4096, task_inputs, priority, NULL);
+        xTaskCreate(&wifi_monitor_task, "wifi_monitor_task", 4096, task_inputs, priority, &_task_handle);
     }
+}
+
+void wifi_support_delete(void)
+{
+    // disable the event handler
+    esp_event_loop_set_cb(NULL, NULL);
+
+    if (_task_handle)
+        vTaskDelete(_task_handle);
 }

@@ -61,6 +61,8 @@ typedef struct
     const datastore_t * datastore;
 } task_inputs_t;
 
+static TaskHandle_t _task_handle = NULL;
+
 static void read_temperatures(DS18B20_Info ** device_infos, float * readings, DS18B20_ERROR * errors, int num_devices)
 {
     ESP_LOGD(TAG, "%s", __FUNCTION__);
@@ -330,6 +332,7 @@ static void sensor_temp_task(void * pvParameter)
     }
 
     free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -398,6 +401,7 @@ static void sensor_temp_sim_task(void * pvParameter)
     }
 
     free(task_inputs);
+    _task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -435,24 +439,21 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const data
         task_inputs->datastore = datastore;
         if (sensors->num_ds18b20s > 0)
         {
-            xTaskCreate(&sensor_temp_task, "sensor_temp_task", 4096, task_inputs, priority, NULL);
+            xTaskCreate(&sensor_temp_task, "sensor_temp_task", 4096, task_inputs, priority, &_task_handle);
         }
         else
         {
             ESP_LOGW(TAG, "No temperature sensors detected - using simulated sensors");
-            xTaskCreate(&sensor_temp_sim_task, "sensor_temp_task", 4096, task_inputs, priority, NULL);
+            xTaskCreate(&sensor_temp_sim_task, "sensor_temp_task", 4096, task_inputs, priority, &_task_handle);
         }
     }
     return sensors;
 }
 
-datastore_age_t sensor_temp_expiry(const datastore_t * datastore)
+void sensor_temp_delete(void)
 {
-    // 1.5x the temp poll period
-    uint32_t poll_period = 0;
-    datastore_get_uint32(datastore, RESOURCE_ID_TEMP_PERIOD, 0, &poll_period);
-    datastore_age_t expiry = (3 * poll_period * 1000) / 2;  // microseconds
-    return expiry;
+    if (_task_handle)
+        vTaskDelete(_task_handle);
 }
 
 void sensor_temp_close(temp_sensors_t * sensors)
@@ -473,4 +474,12 @@ void sensor_temp_close(temp_sensors_t * sensors)
     }
 }
 
+datastore_age_t sensor_temp_expiry(const datastore_t * datastore)
+{
+    // 1.5x the temp poll period
+    uint32_t poll_period = 0;
+    datastore_get_uint32(datastore, RESOURCE_ID_TEMP_PERIOD, 0, &poll_period);
+    datastore_age_t expiry = (3 * poll_period * 1000) / 2;  // microseconds
+    return expiry;
+}
 
