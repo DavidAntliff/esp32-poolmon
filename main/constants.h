@@ -33,7 +33,7 @@
 #define SYSTEM_LEN_BUILD_DATE_TIME 16
 #define SYSTEM_LEN_LOG             256
 
-#define PUBLISH_QUEUE_DEPTH      16
+#define PUBLISH_QUEUE_DEPTH      32
 #define ROOT_TOPIC               "poolmon"
 
 #define LOCAL_TIMEZONE_CODE      "NZST-12NZDT,M9.5.0,M4.1.0/3"

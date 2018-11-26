@@ -176,7 +176,7 @@ static void process_request(const publish_request_t * request, const char * root
         }
         else
         {
-            ESP_LOGW(TAG, "MQTT not connected - discarding request");
+            ESP_LOGW(TAG, "MQTT not connected - discarding request id %d, name %s, instance %d", request->resource_id, datastore_get_name(request->datastore, request->resource_id), request->instance_id);
         }
     }
 }
@@ -225,7 +225,7 @@ void publish_resource(const publish_context_t * publish_context, const datastore
             BaseType_t status = xQueueSendToBack(publish_queue, &request, 0);
             if (status != pdPASS)
             {
-                ESP_LOGE(TAG, "Could not send to queue");
+                ESP_LOGE(TAG, "Could not send resource id %d, instance %d to queue: status %d", id, instance, status);
             }
         }
     }
