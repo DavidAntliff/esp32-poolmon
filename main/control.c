@@ -397,6 +397,22 @@ static void control_pp_task(void * pvParameter)
                 ESP_LOGE(TAG, "PP control loop: invalid case %d", state);
         }
 
+        // if PP in manual mode, drop out of cycle
+        datastore_age_t pp_mode_switch_age = 0;
+        datastore_get_age(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode_switch_age);
+        if (pp_mode_switch_age < MEASUREMENT_EXPIRY)
+        {
+            avr_switch_mode_t pp_mode = AVR_SWITCH_MODE_AUTO;
+            datastore_get_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode);
+            if (pp_mode != AVR_SWITCH_MODE_AUTO)
+            {
+                ESP_LOGI(TAG, "PP control loop: purge pump OFF (manual)");
+                datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump off (manual)");
+                state = STATE_PP_OFF;
+                avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
+            }
+        }
+
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
     }
 }
