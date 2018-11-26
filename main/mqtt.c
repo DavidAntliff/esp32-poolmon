@@ -98,8 +98,7 @@ static void _status_callback(esp_mqtt_status_t status)
             datastore_increment(g_datastore, RESOURCE_ID_MQTT_CONNECTION_COUNT, 0);
 
             // send a device status update
-            const char * value = "MQTT connected";
-            mqtt_publish("poolmon/device/status", (uint8_t*)value, strlen(value), 0, false);
+            datastore_set_string(g_datastore, RESOURCE_ID_SYSTEM_LOG, 0, "MQTT connected");
             break;
 
         case ESP_MQTT_STATUS_DISCONNECTED:

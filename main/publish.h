@@ -36,6 +36,8 @@ typedef struct
     QueueHandle_t queue;
 } publish_context_t;
 
+void publish_topics_init(const datastore_t * datastore, publish_context_t * publish_context);
+
 publish_context_t * publish_init(mqtt_info_t * mqtt_info, unsigned int queue_depth, UBaseType_t priority, const char * root_topic);
 void publish_free(publish_context_t ** publish_context);
 

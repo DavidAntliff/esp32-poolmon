@@ -300,39 +300,6 @@ static void SYMBOL_IS_NOT_USED avr_test_sequence(void)
     state = (state + 1) % 7;
 }
 
-void init_publish_subscriptions(const datastore_t * datastore, publish_context_t * publish_context)
-{
-    if (datastore)
-    {
-        resource_id_t resources[] = {
-            RESOURCE_ID_TEMP_VALUE,
-            RESOURCE_ID_LIGHT_FULL,
-            RESOURCE_ID_LIGHT_VISIBLE,
-            RESOURCE_ID_LIGHT_INFRARED,
-            RESOURCE_ID_LIGHT_ILLUMINANCE,
-            RESOURCE_ID_FLOW_FREQUENCY,
-            RESOURCE_ID_FLOW_RATE,
-            RESOURCE_ID_POWER_VALUE,
-            RESOURCE_ID_POWER_TEMP_DELTA,
-            RESOURCE_ID_SWITCHES_CP_MODE_VALUE,
-            RESOURCE_ID_SWITCHES_CP_MAN_VALUE,
-            RESOURCE_ID_SWITCHES_PP_MODE_VALUE,
-            RESOURCE_ID_SWITCHES_PP_MAN_VALUE,
-            RESOURCE_ID_PUMPS_CP_STATE,
-            RESOURCE_ID_PUMPS_PP_STATE,
-        };
-
-        for (size_t i = 0; i < sizeof(resources) / sizeof(resources[0]); ++i)
-        {
-            datastore_status_t status;
-            if ((status = datastore_add_set_callback(datastore, resources[i], publish_callback, publish_context)) != DATASTORE_STATUS_OK)
-            {
-                ESP_LOGE(TAG, "datastore_add_set_callback for resource %d failed: %d", resources[i], status);
-            }
-        }
-    }
-}
-
 typedef struct
 {
     mqtt_info_t * mqtt_info;
@@ -595,7 +562,7 @@ void app_main()
 
     _delay();
     publish_context_t * publish_context = publish_init(mqtt_info, PUBLISH_QUEUE_DEPTH, publish_priority, ROOT_TOPIC);
-    init_publish_subscriptions(datastore, publish_context);
+    publish_topics_init(datastore, publish_context);
 
     _delay();
     power_init(sensor_priority, datastore);

@@ -108,9 +108,22 @@ static const value_info_t values_info[] =
     { RESOURCE_ID_PUMPS_PP_STATE, 0, "pumps/pp/state", _as_string },
 
     { RESOURCE_ID_WIFI_ADDRESS, 0, "wifi/address", _as_ipv4_address },
+    { RESOURCE_ID_SYSTEM_LOG, 0, "device/log", _as_string },
 
 //    { RESOURCE_ID_ALARM_STATE, 0, "alarms/1/state", },
 };
+
+void publish_topics_init(const datastore_t * datastore, publish_context_t * publish_context)
+{
+    for (size_t i = 0; i < sizeof(values_info) / sizeof(values_info[0]); ++i)
+    {
+        datastore_status_t status;
+        if ((status = datastore_add_set_callback(datastore, values_info[i].resource_id, publish_callback, publish_context)) != DATASTORE_STATUS_OK)
+        {
+            ESP_LOGE(TAG, "datastore_add_set_callback for resource %d failed: %d", values_info[i].resource_id, status);
+        }
+    }
+}
 
 typedef struct
 {

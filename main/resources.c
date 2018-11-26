@@ -59,6 +59,7 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_SYSTEM_VERSION,         "SYSTEM_VERSION",         datastore_create_string_resource(SYSTEM_LEN_VERSION, 1));
         _add_resource(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, "SYSTEM_BUILD_DATE_TIME", datastore_create_string_resource(SYSTEM_LEN_BUILD_DATE_TIME, 1));
         _add_resource(datastore, RESOURCE_ID_SYSTEM_TIME_SET,        "SYSTEM_TIME_SET",        datastore_create_resource(DATASTORE_TYPE_BOOL, 1));
+        _add_resource(datastore, RESOURCE_ID_SYSTEM_LOG,             "SYSTEM_LOG",             datastore_create_string_resource(SYSTEM_LEN_LOG, 1));
 
         _add_resource(datastore, RESOURCE_ID_WIFI_SSID,              "WIFI_SSID",              datastore_create_string_resource(WIFI_LEN_SSID, 1));
         _add_resource(datastore, RESOURCE_ID_WIFI_PASSWORD,          "WIFI_PASSWORD",          datastore_create_string_resource(WIFI_LEN_PASSWORD, 1));
