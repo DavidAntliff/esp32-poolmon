@@ -318,6 +318,7 @@ static void avr_support_task(void * pvParameter)
         if (scratch != SCRATCH_VALUE)
         {
             ESP_LOGW(TAG, "AVR reset detected");
+            datastore_set_string(task_inputs->datastore, RESOURCE_ID_SYSTEM_LOG, 0, "AVR reset");
             _write_register(smbus_info, AVR_REGISTER_SCRATCH, SCRATCH_VALUE);
             datastore_increment(task_inputs->datastore, RESOURCE_ID_AVR_COUNT_RESET, 0);
         }

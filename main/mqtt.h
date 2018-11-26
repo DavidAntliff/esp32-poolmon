@@ -45,6 +45,20 @@ typedef enum
     MQTT_STATUS_CONNECTED,
 } mqtt_status_t;
 
+typedef enum
+{
+    MQTT_TYPE_INVALID = 0,
+    MQTT_TYPE_BOOL,
+    MQTT_TYPE_UINT8,
+    MQTT_TYPE_UINT32,
+    MQTT_TYPE_INT8,
+    MQTT_TYPE_INT32,
+    MQTT_TYPE_FLOAT,
+    MQTT_TYPE_DOUBLE,
+    MQTT_TYPE_STRING,
+    MQTT_TYPE_LAST,
+} mqtt_type_t;
+
 #define MQTT_LEN_BROKER_ADDRESS 64
 
 typedef struct
@@ -67,6 +81,10 @@ typedef void (*mqtt_receive_callback_int32)(const char * topic, int32_t value, v
 typedef void (*mqtt_receive_callback_float)(const char * topic, float value, void * context);
 typedef void (*mqtt_receive_callback_double)(const char * topic, double value, void * context);
 typedef void (*mqtt_receive_callback_string)(const char * topic, const char * value, void * context);
+
+typedef void (*mqtt_receive_callback_generic)(void);
+
+mqtt_error_t mqtt_register_topic(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_generic rcb, void * context, mqtt_type_t type);
 
 mqtt_error_t mqtt_register_topic_as_bool(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_bool rcb, void * context);
 mqtt_error_t mqtt_register_topic_as_uint8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint8 rcb, void * context);

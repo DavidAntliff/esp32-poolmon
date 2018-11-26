@@ -51,7 +51,7 @@
 
 #define SMBUS_TIMEOUT      1000   // milliseconds
 #define TICKS_PER_UPDATE   (500 / portTICK_RATE_MS)
-#define MEASUREMENT_EXPIRY (15 * 1000000)  // microseconds after which a measurement is not displayed
+#define MEASUREMENT_EXPIRY (15 * 1000000)  // microseconds after which a measurement is not displayed (except temp)
 
 #define LCD_NUM_ROWS               4
 #define LCD_NUM_COLUMNS            40

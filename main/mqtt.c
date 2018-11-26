@@ -61,27 +61,11 @@ typedef struct
 static trie * g_trie = NULL;
 static const datastore_t * g_datastore = NULL;
 
-typedef enum
-{
-    MQTT_TYPE_INVALID = 0,
-    MQTT_TYPE_BOOL,
-    MQTT_TYPE_UINT8,
-    MQTT_TYPE_UINT32,
-    MQTT_TYPE_INT8,
-    MQTT_TYPE_INT32,
-    MQTT_TYPE_FLOAT,
-    MQTT_TYPE_DOUBLE,
-    MQTT_TYPE_STRING,
-    MQTT_TYPE_LAST,
-} mqtt_type_t;
-
-typedef void (*generic_callback)(void);
-
 typedef struct
 {
     //const char * topic;
     mqtt_type_t type;
-    generic_callback rcb;
+    mqtt_receive_callback_generic rcb;
     void * context;
 } topic_info_t;
 
@@ -417,7 +401,7 @@ bool mqtt_publish(const char * topic, const uint8_t * payload, size_t len, int q
     return result;
 }
 
-static mqtt_error_t _register_topic(mqtt_info_t * mqtt_info, const char * topic, generic_callback rcb, void * context, mqtt_type_t type)
+static mqtt_error_t _register_topic(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_generic rcb, void * context, mqtt_type_t type)
 {
     mqtt_error_t err = MQTT_ERROR_UNKNOWN;
     if ((err = _is_init(mqtt_info)) == MQTT_OK)
@@ -453,44 +437,49 @@ static mqtt_error_t _register_topic(mqtt_info_t * mqtt_info, const char * topic,
     return err;
 }
 
+mqtt_error_t mqtt_register_topic(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_generic rcb, void * context, mqtt_type_t type)
+{
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, type);
+}
+
 mqtt_error_t mqtt_register_topic_as_bool(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_bool rcb, void * context)
 {
-    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_BOOL);
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, MQTT_TYPE_BOOL);
 }
 
 mqtt_error_t mqtt_register_topic_as_uint8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint8 rcb, void * context)
 {
-    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_UINT8);
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, MQTT_TYPE_UINT8);
 }
 
 mqtt_error_t mqtt_register_topic_as_uint32(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_uint32 rcb, void * context)
 {
-    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_UINT32);
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, MQTT_TYPE_UINT32);
 }
 
 mqtt_error_t mqtt_register_topic_as_int8(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_int8 rcb, void * context)
 {
-    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_INT8);
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, MQTT_TYPE_INT8);
 }
 
 mqtt_error_t mqtt_register_topic_as_int32(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_int32 rcb, void * context)
 {
-    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_INT32);
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, MQTT_TYPE_INT32);
 }
 
 mqtt_error_t mqtt_register_topic_as_float(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_float rcb, void * context)
 {
-    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_FLOAT);
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, MQTT_TYPE_FLOAT);
 }
 
 mqtt_error_t mqtt_register_topic_as_double(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_double rcb, void * context)
 {
-    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_DOUBLE);
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, MQTT_TYPE_DOUBLE);
 }
 
 mqtt_error_t mqtt_register_topic_as_string(mqtt_info_t * mqtt_info, const char * topic, mqtt_receive_callback_string rcb, void * context)
 {
-    return _register_topic(mqtt_info, topic, (generic_callback)rcb, context, MQTT_TYPE_STRING);
+    return _register_topic(mqtt_info, topic, (mqtt_receive_callback_generic)rcb, context, MQTT_TYPE_STRING);
 }
 
 void mqtt_dump(const mqtt_info_t * mqtt_info)
