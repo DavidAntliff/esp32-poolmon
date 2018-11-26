@@ -37,6 +37,7 @@ typedef struct _temp_sensors_t temp_sensors_t;
 #define SENSOR_TEMP_LEN_ROM_CODE   (16+1)
 
 temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const datastore_t * datastore);
+datastore_age_t sensor_temp_expiry(const datastore_t * datastore);
 void sensor_temp_close(temp_sensors_t * sensors);
 
 #endif // SENSOR_TEMP_H

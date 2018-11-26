@@ -35,11 +35,11 @@
 #include "datastore/datastore.h"
 #include "display.h"
 #include "led.h"
+#include "sensor_temp.h"
 
 #define TAG "power"
 
 // ignore any temperature measurements that have expired
-#define MEASUREMENT_EXPIRY (15 * 1000000) // microseconds
 #define SHC_WATER (4184.0)               // J/kg/K
 #define MASS_PER_VOLUME_WATER (1000.0)   // kg/m^3
 
@@ -80,10 +80,11 @@ static void power_calculation_task(void * pvParameter)
         datastore_age_t age_out = DATASTORE_INVALID_AGE;
         datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, in, &age_in);
         datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, out, &age_out);
+        datastore_age_t expiry = sensor_temp_expiry(datastore);
 
-        if (age_in < MEASUREMENT_EXPIRY)
+        if (age_in < expiry)
         {
-            if (age_out < MEASUREMENT_EXPIRY)
+            if (age_out < expiry)
             {
                 float temp_in = 0.0f;
                 float temp_out = 0.0f;

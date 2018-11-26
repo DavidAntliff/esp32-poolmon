@@ -44,8 +44,6 @@
 
 #define MAX_DEVICES          (8)
 #define DS18B20_RESOLUTION   (DS18B20_RESOLUTION_10_BIT)
-#define SAMPLE_PERIOD        (5000)  // sensor sampling period in milliseconds
-#define MEASUREMENT_EXPIRY   (15 * 1000000)    // microseconds
 
 #define TAG "sensor_temp"
 
@@ -321,7 +319,9 @@ static void sensor_temp_task(void * pvParameter)
                 }
             }
 
-            vTaskDelayUntil(&last_wake_time, SAMPLE_PERIOD / portTICK_PERIOD_MS);
+            uint32_t poll_period = 0;
+            datastore_get_uint32(datastore, RESOURCE_ID_TEMP_PERIOD, 0, &poll_period);
+            vTaskDelayUntil(&last_wake_time, poll_period / portTICK_PERIOD_MS);
         }
     }
     else
@@ -392,7 +392,9 @@ static void sensor_temp_sim_task(void * pvParameter)
             ESP_LOGI(TAG, "  T%d: %.1f    %d errors%s", i + 1, reading, num_errors, override ? " OVERRIDE" : " SIMULATED");
         }
 
-        vTaskDelayUntil(&last_wake_time, SAMPLE_PERIOD / portTICK_PERIOD_MS);
+        uint32_t poll_period = 0;
+        datastore_get_uint32(datastore, RESOURCE_ID_TEMP_PERIOD, 0, &poll_period);
+        vTaskDelayUntil(&last_wake_time, poll_period / portTICK_PERIOD_MS);
     }
 
     free(task_inputs);
@@ -442,6 +444,15 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const data
         }
     }
     return sensors;
+}
+
+datastore_age_t sensor_temp_expiry(const datastore_t * datastore)
+{
+    // 1.5x the temp poll period
+    uint32_t poll_period = 0;
+    datastore_get_uint32(datastore, RESOURCE_ID_TEMP_PERIOD, 0, &poll_period);
+    datastore_age_t expiry = (3 * poll_period * 1000) / 2;  // microseconds
+    return expiry;
 }
 
 void sensor_temp_close(temp_sensors_t * sensors)

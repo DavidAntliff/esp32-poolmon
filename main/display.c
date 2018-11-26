@@ -307,7 +307,8 @@ static void _render_temp_line(char * line, unsigned int len, datastore_instance_
     datastore_age_t age = DATASTORE_INVALID_AGE;
 
     _get_temp_sensor(datastore, instance, &value, label, sizeof(label), &age, datastore);
-    if (age < MEASUREMENT_EXPIRY)
+
+    if (age < sensor_temp_expiry(datastore))
     {
         snprintf(line, ROW_STRING_WIDTH, "T%d %-10s %4.1f"DEGREES_C, instance + 1, label, value);
     }

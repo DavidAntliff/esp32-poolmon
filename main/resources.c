@@ -82,6 +82,7 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_TEMP_DETECTED,          "TEMP_DETECTED",          datastore_create_string_resource(SENSOR_TEMP_LEN_ROM_CODE,   SENSOR_TEMP_INSTANCES));
         _add_resource(datastore, RESOURCE_ID_TEMP_ASSIGNMENT,        "TEMP_ASSIGNMENT",        datastore_create_string_resource(SENSOR_TEMP_LEN_ROM_CODE,   SENSOR_TEMP_INSTANCES));
         _add_resource(datastore, RESOURCE_ID_TEMP_OVERRIDE,          "TEMP_OVERRIDE",          datastore_create_resource(DATASTORE_TYPE_FLOAT,              SENSOR_TEMP_INSTANCES));
+        _add_resource(datastore, RESOURCE_ID_TEMP_PERIOD,     "TEMP_POLL_DURATION",     datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS,      "LIGHT_I2C_ADDRESS",      datastore_create_resource(DATASTORE_TYPE_UINT8,  1));
         _add_resource(datastore, RESOURCE_ID_LIGHT_DETECTED,         "LIGHT_DETECTED",         datastore_create_resource(DATASTORE_TYPE_BOOL,   1));
@@ -119,6 +120,9 @@ datastore_t * resources_init(void)
 
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR,           "CONTROL_PP_DAILY_HOUR",           datastore_create_resource(DATASTORE_TYPE_INT32, 1));
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE,         "CONTROL_PP_DAILY_MINUTE",         datastore_create_resource(DATASTORE_TYPE_INT32, 1));
+
+        _add_resource(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, "CONTROL_SAFE_TEMP_HIGH", datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
+        _add_resource(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW,  "CONTROL_SAFE_TEMP_LOW",  datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
 
         _add_resource(datastore, RESOURCE_ID_AVR_VERSION,       "AVR_VERSION",       datastore_create_resource(DATASTORE_TYPE_UINT8, 1));
         _add_resource(datastore, RESOURCE_ID_AVR_COUNT_RESET,   "AVR_COUNT_RESET",   datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
@@ -215,6 +219,8 @@ void resources_load(const datastore_t * datastore)
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_TEMP_ASSIGNMENT, 3, ""));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_TEMP_ASSIGNMENT, 4, ""));
 
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_TEMP_PERIOD, 0, "5000"));
+
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, "7.0"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, "5.0"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, "8.0"));
@@ -222,6 +228,8 @@ void resources_load(const datastore_t * datastore)
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, "5"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, "30"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, "60"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, 0, "80.0"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0, "60.0"));
 
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0, "300"));
     }
@@ -264,6 +272,8 @@ void resources_save(const datastore_t * datastore)
                 ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i));
             }
 
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_TEMP_PERIOD, 0));
+
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0));
@@ -271,6 +281,8 @@ void resources_save(const datastore_t * datastore)
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0));
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, 0));
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0));
 
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0));
 

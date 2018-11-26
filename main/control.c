@@ -35,15 +35,13 @@
 #include "avr_support.h"
 #include "utils.h"
 #include "datastore/datastore.h"
+#include "sensor_temp.h"
 
-#define POLL_PERIOD        (1000)  // control loop period in milliseconds
-#define MEASUREMENT_EXPIRY (15 * 1000000)    // microseconds
-#define SENSOR_HIGH        (1)     // instance of high temperature sensor
-#define SENSOR_LOW         (0)     // instance of low temperature sensor
-#define PP_HOLD_OFF        (30 * 1000000)    // to check for flow when CP is on, wait at least this many seconds before deciding to start PP if flow rate is below threshold
-
-#define PP_EMERGENCY_THRESHOLD_ON  (80)  // temperature at which to initiate emergency PP cycle
-#define PP_EMERGENCY_THRESHOLD_OFF (60)  // temperature at which to terminate emergency PP cycle
+#define POLL_PERIOD                  (1000)            // control loop period in milliseconds
+#define FLOW_RATE_MEASUREMENT_EXPIRY (15 * 1000000)    // microseconds
+#define SENSOR_HIGH                  (1)               // instance of high temperature sensor
+#define SENSOR_LOW                   (0)               // instance of low temperature sensor
+#define PP_HOLD_OFF                  (30 * 1000000)    // to check for flow when CP is on, wait at least this many seconds before deciding to start PP if flow rate is below threshold
 
 #define TAG "control"
 
@@ -67,6 +65,9 @@ static void control_cp_task(void * pvParameter)
     datastore_age_t t_high_age = DATASTORE_INVALID_AGE;
     datastore_age_t t_low_age = DATASTORE_INVALID_AGE;
 
+    // scale measurement expiry threshold by current temp poll period
+    datastore_age_t temp_expiry = sensor_temp_expiry(datastore);
+
     // wait for stable sensor readings
     bool stable = false;
     while (!stable)
@@ -77,7 +78,7 @@ static void control_cp_task(void * pvParameter)
         datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_HIGH, &t_high_age);
         datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_LOW, &t_low_age);
 
-        if ((t_high_age < MEASUREMENT_EXPIRY) && (t_low_age < MEASUREMENT_EXPIRY))
+        if ((t_high_age < temp_expiry) && (t_low_age < temp_expiry))
         {
             stable = true;
             ESP_LOGI(TAG, "CP control loop: sensors stable");
@@ -101,9 +102,12 @@ static void control_cp_task(void * pvParameter)
         datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_HIGH, &t_high_age);
         datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_LOW, &t_low_age);
 
-        if (t_high_age < MEASUREMENT_EXPIRY)
+        // update measurement expiry in case temp poll period has changed
+        temp_expiry = sensor_temp_expiry(datastore);
+
+        if (t_high_age < temp_expiry)
         {
-            if (t_low_age < MEASUREMENT_EXPIRY)
+            if (t_low_age < temp_expiry)
             {
                 datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_HIGH, &t_high);
                 datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_LOW, &t_low);
@@ -186,7 +190,7 @@ static void control_pp_task(void * pvParameter)
 
         datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &age);
 
-        if (age < MEASUREMENT_EXPIRY)
+        if (age < FLOW_RATE_MEASUREMENT_EXPIRY)
         {
             stable = true;
             ESP_LOGI(TAG, "PP control loop: sensors stable");
@@ -207,6 +211,9 @@ static void control_pp_task(void * pvParameter)
     uint32_t cycle_start_time = 0;
     uint32_t n = 0;
     struct tm last_timeinfo = { 0 };
+
+    // scale measurement expiry threshold by current temp poll period
+    datastore_age_t temp_expiry = sensor_temp_expiry(datastore);
 
     while (1)
     {
@@ -262,18 +269,23 @@ static void control_pp_task(void * pvParameter)
             ESP_LOGD(TAG, "PP control loop: waiting for system time to be set");
         }
 
+        // update measurement expiry in case temp poll period has changed
+        temp_expiry = sensor_temp_expiry(datastore);
+
         // If the array temperature (hard-coded as T2) exceeds the safe threshold,
         // immediately run the purge pump cycle until the temperature returns to a safe level
         datastore_age_t t_high_age = DATASTORE_INVALID_AGE;
         datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_HIGH, &t_high_age);
-        if (t_high_age < MEASUREMENT_EXPIRY)
+        if (t_high_age < temp_expiry)
         {
             float t_high = 0.0f;
             datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, SENSOR_HIGH, &t_high);
 
             if (state == STATE_PP_EMERGENCY)
             {
-                if (t_high < PP_EMERGENCY_THRESHOLD_OFF)
+                float threshold = 0.0f;
+                datastore_get_float(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0, &threshold);
+                if (t_high < threshold)
                 {
                     ESP_LOGI(TAG, "Safe temperature restored");
                     state = STATE_PP_OFF;
@@ -291,7 +303,9 @@ static void control_pp_task(void * pvParameter)
             }
             else
             {
-                if (t_high >= PP_EMERGENCY_THRESHOLD_ON)
+                float threshold = 0.0f;
+                datastore_get_float(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, 0, &threshold);
+                if (t_high >= threshold)
                 {
                     ESP_LOGE(TAG, "EMERGENCY - SAFE THRESHOLD EXCEEDED!");
                     datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Emergency purge");
@@ -308,7 +322,7 @@ static void control_pp_task(void * pvParameter)
             case STATE_PP_OFF:
             {
                 datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &age);
-                if (age < MEASUREMENT_EXPIRY)
+                if (age < FLOW_RATE_MEASUREMENT_EXPIRY)
                 {
                     float flow_rate = 0.0f;
                     datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);
@@ -398,19 +412,14 @@ static void control_pp_task(void * pvParameter)
         }
 
         // if PP in manual mode, drop out of cycle
-        datastore_age_t pp_mode_switch_age = 0;
-        datastore_get_age(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode_switch_age);
-        if (pp_mode_switch_age < MEASUREMENT_EXPIRY)
+        avr_switch_mode_t pp_mode = AVR_SWITCH_MODE_AUTO;
+        datastore_get_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode);
+        if (pp_mode != AVR_SWITCH_MODE_AUTO)
         {
-            avr_switch_mode_t pp_mode = AVR_SWITCH_MODE_AUTO;
-            datastore_get_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode);
-            if (pp_mode != AVR_SWITCH_MODE_AUTO)
-            {
-                ESP_LOGI(TAG, "PP control loop: purge pump OFF (manual)");
-                datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump off (manual)");
-                state = STATE_PP_OFF;
-                avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
-            }
+            ESP_LOGI(TAG, "PP control loop: purge pump OFF (manual)");
+            datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump off (manual)");
+            state = STATE_PP_OFF;
+            avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
         }
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
