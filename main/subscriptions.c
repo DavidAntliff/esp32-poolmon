@@ -86,6 +86,7 @@ static void do_datastore_save(const char * topic, bool value, void * context)
     {
         const datastore_t * datastore = (const datastore_t *)context;
         resources_save(datastore);
+        ESP_LOGW(TAG, "Saved resources to NVS");
     }
 }
 
@@ -95,6 +96,7 @@ static void do_datastore_load(const char * topic, bool value, void * context)
     {
         const datastore_t * datastore = (const datastore_t *)context;
         resources_load(datastore);
+        ESP_LOGW(TAG, "Loaded resources from NVS");
     }
 }
 
@@ -137,6 +139,7 @@ static void do_sensors_temp_assignment(const char * topic, const char * value, v
     ESP_LOGD(TAG, "instance %u, value %s", instance, value);
     if (instance > 0 && instance <= SENSOR_TEMP_INSTANCES)
     {
+        ESP_LOGI(TAG, "Temp sensor %u assigned to device %s", instance, value);
         datastore_set_string(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, instance - 1, value);
     }
 }
@@ -149,6 +152,7 @@ static void do_sensors_temp_override(const char * topic, float value, void * con
     ESP_LOGD(TAG, "instance %u, value %f", instance, value);
     if (instance > 0 && instance <= SENSOR_TEMP_INSTANCES)
     {
+        ESP_LOGW(TAG, "Temp override: instance %u set to %f", instance, value);
         datastore_set_float(datastore, RESOURCE_ID_TEMP_OVERRIDE, instance - 1, value);
     }
 }
@@ -167,6 +171,7 @@ static void do_sensors_flow_override(const char * topic, float value, void * con
     ESP_LOGD(TAG, "instance %u, value %f", instance, value);
     if (instance == 1)
     {
+        ESP_LOGW(TAG, "Flow override: instance %u set to %f", instance, value);
         datastore_set_float(datastore, RESOURCE_ID_FLOW_RATE_OVERRIDE, instance - 1, value);
     }
 }
@@ -223,12 +228,14 @@ static void do_control_safe_temp_high(const char * topic, float value, void * co
 {
     datastore_t * datastore = (datastore_t *)context;
     datastore_set_float(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, 0, value);
+    ESP_LOGW(TAG, "Safe temperature high limit set to %f", value);
 }
 
 static void do_control_safe_temp_low(const char * topic, float value, void * context)
 {
     datastore_t * datastore = (datastore_t *)context;
     datastore_set_float(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0, value);
+    ESP_LOGW(TAG, "Safe temperature low limit set to %f", value);
 }
 
 static void do_display_backlight_timeout(const char * topic, uint32_t value, void * context)

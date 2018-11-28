@@ -97,6 +97,8 @@ typedef enum
     RESOURCE_ID_CONTROL_PP_DAILY_MINUTE,
     RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH,  // temperature at which to initiate emergency PP cycle
     RESOURCE_ID_CONTROL_SAFE_TEMP_LOW,   // temperature at which to terminate emergency PP cycle
+    RESOURCE_ID_CONTROL_STATE_CP,
+    RESOURCE_ID_CONTROL_STATE_PP,
 
     RESOURCE_ID_AVR_VERSION,
     RESOURCE_ID_AVR_COUNT_RESET,

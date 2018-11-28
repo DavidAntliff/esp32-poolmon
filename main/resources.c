@@ -124,6 +124,9 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, "CONTROL_SAFE_TEMP_HIGH", datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
         _add_resource(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW,  "CONTROL_SAFE_TEMP_LOW",  datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
 
+        _add_resource(datastore, RESOURCE_ID_CONTROL_STATE_CP, "CONTROL_STATE_CP",   datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_CONTROL_STATE_PP, "CONTROL_STATE_PP",   datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+
         _add_resource(datastore, RESOURCE_ID_AVR_VERSION,       "AVR_VERSION",       datastore_create_resource(DATASTORE_TYPE_UINT8, 1));
         _add_resource(datastore, RESOURCE_ID_AVR_COUNT_RESET,   "AVR_COUNT_RESET",   datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_AVR_COUNT_CP,      "AVR_COUNT_CP",      datastore_create_resource(DATASTORE_TYPE_UINT32, 1));

@@ -28,6 +28,23 @@
 #include "freertos/FreeRTOS.h"
 #include "datastore/datastore.h"
 
+typedef enum
+{
+    CONTROL_CP_STATE_OFF = 0,  //
+    CONTROL_CP_STATE_ON,       //
+} control_cp_state_t;
+
+typedef enum
+{
+    CONTROL_PP_STATE_OFF = 0,   //
+    CONTROL_PP_STATE_ON,        //
+    CONTROL_PP_STATE_PAUSE,     //
+    CONTROL_PP_STATE_EMERGENCY, //
+} control_pp_state_t;
+
+#define CONTROL_CP_SENSOR_HIGH_INSTANCE  (1)               // instance of high temperature sensor
+#define CONTROL_CP_SENSOR_LOW_INSTANCE   (0)               // instance of low temperature sensor
+
 void control_init(UBaseType_t priority, const datastore_t * datastore);
 void control_delete(void);
 

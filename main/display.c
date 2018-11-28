@@ -23,6 +23,7 @@
  */
 
 #include <string.h>
+#include <time.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -45,6 +46,7 @@
 #include "rotary_encoder.h"
 #include "datastore/datastore.h"
 #include "led.h"
+#include "control.h"
 #include "sdkconfig.h"
 
 #define TAG "display"
@@ -91,7 +93,10 @@ static void _handle_page_sensors_temp2(page_buffer_t * page_buffer, void * state
 static void _handle_page_sensors_light(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_sensors_flow(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_power(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
-static void _handle_page_pump_ssrs(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
+static void _handle_page_switches(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
+static void _handle_page_pump_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
+static void _handle_page_cp_control(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
+static void _handle_page_pp_control(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_alarm(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_wifi_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
 static void _handle_page_mqtt_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore);
@@ -110,7 +115,10 @@ static const page_spec_t page_specs[] = {
     { DISPLAY_PAGE_SENSORS_LIGHT,       _handle_page_sensors_light,    NULL },
     { DISPLAY_PAGE_SENSORS_FLOW,        _handle_page_sensors_flow,     NULL },
     { DISPLAY_PAGE_POWER,               _handle_page_power,            NULL },
-    { DISPLAY_PAGE_PUMPS_SSRS,          _handle_page_pump_ssrs,        NULL },
+    { DISPLAY_PAGE_SWITCHES,            _handle_page_switches,         NULL },
+    { DISPLAY_PAGE_PUMP_STATUS,         _handle_page_pump_status,      NULL },
+    { DISPLAY_PAGE_CP_CONTROL,          _handle_page_cp_control,       NULL },
+    { DISPLAY_PAGE_PP_CONTROL,          _handle_page_pp_control,       NULL },
     { DISPLAY_PAGE_ALARM,               _handle_page_alarm,            NULL },
     { DISPLAY_PAGE_WIFI_STATUS,         _handle_page_wifi_status,      NULL },
     { DISPLAY_PAGE_MQTT_STATUS,         _handle_page_mqtt_status,      NULL },
@@ -136,9 +144,12 @@ static const transition_t transitions[] = {
     { DISPLAY_PAGE_SENSORS_TEMP_2,      DISPLAY_PAGE_MAIN,             DISPLAY_PAGE_SENSORS_LIGHT,     DISPLAY_PAGE_SENSORS_TEMP,     DISPLAY_PAGE_IGNORE },
     { DISPLAY_PAGE_SENSORS_LIGHT,       DISPLAY_PAGE_SENSORS_TEMP,     DISPLAY_PAGE_SENSORS_FLOW,      DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
     { DISPLAY_PAGE_SENSORS_FLOW,        DISPLAY_PAGE_SENSORS_LIGHT,    DISPLAY_PAGE_POWER,             DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
-    { DISPLAY_PAGE_POWER,               DISPLAY_PAGE_SENSORS_FLOW,     DISPLAY_PAGE_PUMPS_SSRS,        DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
-    { DISPLAY_PAGE_PUMPS_SSRS,          DISPLAY_PAGE_SENSORS_FLOW,     DISPLAY_PAGE_ALARM,             DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
-    { DISPLAY_PAGE_ALARM,               DISPLAY_PAGE_PUMPS_SSRS,       DISPLAY_PAGE_WIFI_STATUS,       DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_POWER,               DISPLAY_PAGE_SENSORS_FLOW,     DISPLAY_PAGE_SWITCHES,          DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_SWITCHES,            DISPLAY_PAGE_SENSORS_FLOW,     DISPLAY_PAGE_PUMP_STATUS,       DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_PUMP_STATUS,         DISPLAY_PAGE_SWITCHES,         DISPLAY_PAGE_CP_CONTROL,        DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_CP_CONTROL,          DISPLAY_PAGE_PUMP_STATUS,      DISPLAY_PAGE_PP_CONTROL,        DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_PP_CONTROL,          DISPLAY_PAGE_CP_CONTROL,       DISPLAY_PAGE_ALARM,             DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
+    { DISPLAY_PAGE_ALARM,               DISPLAY_PAGE_PP_CONTROL,       DISPLAY_PAGE_WIFI_STATUS,       DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
     { DISPLAY_PAGE_WIFI_STATUS,         DISPLAY_PAGE_ALARM,            DISPLAY_PAGE_MQTT_STATUS,       DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
     { DISPLAY_PAGE_MQTT_STATUS,         DISPLAY_PAGE_WIFI_STATUS,      DISPLAY_PAGE_RESOURCE_STATUS,   DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
     { DISPLAY_PAGE_RESOURCE_STATUS,     DISPLAY_PAGE_MQTT_STATUS,      DISPLAY_PAGE_AVR_STATUS,        DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
@@ -179,6 +190,16 @@ static const uint8_t arrow_up[8]  = { 0b00000,
                                       0b00000 };
 #define ARROW_UP "\xa"
 
+static const uint8_t delta[8]  = { 0b00000,
+                                   0b00001,
+                                   0b00011,
+                                   0b00101,
+                                   0b01001,
+                                   0b10001,
+                                   0b11111,
+                                   0b00000 };
+#define DELTA "\xb"
+
 static esp_err_t _display_reset(const i2c_lcd1602_info_t * lcd_info)
 {
     ESP_LOGI(TAG, "display reset");
@@ -197,6 +218,11 @@ static esp_err_t _display_reset(const i2c_lcd1602_info_t * lcd_info)
     if (err == ESP_OK)
     {
         err = i2c_lcd1602_define_char(lcd_info, I2C_LCD1602_INDEX_CUSTOM_2, arrow_up);
+        I2C_LCD1602_ERROR_CHECK(err);
+    }
+    if (err == ESP_OK)
+    {
+        err = i2c_lcd1602_define_char(lcd_info, I2C_LCD1602_INDEX_CUSTOM_3, delta);
         I2C_LCD1602_ERROR_CHECK(err);
     }
     return err;
@@ -254,12 +280,18 @@ static void _handle_page_blank(page_buffer_t * page_buffer, void * state, const 
     }
 }
 
+static void _split_time(uint32_t time, uint32_t * days, uint32_t * hours, uint32_t * minutes, uint32_t * seconds)
+{
+    *days = time / 60 / 60 / 24;
+    *hours = time / 60 / 60 % 24;
+    *minutes = time / 60 % 60;
+    *seconds = time % 60;
+}
+
 static void _render_uptime(char * buffer, size_t size, uint32_t uptime)
 {
-    uint32_t days = uptime / 60 / 60 / 24;
-    uint32_t hours = uptime / 60 / 60 % 24;
-    uint32_t minutes = uptime / 60 % 60;
-    uint32_t seconds = uptime % 60;
+    uint32_t days, hours, minutes, seconds;
+    _split_time(uptime, &days, &hours, &minutes, &seconds);
     snprintf(buffer, size, "Up %4dd %02d:%02d:%02d", days, hours, minutes, seconds);
 }
 
@@ -460,68 +492,175 @@ static void _handle_page_power(page_buffer_t * page_buffer, void * state, const 
     }
 }
 
-static void _build_switch_string(char * string, uint8_t len, datastore_resource_id_t mode, datastore_resource_id_t man, const datastore_t * datastore)
+static void _build_switch_mode_line(char * buf, uint8_t len, const char * label, datastore_resource_id_t value_id, datastore_resource_id_t count_id, const datastore_t * datastore)
 {
-    avr_switch_mode_t mode_value = 0;
-    datastore_get_uint32(datastore, mode, 0, &mode_value);
+    avr_switch_mode_t value = 0;
+    uint32_t count = 0;
 
-    avr_switch_manual_t manual_value = 0;
-    datastore_get_uint32(datastore, man, 0, &manual_value);
+    datastore_get_uint32(datastore, value_id, 0, &value);
+    datastore_get_uint32(datastore, count_id, 0, &count);
 
-    // TODO: when in AUTO mode, the ON/OFF should be the currently
-    // requested mode, not the Manual switch position. This allows the user
-    // to compare the requested mode with the actual pump state.
+    snprintf(buf, len, "%s Swi Mode %4s %3d", label, value == AVR_SWITCH_MODE_AUTO ? "AUTO" : "MAN", count);
+}
 
-    if (mode_value == AVR_SWITCH_MODE_MANUAL)
+static void _build_switch_man_line(char * buf, uint8_t len, datastore_resource_id_t value_id, datastore_resource_id_t count_id, const datastore_t * datastore)
+{
+    avr_switch_manual_t value = 0;
+    uint32_t count = 0;
+
+    datastore_get_uint32(datastore, value_id, 0, &value);
+    datastore_get_uint32(datastore, count_id, 0, &count);
+
+    snprintf(buf, len, "       Man  %4s %3d", value == AVR_SWITCH_MANUAL_ON ? "ON" : "OFF", count);
+}
+
+static void _handle_page_switches(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
+{
+    _build_switch_mode_line(page_buffer->row[0], ROW_STRING_WIDTH, "CP", RESOURCE_ID_SWITCHES_CP_MODE_VALUE, RESOURCE_ID_AVR_COUNT_CP_MODE, datastore);
+    _build_switch_man_line(page_buffer->row[1], ROW_STRING_WIDTH, RESOURCE_ID_SWITCHES_CP_MAN_VALUE, RESOURCE_ID_AVR_COUNT_CP_MAN, datastore);
+    _build_switch_mode_line(page_buffer->row[2], ROW_STRING_WIDTH, "PP", RESOURCE_ID_SWITCHES_PP_MODE_VALUE, RESOURCE_ID_AVR_COUNT_PP_MODE, datastore);
+    _build_switch_man_line(page_buffer->row[3], ROW_STRING_WIDTH, RESOURCE_ID_SWITCHES_PP_MAN_VALUE, RESOURCE_ID_AVR_COUNT_PP_MAN, datastore);
+ }
+
+static void _build_pump_state_line(char * buf, uint8_t len, const char * label, datastore_instance_id_t state_id, const datastore_t * datastore)
+{
+    avr_pump_state_t state = AVR_PUMP_STATE_OFF;
+    datastore_get_uint32(datastore, state_id, 0, &state);
+    snprintf(buf, len, "%s Status        %3s", label, state == AVR_PUMP_STATE_OFF ? "OFF" : "ON");
+}
+
+static void _build_pump_stats_line(char * buf, uint8_t len, datastore_instance_id_t count_id, const datastore_t * datastore)
+{
+    uint32_t count = 0;
+    datastore_get_uint32(datastore, count_id, 0, &count);
+    datastore_age_t age = 0;
+    datastore_get_age(datastore, count_id, 0, &age);
+    uint32_t days, hours, minutes, seconds;
+    if (age == DATASTORE_INVALID_AGE)
     {
-        snprintf(string, len, "M:%s", manual_value == AVR_SWITCH_MANUAL_OFF ? "OFF" : "ON");
+        age = microseconds_since_boot();
+    }
+    _split_time(age / 1000000, &days, &hours, &minutes, &seconds);
+    snprintf(buf, len, "# %3d %4dd %02d:%02d:%02d", count, days, hours, minutes, seconds);
+}
+
+static void _handle_page_pump_status(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
+{
+    _build_pump_state_line(page_buffer->row[0], ROW_STRING_WIDTH, "CP", RESOURCE_ID_PUMPS_CP_STATE, datastore);
+    _build_pump_stats_line(page_buffer->row[1], ROW_STRING_WIDTH, RESOURCE_ID_AVR_COUNT_CP, datastore);
+    _build_pump_state_line(page_buffer->row[2], ROW_STRING_WIDTH, "PP", RESOURCE_ID_PUMPS_PP_STATE, datastore);
+    _build_pump_stats_line(page_buffer->row[3], ROW_STRING_WIDTH, RESOURCE_ID_AVR_COUNT_PP, datastore);
+}
+
+static void _handle_page_cp_control(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
+{
+    control_cp_state_t cp_state = CONTROL_CP_STATE_OFF;
+    datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_STATE_CP, 0, &cp_state);
+    snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "CP Control       %3s", cp_state == CONTROL_CP_STATE_ON ? "ON" : "OFF");
+
+    float temp_low = 0.0f, temp_high = 0.0f;
+    datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, CONTROL_CP_SENSOR_LOW_INSTANCE, &temp_low);
+    datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, CONTROL_CP_SENSOR_HIGH_INSTANCE, &temp_high);
+    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "Lo  %2.1f"DEGREES_C "  Hi  %2.1f"DEGREES_C , temp_low, temp_high);
+
+    float delta_on = 0.0f, delta_off = 0.0f;
+    datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, &delta_on);
+    datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, &delta_off);
+    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, DELTA"on %4.1f"DEGREES_C " "DELTA"off %4.1f"DEGREES_C , delta_on, delta_off);
+
+    float diff = temp_high - temp_low;
+    float active_delta = cp_state == CONTROL_CP_STATE_OFF ? delta_on : delta_off;
+    float margin = active_delta - diff;
+    snprintf(page_buffer->row[3], ROW_STRING_WIDTH, DELTA"T  %4.1f"DEGREES_C " "DELTA"Th  %4.1f"DEGREES_C , diff, -margin);
+}
+
+// TODO: refactor into a Time module
+static void _get_local_time(time_t * now_time, struct tm * timeinfo)
+{
+    assert(now_time != NULL);
+    assert(timeinfo != NULL);
+    time(now_time);
+    localtime_r(now_time, timeinfo);
+}
+
+static void _handle_page_pp_control(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
+{
+    control_pp_state_t pp_state = CONTROL_PP_STATE_OFF;
+    datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, &pp_state);
+    const char * state_desc = NULL;
+    switch (pp_state)
+    {
+        case CONTROL_PP_STATE_ON: state_desc = "ON"; break;
+        case CONTROL_PP_STATE_OFF: state_desc = "OFF"; break;
+        case CONTROL_PP_STATE_PAUSE: state_desc = "PAUSE"; break;
+        case CONTROL_PP_STATE_EMERGENCY: state_desc = "EMERGENCY"; break;
+        default: state_desc = "ERROR";
+    }
+    snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "PP Control %9s", state_desc);
+
+    control_cp_state_t cp_state = CONTROL_CP_STATE_OFF;
+    datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_STATE_CP, 0, &cp_state);
+    if (cp_state == CONTROL_CP_STATE_ON)
+    {
+        datastore_age_t cp_state_age = DATASTORE_INVALID_AGE;
+        datastore_get_age(datastore, RESOURCE_ID_CONTROL_STATE_CP, 0, &cp_state_age);
+        uint32_t days, hours, minutes, seconds;
+        _split_time(cp_state_age / 1000000, &days, &hours, &minutes, &seconds);
+        snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "CP  ON    %04d:%02d:%02d", days * 24 + hours, minutes, seconds);
     }
     else
     {
-//        avr_pump_state_t requested_state = 0;
-//        datastore_get_uint32(datastore, state, 0, &requested_state);
-//        snprintf(string, len, "A:%s", requested_state == AVR_PUMP_STATE_OFF ? "OFF" : "ON");
-        snprintf(string, len, "A:---");
+        snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "CP OFF");
     }
-}
 
-static void _build_pump_string(char * string, uint8_t len, datastore_resource_id_t id, const datastore_t * datastore)
-{
-    avr_pump_state_t state = 0;
-    datastore_get_uint32(datastore, id, 0, &state);
+    float flow = 0.0f, flow_threshold = 0.0f;
+    datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow);
+    datastore_get_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, &flow_threshold);
+    if (cp_state == CONTROL_CP_STATE_ON)
+    {
+        snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "Flow %4.1f   Min %4.1f", flow, flow_threshold);
+    }
+    else
+    {
+        // don't care about flow if CP isn't running
+        snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "Flow ----   Min %4.1f", flow_threshold);
+    }
 
-    snprintf(string, len, "%-3s", state == AVR_PUMP_STATE_OFF ? "OFF" : "ON");
-}
+    // borrowed this code from control.c but modified to show remaining seconds (not just minutes)
+    bool system_time_set = false;
+    datastore_get_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, &system_time_set);
+    if (system_time_set)
+    {
+        int32_t daily_hour = -1;
+        int32_t daily_minute = -1;
+        datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0, &daily_hour);
+        datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, &daily_minute);
 
-static void _handle_page_pump_ssrs(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)
-{
-    static const uint8_t MODE_LEN = 6;
-    char cp_switches[MODE_LEN];
-    char pp_switches[MODE_LEN];
+        // TODO: a way to disable the daily timer
+        if (daily_hour >= 0 && daily_minute >= 0)
+        {
+            time_t now;
+            struct tm timeinfo;
+            _get_local_time(&now, &timeinfo);
 
-    _build_switch_string(cp_switches, MODE_LEN, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, RESOURCE_ID_SWITCHES_CP_MAN_VALUE, datastore);
-    _build_switch_string(pp_switches, MODE_LEN, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, RESOURCE_ID_SWITCHES_PP_MAN_VALUE, datastore);
-
-    static const uint8_t PUMP_LEN = 4;
-    char cp_pump[PUMP_LEN];
-    char pp_pump[PUMP_LEN];
-
-    _build_pump_string(cp_pump, PUMP_LEN, RESOURCE_ID_PUMPS_CP_STATE, datastore);
-    _build_pump_string(pp_pump, PUMP_LEN, RESOURCE_ID_PUMPS_PP_STATE, datastore);
-
-    snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "Pumps CP %-5s  %-3s", cp_switches, cp_pump);
-    uint32_t count_cp_mode = 0, count_cp_man = 0, count_cp = 0;
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_CP_MODE, 0, &count_cp_mode);
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_CP_MAN, 0, &count_cp_man);
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_CP, 0, &count_cp);
-    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "      %-3d  %-3d  %-3d", count_cp_mode, count_cp_man, count_cp);
-
-    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "      PP %-5s  %-3s", pp_switches, pp_pump);
-    uint32_t count_pp_mode = 0, count_pp_man = 0, count_pp = 0;
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP_MODE, 0, &count_pp_mode);
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP_MAN, 0, &count_pp_man);
-    datastore_get_uint32(datastore, RESOURCE_ID_AVR_COUNT_PP, 0, &count_pp);
-    snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "      %-3d  %-3d  %-3d", count_pp_mode, count_pp_man, count_pp);
+            int now_seconds = timeinfo.tm_hour * 60 * 60 + timeinfo.tm_min * 60 + timeinfo.tm_sec;
+            int set_seconds = daily_hour * 60 * 60 + daily_minute * 60;
+            int rem_seconds = now_seconds - 1 < set_seconds ? set_seconds - now_seconds : 24 * 60 * 60 - now_seconds + set_seconds;
+            int hours_remaining = rem_seconds / 60 / 60;  // floor
+            int minutes_remaining = (rem_seconds - (hours_remaining * 60 * 60)) / 60;
+            int seconds_remaining = rem_seconds - (hours_remaining * 60 * 60) - (minutes_remaining * 60);
+            snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "%02d:%02d:00  T-%02d:%02d:%02d",
+                     daily_hour, daily_minute, hours_remaining, minutes_remaining, seconds_remaining);
+        }
+        else
+        {
+            snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "Timer disabled");
+        }
+    }
+    else
+    {
+        snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "Waiting for time");
+    }
 }
 
 static void _handle_page_alarm(page_buffer_t * page_buffer, void * state, const datastore_t * datastore)

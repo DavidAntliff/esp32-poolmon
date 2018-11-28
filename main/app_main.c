@@ -127,7 +127,7 @@ void app_main()
     esp_log_level_set("datastore", ESP_LOG_INFO);
     esp_log_level_set("mqtt", ESP_LOG_INFO);
     esp_log_level_set("publish", ESP_LOG_INFO);
-    esp_log_level_set("sensor_temp", ESP_LOG_INFO);
+    esp_log_level_set("sensor_temp", ESP_LOG_WARN);
     esp_log_level_set("sensor_light", ESP_LOG_WARN);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
     esp_log_level_set("control", ESP_LOG_INFO);
@@ -291,6 +291,8 @@ void app_main()
 
         vTaskDelayUntil(&last_wake_time, 1000 / portTICK_RATE_MS);
     }
+
+    datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Restarting");
 
     // Delete all tasks before deallocating structures that they might be using.
     ESP_LOGD(TAG, "Deleting tasks");
