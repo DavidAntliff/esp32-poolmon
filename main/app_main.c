@@ -148,8 +148,6 @@ void app_main()
     UBaseType_t control_priority = sensor_priority;
     UBaseType_t system_priority = publish_priority;
 
-    ESP_LOGI(TAG, "Start");
-
     // round to nearest MHz (stored value is only precise to MHz)
     uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
     ESP_LOGI(TAG, "APB CLK %u Hz", apb_freq);

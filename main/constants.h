@@ -32,6 +32,7 @@
 #define SYSTEM_LEN_VERSION           6  // XX.XX + null
 #define SYSTEM_LEN_BUILD_DATE_TIME  16
 #define SYSTEM_LEN_BUILD_GIT_COMMIT (20 + 1)
+#define SYSTEM_LEN_BUILD_ESP_IDF_VERSION (32)
 #define SYSTEM_LEN_LOG              256
 
 #define PUBLISH_QUEUE_DEPTH      32
@@ -62,7 +63,7 @@
 #define FLOW_METER_MODEL_B          (0.619)  // based on flow meter measurements, October 2017
 #define FLOW_METER_MODEL_CUTOFF_HZ  (1.0)    // For values of x < cutoff, linear-interpolate to zero so that 0 Hz = 0 LPM
 
-// TODO: light and temp sensor sampling periods etc.
+// TODO: configurable sampling periods
 
 #define POWER_CALCULATION_PERIOD    (10.0)   // seconds
 
