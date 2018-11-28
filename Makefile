@@ -10,4 +10,6 @@ PROJECT_NAME := esp32-poolmon
 include $(IDF_PATH)/make/project.mk
 
 BUILD_TIMESTAMP := $(shell date +"%Y%m%d-%H%M%S")
-CFLAGS += -DBUILD_TIMESTAMP=\"$(BUILD_TIMESTAMP)\"
+GIT_COMMIT := $(shell git describe --match=NeVeRmAtCh --always --abbrev=14 --dirty)
+
+CFLAGS += -DBUILD_TIMESTAMP=\"$(BUILD_TIMESTAMP)\" -DGIT_COMMIT=\"$(GIT_COMMIT)\"

@@ -301,12 +301,14 @@ static void _handle_page_main(page_buffer_t * page_buffer, void * state, const d
 
     char version[SYSTEM_LEN_VERSION] = "";
     char build_date_time[SYSTEM_LEN_BUILD_DATE_TIME] = "";
+    char git_commit[SYSTEM_LEN_BUILD_GIT_COMMIT] = "";
     datastore_get_string(datastore, RESOURCE_ID_SYSTEM_VERSION, 0, version, sizeof(version));
     datastore_get_string(datastore, RESOURCE_ID_SYSTEM_BUILD_DATE_TIME, 0, build_date_time, sizeof(build_date_time));
+    datastore_get_string(datastore, RESOURCE_ID_SYSTEM_BUILD_GIT_COMMIT, 0, git_commit, sizeof(git_commit));
 
     snprintf(page_buffer->row[0], ROW_STRING_WIDTH, "PoolControl v%-6s", version);
-    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, BLANK_LINE);
-    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "%s", build_date_time);
+    snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "%s", build_date_time);
+    snprintf(page_buffer->row[2], ROW_STRING_WIDTH, "%s", git_commit);
 
     uint32_t uptime = seconds_since_boot(); // in seconds
     _render_uptime(page_buffer->row[3], ROW_STRING_WIDTH, uptime);
@@ -606,7 +608,7 @@ static void _handle_page_pp_control(page_buffer_t * page_buffer, void * state, c
         datastore_get_age(datastore, RESOURCE_ID_CONTROL_STATE_CP, 0, &cp_state_age);
         uint32_t days, hours, minutes, seconds;
         _split_time(cp_state_age / 1000000, &days, &hours, &minutes, &seconds);
-        snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "CP  ON    %04d:%02d:%02d", days * 24 + hours, minutes, seconds);
+        snprintf(page_buffer->row[1], ROW_STRING_WIDTH, "CP ON     %4d:%02d:%02d", days * 24 + hours, minutes, seconds);
     }
     else
     {
