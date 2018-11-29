@@ -227,7 +227,7 @@ void app_main()
         .publish_context = publish_context,
     };
 
-    datastore_status_t status = datastore_add_set_callback(datastore, RESOURCE_ID_MQTT_STATUS, subscriptions_init, &globals);
+    datastore_status_t status = datastore_add_set_callback(datastore, RESOURCE_ID_MQTT_STATUS, 0, subscriptions_init, &globals);
     if (status != DATASTORE_STATUS_OK)
     {
         ESP_LOGE(TAG, "datastore_add_set_callback for resource %d failed: %d", RESOURCE_ID_MQTT_STATUS, status);

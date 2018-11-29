@@ -213,7 +213,7 @@ static void sensor_flow_task(void * pvParameter)
     TickType_t last_wake_time = xTaskGetTickCount();
 
     // subscribe to display changes
-    datastore_add_set_callback(datastore, RESOURCE_ID_DISPLAY_PAGE, _display_page_changed, NULL);
+    datastore_add_set_callback(datastore, RESOURCE_ID_DISPLAY_PAGE, 0, _display_page_changed, NULL);
 
     while (1)
     {

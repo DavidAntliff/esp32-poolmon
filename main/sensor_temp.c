@@ -251,10 +251,10 @@ static void sensor_temp_task(void * pvParameter)
     for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
     {
         _recalc_assignments_handler(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i, &context);
-    }
 
-    // Callback if any assignments change
-    datastore_add_set_callback(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, _recalc_assignments_handler, &context);
+        // Callback if any assignments change
+        datastore_add_set_callback(datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i, _recalc_assignments_handler, &context);
+    }
 
     int errors_count[MAX_DEVICES] = {0};
     if (task_inputs->sensors->num_ds18b20s > 0)
