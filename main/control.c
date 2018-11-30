@@ -418,15 +418,18 @@ static void control_pp_task(void * pvParameter)
         }
 
         // if PP in manual mode, drop out of cycle
-        avr_switch_mode_t pp_mode = AVR_SWITCH_MODE_AUTO;
-        datastore_get_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode);
-        if (pp_mode != AVR_SWITCH_MODE_AUTO)
+        if (state == CONTROL_PP_STATE_ON || state == CONTROL_PP_STATE_PAUSE)
         {
-            ESP_LOGI(TAG, "PP control loop: purge pump OFF (manual)");
-            datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump off (manual)");
-            state = CONTROL_PP_STATE_OFF;
-            datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
-            avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
+            avr_switch_mode_t pp_mode = AVR_SWITCH_MODE_AUTO;
+            datastore_get_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode);
+            if (pp_mode != AVR_SWITCH_MODE_AUTO)
+            {
+                ESP_LOGI(TAG, "PP control loop: purge pump OFF (manual)");
+                datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump off (manual)");
+                state = CONTROL_PP_STATE_OFF;
+                datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
+                avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
+            }
         }
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
