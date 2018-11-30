@@ -144,6 +144,7 @@ datastore_t * resources_init(void)
 
     }
 
+    ESP_LOGI(TAG, "PoolMon v%s", VERSION);
     ESP_LOGI(TAG, "Build timestamp: %s", BUILD_TIMESTAMP);
     ESP_LOGI(TAG, "Git commit: %s", GIT_COMMIT);
     ESP_LOGI(TAG, "ESP-IDF version: %s", esp_get_idf_version());

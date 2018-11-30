@@ -110,12 +110,12 @@ static void power_calculation_task(void * pvParameter)
             }
             else
             {
-                ESP_LOGW(TAG, "T2 measurement has expired");
+                ESP_LOGW(TAG, "output temperature measurement has expired");
             }
         }
         else
         {
-            ESP_LOGW(TAG, "T1 measurement has expired");
+            ESP_LOGW(TAG, "input temperature measurement has expired");
         }
 
         vTaskDelayUntil(&last_wake_time, POWER_CALCULATION_PERIOD * 1000 / portTICK_PERIOD_MS);
