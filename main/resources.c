@@ -237,6 +237,9 @@ void resources_load(const datastore_t * datastore)
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, "5.0"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, "8.0"));
 
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0, "9"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, "0"));
+
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, "5"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, "30"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, "60"));
@@ -289,6 +292,9 @@ void resources_save(const datastore_t * datastore)
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0));
+
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0));
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0));
 
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0));
