@@ -44,7 +44,7 @@
 #define TAG "avr_support"
 
 #define SMBUS_TIMEOUT     1000   // milliseconds
-#define TICKS_PER_UPDATE  (1000 / portTICK_RATE_MS)
+#define TICKS_PER_UPDATE  (250 / portTICK_RATE_MS)
 #define EXPECTED_ID       0x44
 #define EXPECTED_VERSION  1
 #define SCRATCH_VALUE     0x55

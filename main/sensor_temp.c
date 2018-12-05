@@ -389,7 +389,7 @@ static void sensor_temp_sim_task(void * pvParameter)
             }
             else
             {
-                reading = 20.0 + 1.0 * i;
+                reading = 0.0;
             }
 
             datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, reading);

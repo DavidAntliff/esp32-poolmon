@@ -186,6 +186,12 @@ void app_main()
     avr_support_init(i2c_master_info, avr_priority, datastore);
     avr_support_reset();
 
+    // short beep to prove speaker works, and alert in case of a reset
+    _delay();
+    avr_support_set_alarm(AVR_ALARM_STATE_ON);
+    vTaskDelay(500 / portTICK_RATE_MS);
+    avr_support_set_alarm(AVR_ALARM_STATE_OFF);
+
     _delay();
     sensor_light_init(i2c_master_info, sensor_priority, datastore);
 
