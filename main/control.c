@@ -51,6 +51,14 @@ typedef struct
 static TaskHandle_t _cp_task_handle = NULL;
 static TaskHandle_t _pp_task_handle = NULL;
 
+
+void _avr_reset_handler(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * ctxt)
+{
+    bool * flag = (bool *)ctxt;
+    assert(flag != NULL);
+    *flag = true;
+}
+
 static void control_cp_task(void * pvParameter)
 {
     assert(pvParameter);
@@ -87,6 +95,10 @@ static void control_cp_task(void * pvParameter)
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
     }
+
+    // In the case of an AVR reset, refresh the pump states
+    bool refresh_cp = false;
+    datastore_add_set_callback(datastore, RESOURCE_ID_AVR_COUNT_RESET, 0, _avr_reset_handler, &refresh_cp);
 
     while (1)
     {
@@ -141,13 +153,6 @@ static void control_cp_task(void * pvParameter)
                         transition = true;
                     }
                 }
-
-                // output
-                if (transition)
-                {
-                    avr_support_set_cp_pump(state == CONTROL_CP_STATE_ON ? AVR_PUMP_STATE_ON : AVR_PUMP_STATE_OFF);
-                    datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_CP, 0, state);
-                }
             }
             else
             {
@@ -157,6 +162,20 @@ static void control_cp_task(void * pvParameter)
         else
         {
             ESP_LOGW(TAG, "CP control loop: T HIGH measurement timeout");
+        }
+
+        if (refresh_cp)
+        {
+            ESP_LOGW(TAG, "Refresh CP state (AVR reset)");
+            transition = true;
+            refresh_cp = false;
+        }
+
+        // output
+        if (transition)
+        {
+            avr_support_set_cp_pump(state == CONTROL_CP_STATE_ON ? AVR_PUMP_STATE_ON : AVR_PUMP_STATE_OFF);
+            datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_CP, 0, state);
         }
 
         vTaskDelayUntil(&last_wake_time, POLL_PERIOD / portTICK_PERIOD_MS);
