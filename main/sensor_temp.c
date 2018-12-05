@@ -126,6 +126,7 @@ static void associate_ds18b20_devices(const OneWireBus * owb,
         {
             ESP_LOGD(TAG, "Single device optimisations enabled");
             ds18b20_init_solo(ds18b20_info, owb);          // only one device on bus
+            ds18b20_info->rom_code = rom_codes[0];
         }
         else
         {
@@ -416,14 +417,10 @@ temp_sensors_t * sensor_temp_init(uint8_t gpio, UBaseType_t priority, const data
     // publish detected ROM codes
     for (size_t i = 0; i < sensors->num_ds18b20s; ++i)
     {
-        // render device ID (LSB first) as sixteen hex digits
+        // render device ID (LSB first) as sixteen hex digit
         char rom_code[2 * sizeof(OneWireBus_ROMCode) + 1] = "";
-        for (size_t j = 0; j < sizeof(OneWireBus_ROMCode); ++j)
-        {
-            char byte[3] = "";
-            snprintf(byte, 3, "%02x", sensors->ds18b20_infos[i]->rom_code.bytes[sizeof(OneWireBus_ROMCode) - j - 1]);
-            strcat(rom_code, byte);
-        }
+        owb_string_from_rom_code(sensors->ds18b20_infos[i]->rom_code, rom_code, sizeof(rom_code));
+        ESP_LOGD(TAG, "publish %d rom_code: %s", i, rom_code);  // TODO: remove
         datastore_set_string(datastore, RESOURCE_ID_TEMP_DETECTED, i, rom_code);
     }
 
