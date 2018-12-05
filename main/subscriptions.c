@@ -297,7 +297,6 @@ void subscriptions_init(const datastore_t * datastore, datastore_resource_id_t i
             for (size_t i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
             {
                 // store assignment of detected sensors to instances in NV
-                publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_TEMP_ASSIGNMENT, i);
                 publish_resource(globals->publish_context, globals->datastore, RESOURCE_ID_TEMP_DETECTED, i);
             }
 

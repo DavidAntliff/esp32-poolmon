@@ -84,12 +84,6 @@ static const value_info_t values_info[] =
     { RESOURCE_ID_TEMP_DETECTED, 3, "sensors/temp/4/detected", _as_string },
     { RESOURCE_ID_TEMP_DETECTED, 4, "sensors/temp/5/detected", _as_string },
 
-    { RESOURCE_ID_TEMP_ASSIGNMENT, 0, "sensors/temp/1/assignment", _as_string },
-    { RESOURCE_ID_TEMP_ASSIGNMENT, 1, "sensors/temp/2/assignment", _as_string },
-    { RESOURCE_ID_TEMP_ASSIGNMENT, 2, "sensors/temp/3/assignment", _as_string },
-    { RESOURCE_ID_TEMP_ASSIGNMENT, 3, "sensors/temp/4/assignment", _as_string },
-    { RESOURCE_ID_TEMP_ASSIGNMENT, 4, "sensors/temp/5/assignment", _as_string },
-
     { RESOURCE_ID_LIGHT_FULL,        0, "sensors/light/1/full_spectrum", _as_string },
     { RESOURCE_ID_LIGHT_VISIBLE,     0, "sensors/light/1/visible",       _as_string },
     { RESOURCE_ID_LIGHT_INFRARED,    0, "sensors/light/1/infrared",      _as_string },

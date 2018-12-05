@@ -134,6 +134,7 @@ void app_main()
     esp_log_level_set("sntp_rtc", ESP_LOG_INFO);
     esp_log_level_set("power", ESP_LOG_WARN);
     esp_log_level_set("app_main", ESP_LOG_INFO);
+    esp_log_level_set("subscriptions", ESP_LOG_INFO);
 
     // Ensure RMT peripheral is reset properly, in case of prior crash
     periph_module_disable(PERIPH_RMT_MODULE);
