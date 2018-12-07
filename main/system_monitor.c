@@ -55,7 +55,6 @@ static void system_task(void * pvParameter)
 
     task_inputs_t * task_inputs = (task_inputs_t *)pvParameter;
     const datastore_t * datastore = task_inputs->datastore;
-    const publish_context_t * publish_context = task_inputs->publish_context;
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
@@ -75,15 +74,9 @@ static void system_task(void * pvParameter)
         datastore_get_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, &mqtt_connected);
         if (mqtt_connected)
         {
-            // TODO: send via publish task
-            // For now, send via MQTT directly
-            char value_string[256] = "";
-            snprintf(value_string, sizeof(value_string) - 1, "%u", ram_free);
-            publish_direct(publish_context, ROOT_TOPIC"/system/ram_free", (uint8_t *)value_string, strlen(value_string) + 1);
-            snprintf(value_string, sizeof(value_string) - 1, "%u", iram_free);
-            publish_direct(publish_context, ROOT_TOPIC"/system/iram_free", (uint8_t *)value_string, strlen(value_string) + 1);
-            snprintf(value_string, sizeof(value_string) - 1, "%u", uptime);
-            publish_direct(publish_context, ROOT_TOPIC"/system/uptime", (uint8_t *)value_string, strlen(value_string) + 1);
+            datastore_set_uint32(datastore, RESOURCE_ID_SYSTEM_RAM_FREE, 0, ram_free);
+            datastore_set_uint32(datastore, RESOURCE_ID_SYSTEM_IRAM_FREE, 0, iram_free);
+            datastore_set_uint32(datastore, RESOURCE_ID_SYSTEM_UPTIME, 0, uptime);
         }
 
         vTaskDelayUntil(&last_wake_time, CHECK_PERIOD / portTICK_PERIOD_MS);

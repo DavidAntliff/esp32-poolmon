@@ -62,6 +62,9 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_SYSTEM_BUILD_ESP_IDF_VERSION,"SYSTEM_BUILD_ESP_IDF_VERSION",datastore_create_string_resource(SYSTEM_LEN_BUILD_ESP_IDF_VERSION, 1));
         _add_resource(datastore, RESOURCE_ID_SYSTEM_TIME_SET,        "SYSTEM_TIME_SET",        datastore_create_resource(DATASTORE_TYPE_BOOL, 1));
         _add_resource(datastore, RESOURCE_ID_SYSTEM_LOG,             "SYSTEM_LOG",             datastore_create_string_resource(SYSTEM_LEN_LOG, 1));
+        _add_resource(datastore, RESOURCE_ID_SYSTEM_RAM_FREE,        "SYSTEM_RAM_FREE",        datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_SYSTEM_IRAM_FREE,       "SYSTEM_IRAM_FREE",       datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+        _add_resource(datastore, RESOURCE_ID_SYSTEM_UPTIME,          "SYSTEM_UPTIME",          datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_WIFI_SSID,              "WIFI_SSID",              datastore_create_string_resource(WIFI_LEN_SSID, 1));
         _add_resource(datastore, RESOURCE_ID_WIFI_PASSWORD,          "WIFI_PASSWORD",          datastore_create_string_resource(WIFI_LEN_PASSWORD, 1));
@@ -101,13 +104,9 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_POWER_VALUE,            "POWER_VALUE",            datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
 
         _add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_VALUE, "SWITCHES_CP_MODE_VALUE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        //_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MODE_COUNT, "SWITCHES_CP_MODE_COUNT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MAN_VALUE,  "SWITCHES_CP_MAN_VALUE",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        //_add_resource(datastore, RESOURCE_ID_SWITCHES_CP_MAN_COUNT, "SWITCHES_CP_MAN_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, "SWITCHES_PP_MODE_VALUE", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        //_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MODE_COUNT, "SWITCHES_PP_MODE_COUNT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MAN_VALUE,  "SWITCHES_PP_MAN_VALUE",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-        //_add_resource(datastore, RESOURCE_ID_SWITCHES_PP_MAN_COUNT, "SWITCHES_PP_MAN_COUNT",  datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
 
         _add_resource(datastore, RESOURCE_ID_PUMPS_CP_STATE,         "PUMPS_CP_STATE",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
         _add_resource(datastore, RESOURCE_ID_PUMPS_PP_STATE,         "PUMPS_PP_STATE",         datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
@@ -141,7 +140,6 @@ datastore_t * resources_init(void)
 
         _add_resource(datastore, RESOURCE_ID_DISPLAY_PAGE,              "DISPLAY_PAGE",              datastore_create_resource(DATASTORE_TYPE_INT32, 1));
         _add_resource(datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, "DISPLAY_BACKLIGHT_TIMEOUT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
-
     }
 
     ESP_LOGI(TAG, "PoolMon v%s", VERSION);

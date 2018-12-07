@@ -70,6 +70,10 @@ static void _as_ipv4_address(const datastore_t * datastore, datastore_resource_i
              (ipv4_address & 0xff000000) >> 24);
 }
 
+
+// NOTICE: if you add entries to this table, make sure that Telegraf is configured
+// correctly. For example, if you are publishing strings (not ints or floats sent as strings)
+// then you will need to add explicit topic subscriptions in telegraf.conf.
 static const value_info_t values_info[] =
 {
     { RESOURCE_ID_TEMP_VALUE, 0, "sensors/temp/1/value", _as_string },
@@ -103,8 +107,13 @@ static const value_info_t values_info[] =
     { RESOURCE_ID_PUMPS_CP_STATE, 0, "pumps/cp/state", _as_string },
     { RESOURCE_ID_PUMPS_PP_STATE, 0, "pumps/pp/state", _as_string },
 
-    { RESOURCE_ID_WIFI_ADDRESS, 0, "wifi/address", _as_ipv4_address },
-    { RESOURCE_ID_SYSTEM_LOG, 0, "system/log", _as_string },
+    { RESOURCE_ID_WIFI_ADDRESS,     0, "wifi/address",     _as_ipv4_address },
+    //{ RESOURCE_ID_WIFI_RSSI,        0, "wifi/rssi",        _as_string },
+
+    { RESOURCE_ID_SYSTEM_LOG,       0, "system/log",       _as_string },
+    { RESOURCE_ID_SYSTEM_RAM_FREE,  0, "system/ram_free",  _as_string },
+    { RESOURCE_ID_SYSTEM_IRAM_FREE, 0, "system/iram_free", _as_string },
+    { RESOURCE_ID_SYSTEM_UPTIME,    0, "system/uptime",    _as_string },
 
 //    { RESOURCE_ID_ALARM_STATE, 0, "alarms/1/state", },
 };
@@ -237,6 +246,8 @@ void publish_direct(const publish_context_t * publish_context, const char * topi
 {
     if (publish_context != NULL)
     {
+        // TODO: use publish_context to send the topic/value to publish task
+        // For now, just publish it directly:
         mqtt_publish(topic, data, length, 0, false);
     }
     else

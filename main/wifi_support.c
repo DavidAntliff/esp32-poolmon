@@ -38,6 +38,7 @@
 #include "datastore/datastore.h"
 
 #define TAG "wifi_support"
+#define CHECK_PERIOD (1000) // milliseconds
 
 typedef struct
 {
@@ -110,9 +111,12 @@ static void wifi_monitor_task(void * pvParameter)
     const datastore_t * datastore = task_inputs->datastore;
 
     bool new_info = true;
+    TickType_t last_wake_time = xTaskGetTickCount();
 
     while (1)
     {
+        last_wake_time = xTaskGetTickCount();
+
         wifi_ap_record_t ap_info = { 0 };
         if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK)
         {
@@ -124,6 +128,7 @@ static void wifi_monitor_task(void * pvParameter)
                 ESP_LOGI(TAG, "802.11%s%s%s", ap_info.phy_11b ? "b" : "", ap_info.phy_11g ? "g" : "", ap_info.phy_11n ? "n" : "");
                 ESP_LOGI(TAG, "RSSI %d", ap_info.rssi);
                 new_info = false;
+
             }
             else
             {
@@ -137,7 +142,8 @@ static void wifi_monitor_task(void * pvParameter)
             new_info = true;
             datastore_set_int8(datastore, RESOURCE_ID_WIFI_RSSI, 0, 0);
         }
-        vTaskDelay(1000 / portTICK_RATE_MS);
+
+        vTaskDelayUntil(&last_wake_time, CHECK_PERIOD / portTICK_PERIOD_MS);
     }
 
     free(task_inputs);
