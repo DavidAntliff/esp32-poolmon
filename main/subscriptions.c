@@ -251,6 +251,24 @@ static void do_ota_url(const char * topic, const char * value, void * context)
     datastore_set_string(datastore, RESOURCE_ID_OTA_URL, 0, value);
 }
 
+static void do_log_debug(const char * topic, const char * value, void * context)
+{
+    ESP_LOGI(TAG, "Set debug logging for tag '%s'", value);
+    esp_log_level_set(value, ESP_LOG_DEBUG);
+}
+
+static void do_log_info(const char * topic, const char * value, void * context)
+{
+    ESP_LOGI(TAG, "Set info logging for tag '%s'", value);
+    esp_log_level_set(value, ESP_LOG_INFO);
+}
+
+static void do_log_warn(const char * topic, const char * value, void * context)
+{
+    ESP_LOGI(TAG, "Set warn logging for tag '%s'", value);
+    esp_log_level_set(value, ESP_LOG_WARN);
+}
+
 typedef struct
 {
     const char * topic;
@@ -283,6 +301,9 @@ static subscribe_item_t SUBSCRIPTIONS[] = {
     { ROOT_TOPIC"/control/safe/low",                 MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_control_safe_temp_low },
     { ROOT_TOPIC"/display/backlight/timeout",        MQTT_TYPE_UINT32, (mqtt_receive_callback_generic)&do_display_backlight_timeout },
     { ROOT_TOPIC"/ota/url",                          MQTT_TYPE_STRING, (mqtt_receive_callback_generic)&do_ota_url },
+    { ROOT_TOPIC"/log/debug",                        MQTT_TYPE_STRING, (mqtt_receive_callback_generic)&do_log_debug },
+    { ROOT_TOPIC"/log/info",                         MQTT_TYPE_STRING, (mqtt_receive_callback_generic)&do_log_info },
+    { ROOT_TOPIC"/log/warn",                         MQTT_TYPE_STRING, (mqtt_receive_callback_generic)&do_log_warn },
 };
 
 void subscriptions_init(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context)
