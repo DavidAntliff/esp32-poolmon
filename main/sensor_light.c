@@ -114,7 +114,7 @@ static void sensor_light_task(void * pvParameter)
             {
                 uint32_t lux = tsl2561_compute_lux(tsl2561_info, visible, infrared);
 
-                ESP_LOGI(TAG, "Light Sensor Readings:")
+                ESP_LOGI(TAG, "Light Sensor Readings:");
                 ESP_LOGI(TAG, "  Full spectrum: %d", visible + infrared);
                 ESP_LOGI(TAG, "  Infrared:      %d", infrared);
                 ESP_LOGI(TAG, "  Visible:       %d", visible);
