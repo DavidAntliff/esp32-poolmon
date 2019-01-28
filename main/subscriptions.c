@@ -244,6 +244,13 @@ static void do_display_backlight_timeout(const char * topic, uint32_t value, voi
     datastore_set_uint32(datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0, value);
 }
 
+static void do_ota_url(const char * topic, const char * value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    ESP_LOGI(TAG, "OTA URL: %s", value);
+    datastore_set_string(datastore, RESOURCE_ID_OTA_URL, 0, value);
+}
+
 typedef struct
 {
     const char * topic;
@@ -275,6 +282,7 @@ static subscribe_item_t SUBSCRIPTIONS[] = {
     { ROOT_TOPIC"/control/safe/high",                MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_control_safe_temp_high },
     { ROOT_TOPIC"/control/safe/low",                 MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_control_safe_temp_low },
     { ROOT_TOPIC"/display/backlight/timeout",        MQTT_TYPE_UINT32, (mqtt_receive_callback_generic)&do_display_backlight_timeout },
+    { ROOT_TOPIC"/ota/url",                          MQTT_TYPE_STRING, (mqtt_receive_callback_generic)&do_ota_url },
 };
 
 void subscriptions_init(const datastore_t * datastore, datastore_resource_id_t id, datastore_instance_id_t instance, void * context)

@@ -34,6 +34,7 @@
 #include "mqtt.h"
 #include "sensor_temp.h"
 #include "nvs_support.h"
+#include "ota.h"
 
 #define TAG "resources"
 
@@ -140,6 +141,8 @@ datastore_t * resources_init(void)
 
         _add_resource(datastore, RESOURCE_ID_DISPLAY_PAGE,              "DISPLAY_PAGE",              datastore_create_resource(DATASTORE_TYPE_INT32, 1));
         _add_resource(datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, "DISPLAY_BACKLIGHT_TIMEOUT", datastore_create_resource(DATASTORE_TYPE_UINT32, 1));
+
+        _add_resource(datastore, RESOURCE_ID_OTA_URL, "OTA_URL", datastore_create_string_resource(OTA_URL_LEN, 1));
     }
 
     ESP_LOGI(TAG, "PoolMon v%s", VERSION);

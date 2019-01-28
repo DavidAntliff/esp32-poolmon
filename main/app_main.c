@@ -55,6 +55,7 @@
 #include "system_monitor.h"
 #include "sntp_rtc.h"
 #include "datastore/datastore.h"
+#include "ota.h"
 
 #define TAG "app_main"
 
@@ -135,6 +136,7 @@ void app_main()
     esp_log_level_set("power", ESP_LOG_WARN);
     esp_log_level_set("app_main", ESP_LOG_INFO);
     esp_log_level_set("subscriptions", ESP_LOG_INFO);
+    esp_log_level_set("ota", ESP_LOG_INFO);
 
     // Ensure RMT peripheral is reset properly, in case of prior crash
     periph_module_disable(PERIPH_RMT_MODULE);
@@ -148,6 +150,7 @@ void app_main()
     UBaseType_t wifi_monitor_priority = sensor_priority;
     UBaseType_t control_priority = sensor_priority;
     UBaseType_t system_priority = publish_priority;
+    UBaseType_t ota_priority = publish_priority;
 
     // round to nearest MHz (stored value is only precise to MHz)
     uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
@@ -247,6 +250,9 @@ void app_main()
     _delay();
 
     system_monitor_init(system_priority, datastore, publish_context);
+    _delay();
+
+    ota_init(ota_priority, datastore);
     _delay();
 
     uint32_t last_mark_time = 0;
