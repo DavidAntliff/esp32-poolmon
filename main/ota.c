@@ -136,14 +136,14 @@ static bool connect_to_http_server(const char * server_name, const char * server
         void *ptr;
         inet_ntop (res->ai_family, res->ai_addr->sa_data, addrstr, 100);
         switch (res->ai_family)
-          {
-          case AF_INET:
-            ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
-            break;
-          case AF_INET6:
-            ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
-            break;
-          }
+        {
+            case AF_INET:
+                ptr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
+                break;
+            case AF_INET6:
+                ptr = &((struct sockaddr_in6 *) res->ai_addr)->sin6_addr;
+                break;
+        }
         inet_ntop (res->ai_family, ptr, addrstr, 100);
         ESP_LOGD(TAG, "IPv%d address: %s (%s)", res->ai_family == PF_INET6 ? 6 : 4,
                 addrstr, res->ai_canonname);
@@ -154,6 +154,7 @@ static bool connect_to_http_server(const char * server_name, const char * server
             ESP_LOGE(TAG, "Create socket failed!");
             continue;
         }
+        ESP_LOGD(TAG, "socket created");
 
         // connect to http server
         if (connect(socket_id, rp->ai_addr, rp->ai_addrlen) == -1)
@@ -250,21 +251,26 @@ static bool _do_ota_upgrade(const char * server_name, const char * server_port, 
     // deal with all receive packet
     while (flag)
     {
+        ESP_LOGD(TAG, "Waiting for data");
         memset(text, 0, TEXT_BUFFSIZE);
         memset(ota_write_data, 0, BUFFSIZE);
         int buff_len = recv(socket_id, text, TEXT_BUFFSIZE, 0);
         if (buff_len < 0)
-        { // receive error
+        {
+            // receive error
             ESP_LOGE(TAG, "Error: receive data error! errno=%d", errno);
             return false;
         }
         else if (buff_len > 0 && !resp_body_start)
-        { // deal with response header
+        {
+            // deal with response header
+            ESP_LOGD(TAG, "received response header");
             memcpy(ota_write_data, text, buff_len);
             resp_body_start = read_past_http_header(text, buff_len, update_handle);
         }
         else if (buff_len > 0 && resp_body_start)
-        { // deal with response body
+        {
+            // deal with response body
             memcpy(ota_write_data, text, buff_len);
             err = esp_ota_write(update_handle, (const void *) ota_write_data, buff_len);
             if (err != ESP_OK)
@@ -276,7 +282,8 @@ static bool _do_ota_upgrade(const char * server_name, const char * server_port, 
             ESP_LOGI(TAG, "Have written image length %d", binary_file_length);
         }
         else if (buff_len == 0)
-        { // packet over
+        {
+            // packet over
             flag = false;
             ESP_LOGI(TAG, "Connection closed, all packets received");
             close(socket_id);
@@ -355,22 +362,30 @@ static void ota_task(void * pvParameter)
 
         if (trigger)
         {
-            ESP_LOGD(TAG, "start load");
             char server_name[SERVER_NAME_LEN + 1] = "";
             char server_port[SERVER_PORT_LEN + 1] = "80";
             char filename[FILENAME_LEN + 1] = "";
+            binary_file_length = 0;
 
-            char url[OTA_URL_LEN] = { 0 };
+            char url[OTA_URL_LEN] = "";
             datastore_get_as_string(datastore, RESOURCE_ID_OTA_URL, 0, url, sizeof(url));
+
+            char buffer[256] = "";
+            snprintf(buffer, 256, "OTA upgrade initiated: %s", url);
+            ESP_LOGI(TAG, buffer);
+            datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, buffer);
+
             if (_parse_url(url, server_name, server_port, filename))
             {
                 if (_do_ota_upgrade(server_name, server_port, filename))
                 {
                     ESP_LOGI(TAG, "OTA upgrade successful - reboot to activate new software");
+                    datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "OTA upgrade successful");
                 }
                 else
                 {
                     ESP_LOGE(TAG, "OTA upgrade failed");
+                    datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "OTA upgrade failed");
                 }
             }
             else
