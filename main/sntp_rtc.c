@@ -39,6 +39,7 @@
 
 #define OUTER_CHECK_PERIOD (10 * 1000)  // wait time between checking system time is set in milliseconds
 #define INNER_CHECK_PERIOD (5 * 1000)   // wait time between inner checks in milliseconds
+#define NTP_SERVER "pool.ntp.org"
 
 typedef struct
 {
@@ -52,7 +53,7 @@ static void _initialise_sntp(void)
     ESP_LOGI(TAG, "Initializing SNTP");
     sntp_stop();
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "pool.ntp.org");
+    sntp_setservername(0, NTP_SERVER);
     sntp_init();
 }
 
@@ -65,7 +66,7 @@ static bool _obtain_time(void)
     struct tm timeinfo = { 0 };
     int retry = 0;
     const int retry_count = 10;
-    while(timeinfo.tm_year < (2016 - 1900) && retry++ < retry_count) {
+    while (timeinfo.tm_year < (2016 - 1900) && retry++ < retry_count) {
         ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
         vTaskDelay(INNER_CHECK_PERIOD / portTICK_PERIOD_MS);
         time(&now);

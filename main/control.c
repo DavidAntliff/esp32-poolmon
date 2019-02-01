@@ -241,51 +241,57 @@ static void control_pp_task(void * pvParameter)
 
         ESP_LOGD(TAG, "PP control loop: state %d, n %d", state, n);
 
-        // run cycle daily at configured time
+        bool daily_enable = false;
+        datastore_get_bool(datastore, RESOURCE_ID_CONTROL_PP_DAILY_ENABLE, 0, &daily_enable);
         bool daily_trigger = false;
-        bool system_time_set = false;
-        datastore_get_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, &system_time_set);
-        if (system_time_set)
-        {
-            int32_t daily_hour = -1;
-            int32_t daily_minute = -1;
-            datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0, &daily_hour);
-            datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, &daily_minute);
 
-            if (daily_hour >= 0 && daily_minute >= 0)
+        if (daily_enable)
+        {
+            // run cycle daily at configured time
+            bool system_time_set = false;
+            datastore_get_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, &system_time_set);
+            if (system_time_set)
             {
-                time_t now;
-                struct tm timeinfo;
-                _get_local_time(&now, &timeinfo);
-                ESP_LOGD(TAG, "PP control loop: timeinfo.tm_hour %d, last_timeinfo.tm_hour %d", timeinfo.tm_hour, last_timeinfo.tm_hour);
-                ESP_LOGD(TAG, "PP control loop: timeinfo.tm_min %d, last_timeinfo.tm_min %d", timeinfo.tm_min, last_timeinfo.tm_min);
-                if ((timeinfo.tm_min != last_timeinfo.tm_min)
-                    && (timeinfo.tm_hour == daily_hour && timeinfo.tm_min == daily_minute))
+                int32_t daily_hour = -1;
+                int32_t daily_minute = -1;
+                datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0, &daily_hour);
+                datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, &daily_minute);
+
+                if (daily_hour >= 0 && daily_minute >= 0)
                 {
-                    daily_trigger = true;
-                    char strftime_buf[64];
-                    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-                    ESP_LOGI(TAG, "PP control loop: triggered Purge Pump at %s", strftime_buf);
+                    time_t now;
+                    struct tm timeinfo;
+                    _get_local_time(&now, &timeinfo);
+                    ESP_LOGD(TAG, "PP control loop: timeinfo.tm_hour %d, last_timeinfo.tm_hour %d", timeinfo.tm_hour, last_timeinfo.tm_hour);
+                    ESP_LOGD(TAG, "PP control loop: timeinfo.tm_min %d, last_timeinfo.tm_min %d", timeinfo.tm_min, last_timeinfo.tm_min);
+                    if ((timeinfo.tm_min != last_timeinfo.tm_min)
+                        && (timeinfo.tm_hour == daily_hour && timeinfo.tm_min == daily_minute))
+                    {
+                        daily_trigger = true;
+                        char strftime_buf[64];
+                        strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+                        ESP_LOGI(TAG, "PP control loop: triggered Purge Pump at %s", strftime_buf);
+                    }
+                    else
+                    {
+                        int now_minutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
+                        int set_minutes = daily_hour * 60 + daily_minute;
+                        int rem_minutes = now_minutes <= set_minutes ? set_minutes - now_minutes : 24 * 60 - now_minutes + set_minutes;
+                        int hours_remaining = rem_minutes / 60;  // floor
+                        int minutes_remaining = rem_minutes - (hours_remaining * 60);
+                        ESP_LOGD(TAG, "PP control loop: %dh%02dm until daily purge (now %d, set %d, rem %d)", hours_remaining, minutes_remaining, now_minutes, set_minutes, rem_minutes);
+                    }
+                    last_timeinfo = timeinfo;
                 }
                 else
                 {
-                    int now_minutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
-                    int set_minutes = daily_hour * 60 + daily_minute;
-                    int rem_minutes = now_minutes <= set_minutes ? set_minutes - now_minutes : 24 * 60 - now_minutes + set_minutes;
-                    int hours_remaining = rem_minutes / 60;  // floor
-                    int minutes_remaining = rem_minutes - (hours_remaining * 60);
-                    ESP_LOGD(TAG, "PP control loop: %dh%02dm until daily purge (now %d, set %d, rem %d)", hours_remaining, minutes_remaining, now_minutes, set_minutes, rem_minutes);
+                    ESP_LOGD(TAG, "PP control loop: daily PP timer disabled");
                 }
-                last_timeinfo = timeinfo;
             }
             else
             {
-                ESP_LOGD(TAG, "PP control loop: daily PP timer disabled");
+                ESP_LOGD(TAG, "PP control loop: waiting for system time to be set");
             }
-        }
-        else
-        {
-            ESP_LOGD(TAG, "PP control loop: waiting for system time to be set");
         }
 
         // update measurement expiry in case temp poll period has changed

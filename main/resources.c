@@ -122,6 +122,7 @@ datastore_t * resources_init(void)
 
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR,           "CONTROL_PP_DAILY_HOUR",           datastore_create_resource(DATASTORE_TYPE_INT32, 1));
         _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE,         "CONTROL_PP_DAILY_MINUTE",         datastore_create_resource(DATASTORE_TYPE_INT32, 1));
+        _add_resource(datastore, RESOURCE_ID_CONTROL_PP_DAILY_ENABLE,         "CONTROL_PP_DAILY_ENABLE",         datastore_create_resource(DATASTORE_TYPE_BOOL, 1));
 
         _add_resource(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, "CONTROL_SAFE_TEMP_HIGH", datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
         _add_resource(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW,  "CONTROL_SAFE_TEMP_LOW",  datastore_create_resource(DATASTORE_TYPE_FLOAT, 1));
@@ -164,6 +165,9 @@ datastore_t * resources_init(void)
     ERROR_CHECK(datastore_set_uint32(datastore, RESOURCE_ID_MQTT_BROKER_PORT, 0, CONFIG_MQTT_BROKER_TCP_PORT));
 
     ERROR_CHECK(datastore_set_uint8(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS));
+
+    ERROR_CHECK(datastore_set_bool(datastore, RESOURCE_ID_CONTROL_PP_DAILY_ENABLE, 0, false));
+
     return datastore;
 }
 
@@ -248,6 +252,8 @@ void resources_load(const datastore_t * datastore)
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0, "60.0"));
 
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0, "300"));
+
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_DAILY_ENABLE, 0, "false"));
     }
 }
 
@@ -304,6 +310,8 @@ void resources_save(const datastore_t * datastore)
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0));
 
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0));
+
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_DAILY_ENABLE, 0));
 
             nvs_commit(nh);
             nvs_close(nh);

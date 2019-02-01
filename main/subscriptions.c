@@ -224,6 +224,12 @@ static void do_control_pp_daily_minute(const char * topic, int32_t value, void *
     datastore_set_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, value);
 }
 
+static void do_control_pp_daily_enable(const char * topic, bool value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    datastore_set_bool(datastore, RESOURCE_ID_CONTROL_PP_DAILY_ENABLE, 0, value);
+}
+
 static void do_control_safe_temp_high(const char * topic, float value, void * context)
 {
     datastore_t * datastore = (datastore_t *)context;
@@ -297,6 +303,7 @@ static subscribe_item_t SUBSCRIPTIONS[] = {
     { ROOT_TOPIC"/control/pp/cycle/pause_duration",  MQTT_TYPE_UINT32, (mqtt_receive_callback_generic)&do_control_pp_cycle_pause_duration },
     { ROOT_TOPIC"/control/pp/daily/hour",            MQTT_TYPE_INT32,  (mqtt_receive_callback_generic)&do_control_pp_daily_hour },
     { ROOT_TOPIC"/control/pp/daily/minute",          MQTT_TYPE_INT32,  (mqtt_receive_callback_generic)&do_control_pp_daily_minute },
+    { ROOT_TOPIC"/control/pp/daily/enable",          MQTT_TYPE_BOOL,   (mqtt_receive_callback_generic)&do_control_pp_daily_enable },
     { ROOT_TOPIC"/control/safe/high",                MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_control_safe_temp_high },
     { ROOT_TOPIC"/control/safe/low",                 MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_control_safe_temp_low },
     { ROOT_TOPIC"/display/backlight/timeout",        MQTT_TYPE_UINT32, (mqtt_receive_callback_generic)&do_display_backlight_timeout },

@@ -633,13 +633,14 @@ static void _handle_page_pp_control(page_buffer_t * page_buffer, void * state, c
     datastore_get_bool(datastore, RESOURCE_ID_SYSTEM_TIME_SET, 0, &system_time_set);
     if (system_time_set)
     {
+        bool daily_enable = false;
         int32_t daily_hour = -1;
         int32_t daily_minute = -1;
+        datastore_get_bool(datastore, RESOURCE_ID_CONTROL_PP_DAILY_ENABLE, 0, &daily_enable);
         datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0, &daily_hour);
         datastore_get_int32(datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, &daily_minute);
 
-        // TODO: a way to disable the daily timer
-        if (daily_hour >= 0 && daily_minute >= 0)
+        if (daily_enable && daily_hour >= 0 && daily_minute >= 0)
         {
             time_t now;
             struct tm timeinfo;
@@ -656,7 +657,7 @@ static void _handle_page_pp_control(page_buffer_t * page_buffer, void * state, c
         }
         else
         {
-            snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "Timer disabled");
+            snprintf(page_buffer->row[3], ROW_STRING_WIDTH, "Daily disabled");
         }
     }
     else

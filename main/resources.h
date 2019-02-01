@@ -100,6 +100,7 @@ typedef enum
     RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION,  // seconds
     RESOURCE_ID_CONTROL_PP_DAILY_HOUR,
     RESOURCE_ID_CONTROL_PP_DAILY_MINUTE,
+    RESOURCE_ID_CONTROL_PP_DAILY_ENABLE,
     RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH,  // temperature at which to initiate emergency PP cycle
     RESOURCE_ID_CONTROL_SAFE_TEMP_LOW,   // temperature at which to terminate emergency PP cycle
     RESOURCE_ID_CONTROL_STATE_CP,
