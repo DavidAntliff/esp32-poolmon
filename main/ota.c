@@ -372,7 +372,7 @@ static void ota_task(void * pvParameter)
 
             char buffer[256] = "";
             snprintf(buffer, 256, "OTA upgrade initiated: %s", url);
-            ESP_LOGI(TAG, buffer);
+            ESP_LOGI(TAG, "%s", buffer);
             datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, buffer);
 
             if (_parse_url(url, server_name, server_port, filename))

@@ -288,13 +288,8 @@ static void sensor_temp_task(void * pvParameter)
 
             // print results in a separate loop, after all have been read
             ESP_LOGI(TAG, "Temperature readings (degrees C): sample %d", sample_count);
-            for (int i = 0; i < task_inputs->sensors->num_ds18b20s; ++i)
+            for (int i = 0; i < SENSOR_TEMP_INSTANCES; ++i)
             {
-                // map actual sensors to T1, ..., T4 assignments
-                float reading = map[i] >= 0 ? readings[map[i]] : -2048.0;
-                int num_errors = map[i] >= 0 ? errors_count[map[i]] : 0;
-                DS18B20_ERROR error = map[i] >= 0 ? errors[map[i]] : DS18B20_OK;
-
                 datastore_age_t override_age = 0;
                 datastore_get_age(datastore, RESOURCE_ID_TEMP_OVERRIDE, i, &override_age);
                 if (override_age < (esp_timer_get_time() - 10))
@@ -302,10 +297,15 @@ static void sensor_temp_task(void * pvParameter)
                     float override_value = 0.0f;
                     datastore_get_float(datastore, RESOURCE_ID_TEMP_OVERRIDE, i, &override_value);
                     datastore_set_float(datastore, RESOURCE_ID_TEMP_VALUE, i, override_value);
-                    ESP_LOGI(TAG, "  T%d: %.1f    %d errors  OVERRIDE", i + 1, override_value, num_errors);
+                    ESP_LOGI(TAG, "  T%d: %.1f    OVERRIDE", i + 1, override_value);
                 }
-                else
+                else if (i < task_inputs->sensors->num_ds18b20s)
                 {
+                    // map actual sensors to T1, ..., T4 assignments
+                    float reading = map[i] >= 0 ? readings[map[i]] : -2048.0;
+                    int num_errors = map[i] >= 0 ? errors_count[map[i]] : 0;
+                    DS18B20_ERROR error = map[i] >= 0 ? errors[map[i]] : DS18B20_OK;
+
                     // filter out unmapped and errored readings
                     if (map[i] >= 0)
                     {
