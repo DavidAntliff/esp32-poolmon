@@ -150,7 +150,7 @@ void app_main()
     UBaseType_t wifi_monitor_priority = sensor_priority;
     UBaseType_t control_priority = sensor_priority;
     UBaseType_t system_priority = publish_priority;
-    UBaseType_t ota_priority = publish_priority;
+    UBaseType_t ota_priority = publish_priority + 1;
 
     // round to nearest MHz (stored value is only precise to MHz)
     uint32_t apb_freq = (rtc_clk_apb_freq_get() + 500000) / 1000000 * 1000000;
