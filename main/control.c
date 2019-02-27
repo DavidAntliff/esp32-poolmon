@@ -135,7 +135,7 @@ static void control_cp_task(void * pvParameter)
                     if (t_high - t_low >= delta)
                     {
                         ESP_LOGI(TAG, "CP control loop: circulation pump ON");
-                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Circulation pump on");
+                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Circulation pump ON");
                         state = CONTROL_CP_STATE_ON;
                         transition = true;
                     }
@@ -148,7 +148,7 @@ static void control_cp_task(void * pvParameter)
                     if (t_high - t_low <= delta)
                     {
                         ESP_LOGI(TAG, "CP control loop: circulation pump OFF");
-                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Circulation pump off");
+                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Circulation pump OFF");
                         state = CONTROL_CP_STATE_OFF;
                         transition = true;
                     }
@@ -312,11 +312,10 @@ static void control_pp_task(void * pvParameter)
                 datastore_get_float(datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0, &threshold);
                 if (t_high < threshold)
                 {
-                    ESP_LOGI(TAG, "Safe temperature restored");
+                    ESP_LOGI(TAG, "PP control loop: safe temperature restored - purge pump OFF");
+                    datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Safe temperature restored - purge pump OFF");
                     state = CONTROL_PP_STATE_OFF;
                     datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
-                    ESP_LOGI(TAG, "PP control loop: purge pump OFF");
-                    datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Safe temperature restored");
                     avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
                 }
                 else
@@ -334,10 +333,10 @@ static void control_pp_task(void * pvParameter)
                 if (t_high >= threshold)
                 {
                     ESP_LOGE(TAG, "EMERGENCY - SAFE THRESHOLD EXCEEDED!");
-                    datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Emergency purge");
+                    ESP_LOGI(TAG, "PP control loop: purge pump ON");
+                    datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Safe threshold exceeded - purge pump ON");
                     state = CONTROL_PP_STATE_EMERGENCY;
                     datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
-                    ESP_LOGI(TAG, "PP control loop: purge pump ON");
                     avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
                 }
             }
@@ -393,7 +392,10 @@ static void control_pp_task(void * pvParameter)
 
                 if (now >= cycle_end_time)
                 {
-                    ESP_LOGI(TAG, "PP control loop: purge pump PAUSE (%d)", n);
+                    char buffer[100] = "";
+                    sprintf("Purge pump PAUSE (%d)", n);
+                    ESP_LOGI(TAG, "PP control loop: %s", buffer);
+                    datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, buffer);
                     state = CONTROL_PP_STATE_PAUSE;
                     datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
                     cycle_start_time = now;
@@ -412,7 +414,10 @@ static void control_pp_task(void * pvParameter)
                 {
                     if (now >= cycle_end_time)
                     {
-                        ESP_LOGI(TAG, "PP control loop: purge pump ON (%d)", n);
+                        char buffer[100] = "";
+                        sprintf("Purge pump ON (%d)", n);
+                        ESP_LOGI(TAG, "PP control loop: %s", buffer);
+                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, buffer);
                         state = CONTROL_PP_STATE_ON;
                         datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
                         avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
@@ -425,7 +430,7 @@ static void control_pp_task(void * pvParameter)
                     if (now >= cycle_end_time)
                     {
                         ESP_LOGI(TAG, "PP control loop: purge pump OFF");
-                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump off");
+                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump OFF");
                         state = CONTROL_PP_STATE_OFF;
                         datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
                         avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
@@ -450,7 +455,7 @@ static void control_pp_task(void * pvParameter)
             if (pp_mode != AVR_SWITCH_MODE_AUTO)
             {
                 ESP_LOGI(TAG, "PP control loop: purge pump OFF (manual)");
-                datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump off (manual)");
+                datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Purge pump OFF (manual)");
                 state = CONTROL_PP_STATE_OFF;
                 datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
                 avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
