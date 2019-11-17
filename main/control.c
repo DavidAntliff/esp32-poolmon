@@ -351,32 +351,38 @@ static void control_pp_task(void * pvParameter)
                 datastore_get_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode);
                 if (pp_mode == AVR_SWITCH_MODE_AUTO)
                 {
+                    avr_pump_state_t cp_pump_state = AVR_PUMP_STATE_OFF;
+                    datastore_get_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_pump_state);
+                    datastore_age_t cp_state_age = 0;
+                    datastore_get_age(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_state_age);
+                    ESP_LOGD(TAG, "PP control loop: cp_state_age %" PRIu64, cp_state_age);
+
                     bool flow_rate_trigger = false;
                     datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate_age);
                     if (flow_rate_age < FLOW_RATE_MEASUREMENT_EXPIRY)
                     {
                         float flow_rate = 0.0f;
                         datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);
-                        avr_pump_state_t cp_pump_state = AVR_PUMP_STATE_OFF;
-
-                        datastore_get_uint32(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_pump_state);
-                        datastore_age_t cp_state_age = 0;
-                        datastore_get_age(datastore, RESOURCE_ID_PUMPS_CP_STATE, 0, &cp_state_age);
-                        ESP_LOGD(TAG, "PP control loop: cp_state_age %" PRIu64, cp_state_age);
 
                         float flow_threshold = 0.0f;
                         datastore_get_float(datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, &flow_threshold);
 
                         ESP_LOGD(TAG, "PP control loop: flow rate %f, cp state %d, threshold %f", flow_rate, cp_pump_state, flow_threshold);
-
                         flow_rate_trigger = (cp_pump_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold) && (cp_state_age > PP_HOLD_OFF);
                     }
 
-                    if (daily_trigger || flow_rate_trigger)
+                    // New in 0.95 - always start the PP cycle when the CP is started to prevent running the CP dry for more than a few seconds
+                    bool cp_start_trigger = false;
+                    if ((cp_pump_state == AVR_PUMP_STATE_ON) && (cp_state_age < PP_HOLD_OFF)) {
+                        ESP_LOGD(TAG, "PP control loop: cp state ON, age %" PRIu64 " < %d", cp_state_age, PP_HOLD_OFF);
+                        cp_start_trigger = true;
+                    }
+
+                    if (daily_trigger || flow_rate_trigger || cp_start_trigger)
                     {
                         datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, &n);
-                        ESP_LOGI(TAG, "PP control loop: purge pump ON (%d): %s", n, daily_trigger ? "time of day" : "low flow");
-                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, daily_trigger ? "Purge pump on (time of day)" : "Purge pump on (low flow)");
+                        ESP_LOGI(TAG, "PP control loop: purge pump ON (%d): %s", n, daily_trigger ? "time of day" : (flow_rate_trigger ? "low flow" : "CP start"));
+                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, daily_trigger ? "Purge pump on (time of day)" : (flow_rate_trigger ? "Purge pump on (low flow)" : "Purge pump on (CP start)"));
                         state = CONTROL_PP_STATE_ON;
                         datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
                         avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
