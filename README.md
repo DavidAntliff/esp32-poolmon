@@ -35,3 +35,37 @@ This is probably too low for a single device.
 
 TODO: calculate a better Rpup resistor value.
 
+
+
+## MQTT
+
+Subscribe to all messages:
+
+```
+$ mosquitto_sub -h rpi -v -t \#
+```
+
+Send a message (e.g. reset ESP32):
+
+```
+$ mosquitto_pub -h rpi -t poolmon/esp32/reset -m 1
+```
+
+Update OTA (use the .bin file):
+
+Locally:
+```
+$ python -m http.server --directory build/
+```
+
+```
+$ mosquitto_pub -h 192.168.1.67 -t poolmon/ota/url -m "http://192.168.1.72:8000/esp32-poolmon.bin"
+$ mosquitto_pub -h rpi -t poolmon/esp32/reset -m 1
+```
+
+NOTE: Things to check before doing OTA!
+
+* The WiFi credentials in the new .bin match the current ones,
+* The partition table is set to Factory + 2 x OTA (not the default!)
+* The FLASH size is set to 4 MB
+

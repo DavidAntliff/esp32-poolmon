@@ -240,16 +240,16 @@ void resources_load(const datastore_t * datastore)
 
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, "7.0"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, "5.0"));
-        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, "8.0"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, "5.0"));
 
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_DAILY_HOUR, 0, "9"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_DAILY_MINUTE, 0, "0"));
 
-        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, "5"));
-        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, "30"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, "2"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_ON_DURATION, 0, "45"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_PP_CYCLE_PAUSE_DURATION, 0, "60"));
-        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, 0, "80.0"));
-        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0, "60.0"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_HIGH, 0, "90.0"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_SAFE_TEMP_LOW, 0, "80.0"));
 
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_DISPLAY_BACKLIGHT_TIMEOUT, 0, "300"));
 

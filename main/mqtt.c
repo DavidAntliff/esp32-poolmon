@@ -369,7 +369,9 @@ mqtt_error_t mqtt_start(mqtt_info_t * mqtt_info, const datastore_t * datastore)
         {
             // sadly the esp_mqtt component only supports a single instance
             datastore_set_uint32(datastore, RESOURCE_ID_MQTT_STATUS, 0, MQTT_STATUS_CONNECTING);
-            esp_mqtt_start(CONFIG_MQTT_BROKER_IP_ADDRESS, CONFIG_MQTT_BROKER_TCP_PORT, "esp-mqtt", "username", "password");
+            char port[8] = "";
+            sprintf(port, "%d", CONFIG_MQTT_BROKER_TCP_PORT);
+            esp_mqtt_start(CONFIG_MQTT_BROKER_IP_ADDRESS, port, "esp-mqtt", "username", "password");
             err = MQTT_OK;
         }
         else

@@ -28,7 +28,7 @@
 #include "freertos/task.h"
 
 #include "esp_log.h"
-#include "apps/sntp/sntp.h"
+#include "lwip/apps/sntp.h"
 
 #include "constants.h"
 #include "wifi_support.h"
