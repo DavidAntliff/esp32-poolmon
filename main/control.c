@@ -207,16 +207,16 @@ static void control_pp_task(void * pvParameter)
     avr_support_set_pp_pump(AVR_PUMP_STATE_OFF);
 
     // wait for stable sensor readings
-    datastore_age_t age = DATASTORE_INVALID_AGE;
+    datastore_age_t flow_rate_age = DATASTORE_INVALID_AGE;
     bool stable = false;
     while (!stable)
     {
         last_wake_time = xTaskGetTickCount();
         ESP_LOGD(TAG, "PP control loop: wait for stable sensors");
 
-        datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &age);
+        datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate_age);
 
-        if (age < FLOW_RATE_MEASUREMENT_EXPIRY)
+        if (flow_rate_age < FLOW_RATE_MEASUREMENT_EXPIRY)
         {
             stable = true;
             ESP_LOGI(TAG, "PP control loop: sensors stable");
@@ -351,8 +351,9 @@ static void control_pp_task(void * pvParameter)
                 datastore_get_uint32(datastore, RESOURCE_ID_SWITCHES_PP_MODE_VALUE, 0, &pp_mode);
                 if (pp_mode == AVR_SWITCH_MODE_AUTO)
                 {
-                    datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &age);
-                    if (age < FLOW_RATE_MEASUREMENT_EXPIRY)
+                    bool flow_rate_trigger = false;
+                    datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate_age);
+                    if (flow_rate_age < FLOW_RATE_MEASUREMENT_EXPIRY)
                     {
                         float flow_rate = 0.0f;
                         datastore_get_float(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate);
@@ -368,18 +369,19 @@ static void control_pp_task(void * pvParameter)
 
                         ESP_LOGD(TAG, "PP control loop: flow rate %f, cp state %d, threshold %f", flow_rate, cp_pump_state, flow_threshold);
 
-                        if (daily_trigger ||
-                            ((cp_pump_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold) && (cp_state_age > PP_HOLD_OFF)))
-                        {
-                            datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, &n);
-                            ESP_LOGI(TAG, "PP control loop: purge pump ON (%d): %s", n, daily_trigger ? "time of day" : "low flow");
-                            datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, daily_trigger ? "Purge pump on (time of day)" : "Purge pump on (low flow)");
-                            state = CONTROL_PP_STATE_ON;
-                            datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
-                            avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
-                            cycle_start_time = now;
-                            --n;
-                        }
+                        flow_rate_trigger = (cp_pump_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold) && (cp_state_age > PP_HOLD_OFF);
+                    }
+
+                    if (daily_trigger || flow_rate_trigger)
+                    {
+                        datastore_get_uint32(datastore, RESOURCE_ID_CONTROL_PP_CYCLE_COUNT, 0, &n);
+                        ESP_LOGI(TAG, "PP control loop: purge pump ON (%d): %s", n, daily_trigger ? "time of day" : "low flow");
+                        datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, daily_trigger ? "Purge pump on (time of day)" : "Purge pump on (low flow)");
+                        state = CONTROL_PP_STATE_ON;
+                        datastore_set_uint32(datastore, RESOURCE_ID_CONTROL_STATE_PP, 0, state);
+                        avr_support_set_pp_pump(AVR_PUMP_STATE_ON);
+                        cycle_start_time = now;
+                        --n;
                     }
                 }
                 else
