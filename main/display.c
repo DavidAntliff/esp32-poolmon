@@ -137,7 +137,7 @@ typedef struct
 } transition_t;
 
 static const transition_t transitions[] = {
-    // ID                       counter-clockwise      clockwise               short                  long
+    // ID                               counter-clockwise              clockwise                       short                          long
     { DISPLAY_PAGE_BLANK,               DISPLAY_PAGE_MAIN,             DISPLAY_PAGE_MAIN,              DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
     { DISPLAY_PAGE_MAIN,                DISPLAY_PAGE_AVR_STATUS,       DISPLAY_PAGE_SENSORS_TEMP,      DISPLAY_PAGE_IGNORE,           DISPLAY_PAGE_IGNORE },
     { DISPLAY_PAGE_SENSORS_TEMP,        DISPLAY_PAGE_MAIN,             DISPLAY_PAGE_SENSORS_LIGHT,     DISPLAY_PAGE_SENSORS_TEMP_2,   DISPLAY_PAGE_IGNORE },
