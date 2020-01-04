@@ -27,7 +27,7 @@
 
 #include "sdkconfig.h"
 
-#define VERSION "0.96"
+#define VERSION "0.97"
 
 #define SYSTEM_LEN_VERSION           6  // XX.XX + null
 #define SYSTEM_LEN_BUILD_DATE_TIME  16
@@ -59,8 +59,8 @@
 #define FLOW_METER_SAMPLING_PERIOD  (10.0)   // seconds
 #define FLOW_METER_SAMPLING_WINDOW  (5.0)    // seconds
 #define FLOW_METER_FILTER_LENGTH    1023     // APB @ 80MHz => limits maximum frequency to 39,100 Hz
-#define FLOW_METER_MODEL_A          (0.319)  // rate (LPM) = A * x (Hz) + B
-#define FLOW_METER_MODEL_B          (0.619)  // based on flow meter measurements, October 2017
+#define FLOW_METER_MODEL_A          (0.949)  // rate (LPM) = A * x (Hz) + B
+#define FLOW_METER_MODEL_B          (-1.55)  // based on flow meter measurements, January 2020
 #define FLOW_METER_MODEL_CUTOFF_HZ  (1.0)    // For values of x < cutoff, linear-interpolate to zero so that 0 Hz = 0 LPM
 
 // TODO: configurable sampling periods
