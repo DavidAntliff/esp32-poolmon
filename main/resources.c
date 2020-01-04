@@ -100,6 +100,8 @@ datastore_t * resources_init(void)
         _add_resource(datastore, RESOURCE_ID_FLOW_FREQUENCY,         "FLOW_FREQUENCY",         datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
         _add_resource(datastore, RESOURCE_ID_FLOW_RATE,              "FLOW_RATE",              datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
         _add_resource(datastore, RESOURCE_ID_FLOW_RATE_OVERRIDE,     "FLOW_RATE_OVERRIDE",     datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
+        _add_resource(datastore, RESOURCE_ID_FLOW_MODEL_A,           "FLOW_MODEL_A",           datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
+        _add_resource(datastore, RESOURCE_ID_FLOW_MODEL_B,           "FLOW_MODEL_B",           datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
 
         _add_resource(datastore, RESOURCE_ID_POWER_TEMP_DELTA,       "POWER_TEMP_DELTA",       datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
         _add_resource(datastore, RESOURCE_ID_POWER_VALUE,            "POWER_VALUE",            datastore_create_resource(DATASTORE_TYPE_FLOAT,  1));
@@ -167,6 +169,9 @@ datastore_t * resources_init(void)
     ERROR_CHECK(datastore_set_uint8(datastore, RESOURCE_ID_LIGHT_I2C_ADDRESS, 0, CONFIG_LIGHT_SENSOR_I2C_ADDRESS));
 
     ERROR_CHECK(datastore_set_bool(datastore, RESOURCE_ID_CONTROL_PP_DAILY_ENABLE, 0, false));
+
+    ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_FLOW_MODEL_A, 0, 1.0f));
+    ERROR_CHECK(datastore_set_float(datastore, RESOURCE_ID_FLOW_MODEL_B, 0, 0.0f));
 
     return datastore;
 }
@@ -238,6 +243,9 @@ void resources_load(const datastore_t * datastore)
 
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_TEMP_PERIOD, 0, "5000"));
 
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_FLOW_MODEL_A, 0, "1.0"));
+        ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_FLOW_MODEL_B, 0, "0.0"));
+
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, "7.0"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, "5.0"));
         ERROR_CHECK(_load_from_nvs(nh, datastore, RESOURCE_ID_CONTROL_FLOW_THRESHOLD, 0, "5.0"));
@@ -295,6 +303,9 @@ void resources_save(const datastore_t * datastore)
             }
 
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_TEMP_PERIOD, 0));
+
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_FLOW_MODEL_A, 0));
+            ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_FLOW_MODEL_B, 0));
 
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0));
             ESP_ERROR_CHECK(_save_to_nvs(nh, datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0));

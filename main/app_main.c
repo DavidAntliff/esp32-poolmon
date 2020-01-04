@@ -130,6 +130,7 @@ void app_main()
     esp_log_level_set("publish", ESP_LOG_INFO);
     esp_log_level_set("sensor_temp", ESP_LOG_WARN);
     esp_log_level_set("sensor_light", ESP_LOG_WARN);
+    esp_log_level_set("sensor_flow", ESP_LOG_WARN);
     esp_log_level_set("i2c-lcd1602", ESP_LOG_INFO);   // debug is too verbose
     esp_log_level_set("control", ESP_LOG_INFO);
     esp_log_level_set("sntp_rtc", ESP_LOG_INFO);

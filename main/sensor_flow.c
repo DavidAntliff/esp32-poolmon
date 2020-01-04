@@ -149,9 +149,11 @@ static void init_pcnt(uint8_t pulse_gpio, uint8_t ctrl_gpio, pcnt_unit_t unit, p
 }
 
 // Hz => LPM
-#define FLOW_RATE_LPM(X) (FLOW_METER_MODEL_A * (X) + FLOW_METER_MODEL_B)
+#define FLOW_RATE_LPM(X, A, B) ((A) * (X) + (B))
 
-static double calc_flow_rate_lpm(double hz)
+// LPM = a * Hz + b
+// For Hz values less than cutoff, interpolate to zero
+static double calc_flow_rate_lpm(double hz, double a, double b)
 {
     double rate_lpm = 0.0;
 
@@ -160,11 +162,11 @@ static double calc_flow_rate_lpm(double hz)
         if (hz < FLOW_METER_MODEL_CUTOFF_HZ)
         {
             // interpolate between cutoff LPM and zero
-            rate_lpm = hz / FLOW_METER_MODEL_CUTOFF_HZ * FLOW_RATE_LPM(FLOW_METER_MODEL_CUTOFF_HZ);
+            rate_lpm = hz / FLOW_METER_MODEL_CUTOFF_HZ * FLOW_RATE_LPM(FLOW_METER_MODEL_CUTOFF_HZ, a, b);
         }
         else
         {
-            rate_lpm = FLOW_RATE_LPM(hz);
+            rate_lpm = FLOW_RATE_LPM(hz, a, b);
         }
     }
     else
@@ -215,6 +217,13 @@ static void sensor_flow_task(void * pvParameter)
     // subscribe to display changes
     datastore_add_set_callback(datastore, RESOURCE_ID_DISPLAY_PAGE, 0, _display_page_changed, NULL);
 
+    float flow_model_a = 0.0;
+    float flow_model_b = 0.0;
+    datastore_get_float(datastore, RESOURCE_ID_FLOW_MODEL_A, 0, &flow_model_a);
+    datastore_get_float(datastore, RESOURCE_ID_FLOW_MODEL_B, 0, &flow_model_b);
+
+    ESP_LOGD(TAG, "flow coefficients: A %f, B %f", flow_model_a, flow_model_b);
+
     while (1)
     {
         last_wake_time = xTaskGetTickCount();
@@ -250,7 +259,7 @@ static void sensor_flow_task(void * pvParameter)
         {
             // TODO: check for overflow?
             frequency_hz = count / 2.0 / task_inputs->sampling_window;
-            rate_lpm = calc_flow_rate_lpm(frequency_hz);
+            rate_lpm = calc_flow_rate_lpm(frequency_hz, flow_model_a, flow_model_b);
         }
 
         datastore_set_float(datastore, RESOURCE_ID_FLOW_FREQUENCY, 0, frequency_hz);

@@ -176,6 +176,30 @@ static void do_sensors_flow_override(const char * topic, float value, void * con
     }
 }
 
+static void do_sensors_flow_model_a(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    uint32_t instance = 0;
+    sscanf(topic, ROOT_TOPIC"/sensors/flow/%u/model/a", &instance);
+    ESP_LOGD(TAG, "instance %u, value %f", instance, value);
+    if (instance == 1)
+    {
+        datastore_set_float(datastore, RESOURCE_ID_FLOW_MODEL_A, instance - 1, value);
+    }
+}
+
+static void do_sensors_flow_model_b(const char * topic, float value, void * context)
+{
+    datastore_t * datastore = (datastore_t *)context;
+    uint32_t instance = 0;
+    sscanf(topic, ROOT_TOPIC"/sensors/flow/%u/model/b", &instance);
+    ESP_LOGD(TAG, "instance %u, value %f", instance, value);
+    if (instance == 1)
+    {
+        datastore_set_float(datastore, RESOURCE_ID_FLOW_MODEL_B, instance - 1, value);
+    }
+}
+
 static void do_control_cp_delta_on(const char * topic, float value, void * context)
 {
     datastore_t * datastore = (datastore_t *)context;
@@ -295,6 +319,8 @@ static subscribe_item_t SUBSCRIPTIONS[] = {
     { ROOT_TOPIC"/datastore/erase_all",              MQTT_TYPE_BOOL,   (mqtt_receive_callback_generic)&do_nvs_erase_all },
     { ROOT_TOPIC"/temp/period",                      MQTT_TYPE_UINT32, (mqtt_receive_callback_generic)&do_temp_period },
     { ROOT_TOPIC"/sensors/flow/1/override",          MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_sensors_flow_override },
+    { ROOT_TOPIC"/sensors/flow/1/model/a",           MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_sensors_flow_model_a },
+    { ROOT_TOPIC"/sensors/flow/1/model/b",           MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_sensors_flow_model_b },
     { ROOT_TOPIC"/control/cp/delta_on",              MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_control_cp_delta_on },
     { ROOT_TOPIC"/control/cp/delta_off",             MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_control_cp_delta_off },
     { ROOT_TOPIC"/control/flow/threshold",           MQTT_TYPE_FLOAT,  (mqtt_receive_callback_generic)&do_control_flow_threshold },
