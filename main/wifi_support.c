@@ -115,8 +115,6 @@ static void wifi_monitor_task(void * pvParameter)
 
     while (1)
     {
-        last_wake_time = xTaskGetTickCount();
-
         wifi_ap_record_t ap_info = { 0 };
         if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK)
         {

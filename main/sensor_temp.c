@@ -267,8 +267,6 @@ static void sensor_temp_task(void * pvParameter)
 
         while (1)
         {
-            last_wake_time = xTaskGetTickCount();
-
             bool control_led = display_is_currently(datastore, DISPLAY_PAGE_SENSORS_TEMP) || display_is_currently(datastore, DISPLAY_PAGE_SENSORS_TEMP_2);
             if (control_led)
             {
@@ -358,8 +356,6 @@ static void sensor_temp_sim_task(void * pvParameter)
 
     while (1)
     {
-        last_wake_time = xTaskGetTickCount();
-
         bool control_led = display_is_currently(datastore, DISPLAY_PAGE_SENSORS_TEMP) || display_is_currently(datastore, DISPLAY_PAGE_SENSORS_TEMP_2);
         if (control_led)
         {

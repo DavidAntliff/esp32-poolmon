@@ -358,7 +358,6 @@ static void ota_task(void * pvParameter)
     while (1)
     {
         ESP_LOGD(TAG, "ota loop");
-        last_wake_time = xTaskGetTickCount();
 
         if (trigger)
         {

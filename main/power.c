@@ -72,7 +72,6 @@ static void power_calculation_task(void * pvParameter)
     while (1)
     {
         ESP_LOGD(TAG, "power calculation loop");
-        last_wake_time = xTaskGetTickCount();
 
         // for now, use T1 and T3
         const uint8_t in = 0;  // Pool

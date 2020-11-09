@@ -98,8 +98,6 @@ static void sntp_rtc_task(void * pvParameter)
 
     while (1)
     {
-        last_wake_time = xTaskGetTickCount();
-
         // check wifi is connected
         wifi_status_t wifi_status = WIFI_STATUS_DISCONNECTED;
         datastore_get_uint32(datastore, RESOURCE_ID_WIFI_STATUS, 0, &wifi_status);

@@ -260,8 +260,6 @@ void app_main()
 
     while (running)
     {
-        last_wake_time = xTaskGetTickCount();
-
         //avr_test_sequence();
 
         // period mark in log

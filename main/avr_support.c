@@ -240,8 +240,6 @@ static void avr_support_task(void * pvParameter)
 
     while (1)
     {
-        last_wake_time = xTaskGetTickCount();
-
         command_t command = 0;
         while (xQueueReceive(command_queue, &command, 0) == pdTRUE)
         {

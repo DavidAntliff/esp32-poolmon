@@ -81,7 +81,6 @@ static void control_cp_task(void * pvParameter)
     bool stable = false;
     while (!stable)
     {
-        last_wake_time = xTaskGetTickCount();
         ESP_LOGD(TAG, "CP control loop: wait for stable sensors");
 
         datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, CONTROL_CP_SENSOR_HIGH_INSTANCE, &t_high_age);
@@ -102,7 +101,6 @@ static void control_cp_task(void * pvParameter)
 
     while (1)
     {
-        last_wake_time = xTaskGetTickCount();
         ESP_LOGD(TAG, "--");
         ESP_LOGD(TAG, "CP control loop: state %d", state);
 
@@ -211,7 +209,6 @@ static void control_pp_task(void * pvParameter)
     bool stable = false;
     while (!stable)
     {
-        last_wake_time = xTaskGetTickCount();
         ESP_LOGD(TAG, "PP control loop: wait for stable sensors");
 
         datastore_get_age(datastore, RESOURCE_ID_FLOW_RATE, 0, &flow_rate_age);
@@ -236,7 +233,6 @@ static void control_pp_task(void * pvParameter)
 
     while (1)
     {
-        last_wake_time = xTaskGetTickCount();
         uint32_t now = seconds_since_boot();
 
         ESP_LOGD(TAG, "PP control loop: state %d, n %d", state, n);

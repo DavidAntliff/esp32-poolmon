@@ -60,8 +60,6 @@ static void system_task(void * pvParameter)
 
     while (1)
     {
-        last_wake_time = xTaskGetTickCount();
-
         uint32_t ram_free = esp_get_free_heap_size();  // byte-addressable heap memory
         uint32_t iram_free = heap_caps_get_free_size(MALLOC_CAP_32BIT);  // IRAM 32-bit aligned heap
         uint32_t uptime = microseconds_since_boot() / 1000000;

@@ -226,8 +226,6 @@ static void sensor_flow_task(void * pvParameter)
 
     while (1)
     {
-        last_wake_time = xTaskGetTickCount();
-
         // clear counter
         pcnt_counter_clear(task_inputs->pcnt_unit);
 

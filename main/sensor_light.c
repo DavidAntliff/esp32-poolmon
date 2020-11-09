@@ -90,8 +90,6 @@ static void sensor_light_task(void * pvParameter)
 
         while (1)
         {
-            last_wake_time = xTaskGetTickCount();
-
             tsl2561_visible_t visible = 0;
             tsl2561_infrared_t infrared = 0;
 
