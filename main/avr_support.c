@@ -238,6 +238,14 @@ static void avr_support_task(void * pvParameter)
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
+    // Issue #3 - inhibit circulation pump operation when the purge pump is active.
+    // Maintain the last set state of the circulation and purge pumps.
+    // When the purge pump is enabled, disable the circulation pump.
+    // When the purge pump is disabled, restore the circulation pump state.
+    // If the circulation pump state is changed by a command, update the circulation pump state.
+    avr_pump_state_t last_cp_state = AVR_PUMP_STATE_OFF;
+    avr_pump_state_t last_pp_state = AVR_PUMP_STATE_OFF;
+
     while (1)
     {
         command_t command = 0;
@@ -251,13 +259,31 @@ static void avr_support_task(void * pvParameter)
             {
                 if (_test_command(command, COMMAND_SELECT_CP))
                 {
-                    ESP_LOGI(TAG, "CP on");
-                    control_reg |= AVR_REGISTER_CONTROL_SSR1;
+                    last_cp_state = AVR_PUMP_STATE_ON;
+
+                    // If the PP is on, do not engage the CP pump
+                    if (last_pp_state == AVR_PUMP_STATE_ON)
+                    {
+                        ESP_LOGI(TAG, "CP on (inhibited by PP)");
+                    }
+                    else
+                    {
+                        ESP_LOGI(TAG, "CP on");
+                        control_reg |= AVR_REGISTER_CONTROL_SSR1;
+                    }
                 }
                 if (_test_command(command, COMMAND_SELECT_PP))
                 {
                     ESP_LOGI(TAG, "PP on");
+                    last_pp_state = AVR_PUMP_STATE_ON;
                     control_reg |= AVR_REGISTER_CONTROL_SSR2;
+
+                    // if CP is on, turn it off
+                    if (last_cp_state == AVR_PUMP_STATE_ON)
+                    {
+                        ESP_LOGI(TAG, "CP off (inhibited by PP)");
+                        control_reg &= ~AVR_REGISTER_CONTROL_SSR1;
+                    }
                 }
                 if (_test_command(command, COMMAND_SELECT_ALARM))
                 {
@@ -273,12 +299,21 @@ static void avr_support_task(void * pvParameter)
                 if (_test_command(command, COMMAND_SELECT_CP))
                 {
                     ESP_LOGI(TAG, "CP off");
+                    last_cp_state = AVR_PUMP_STATE_OFF;
                     control_reg &= ~AVR_REGISTER_CONTROL_SSR1;
                 }
                 if (_test_command(command, COMMAND_SELECT_PP))
                 {
                     ESP_LOGI(TAG, "PP off");
+                    last_pp_state = AVR_PUMP_STATE_OFF;
                     control_reg &= ~AVR_REGISTER_CONTROL_SSR2;
+
+                    // If the CP pump *was* on, or should be on, turn it back on now
+                    if (last_cp_state == AVR_PUMP_STATE_ON)
+                    {
+                        ESP_LOGI(TAG, "CP on (PP inhibit removed)");
+                        control_reg |= AVR_REGISTER_CONTROL_SSR1;
+                    }
                 }
                 if (_test_command(command, COMMAND_SELECT_ALARM))
                 {

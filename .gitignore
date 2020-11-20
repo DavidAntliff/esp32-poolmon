@@ -1,4 +1,6 @@
 build/
 sdkconfig*
 !sdkconfig.defaults
+cmake-*/
+datastore.20*
 
