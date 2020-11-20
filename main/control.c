@@ -40,6 +40,10 @@
 #define POLL_PERIOD                  (1000)            // control loop period in milliseconds
 #define FLOW_RATE_MEASUREMENT_EXPIRY (15 * 1000000)    // microseconds
 #define PP_HOLD_OFF                  (30 * 1000000)    // to check for flow when CP is on, wait at least this many seconds before deciding to start PP if flow rate is below threshold
+#define TEMP_MEASUREMENT_EXPIRY      (15 * 1000000)    // microseconds
+
+#define ANTI_FREEZE_THRESHOLD_ON  (-2.0)  // degrees C at which CP turns on unconditionally to avoid freezing pipes
+#define ANTI_FREEZE_THRESHOLD_OFF (+2.0)  // degrees C at which CP is allowed to turn off
 
 #define TAG "control"
 
@@ -130,7 +134,7 @@ static void control_cp_task(void * pvParameter)
                     float delta = 0.0f;
                     datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_ON_DELTA, 0, &delta);
                     ESP_LOGD(TAG, "CP control loop: delta on %f", delta);
-                    if (t_high - t_low >= delta)
+                    if ((t_high - t_low >= delta) || (t_high <= ANTI_FREEZE_THRESHOLD_ON))
                     {
                         ESP_LOGI(TAG, "CP control loop: circulation pump ON");
                         datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Circulation pump on");
@@ -143,7 +147,7 @@ static void control_cp_task(void * pvParameter)
                     float delta = 0.0f;
                     datastore_get_float(datastore, RESOURCE_ID_CONTROL_CP_OFF_DELTA, 0, &delta);
                     ESP_LOGD(TAG, "CP control loop: delta off %f", delta);
-                    if (t_high - t_low <= delta)
+                    if ((t_high - t_low <= delta) && (t_high >= ANTI_FREEZE_THRESHOLD_OFF))
                     {
                         ESP_LOGI(TAG, "CP control loop: circulation pump OFF");
                         datastore_set_string(datastore, RESOURCE_ID_SYSTEM_LOG, 0, "Circulation pump off");
@@ -367,9 +371,19 @@ static void control_pp_task(void * pvParameter)
                         flow_rate_trigger = (cp_pump_state == AVR_PUMP_STATE_ON) && (flow_rate <= flow_threshold) && (cp_state_age > PP_HOLD_OFF);
                     }
 
-                    // New in 0.95 - always start the PP cycle when the CP is started to prevent running the CP dry for more than a few seconds
+                    // v0.95 - always start the PP cycle when the CP is started to prevent running the CP dry for more than a few seconds
+                    // v1.0 - only start the PP cycle when the CP is started if the array temperature is greater than the anti-freeze-off threshold
                     bool cp_start_trigger = false;
-                    if ((cp_pump_state == AVR_PUMP_STATE_ON) && (cp_state_age < PP_HOLD_OFF)) {
+
+                    datastore_age_t t_high_age = DATASTORE_INVALID_AGE;
+                    datastore_get_age(datastore, RESOURCE_ID_TEMP_VALUE, CONTROL_CP_SENSOR_HIGH_INSTANCE, &t_high_age);
+                    float t_high = 0.0f;
+                    datastore_get_float(datastore, RESOURCE_ID_TEMP_VALUE, CONTROL_CP_SENSOR_HIGH_INSTANCE, &t_high);
+
+                    // Add 1 degree C to threshold to ensure CP is off by the time we remove the PP inhibit
+                    bool antifreeze_not_active = (t_high_age < TEMP_MEASUREMENT_EXPIRY) && (t_high >= ANTI_FREEZE_THRESHOLD_OFF + 1);
+
+                    if ((cp_pump_state == AVR_PUMP_STATE_ON) && (antifreeze_not_active) && (cp_state_age < PP_HOLD_OFF)) {
                         ESP_LOGD(TAG, "PP control loop: cp state ON, age %" PRIu64 " < %d", cp_state_age, PP_HOLD_OFF);
                         cp_start_trigger = true;
                     }

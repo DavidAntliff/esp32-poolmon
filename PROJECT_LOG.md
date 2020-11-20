@@ -29,4 +29,7 @@ Address issue #3 [Inhibit Circulation Pump operation when purge pump is operatin
 
 Built with ESP-IDF v3.3 and installed via OTA.
 
+### v1.0
+
+Address issue #4 [Prevent potential freezing in winter by running circulation pump when array temperature is below threshold](https://github.com/DavidAntliff/esp32-poolmon/issues/4).
 

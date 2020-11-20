@@ -27,9 +27,9 @@
 
 #include "sdkconfig.h"
 
-#define VERSION "0.99"
+#define VERSION "1.0"
 
-#define SYSTEM_LEN_VERSION           6  // XX.XX + null
+#define SYSTEM_LEN_VERSION          6  // XX.XX + null
 #define SYSTEM_LEN_BUILD_DATE_TIME  16
 #define SYSTEM_LEN_BUILD_GIT_COMMIT (20 + 1)
 #define SYSTEM_LEN_BUILD_ESP_IDF_VERSION (32)
